@@ -99,9 +99,9 @@ const OPS = [
   return vec2(v * atan(a, b),
               sgn * v * log(xmax + sqrt_safe(xmax - 1.0)));
 }` },
-  { name:'Counterchange', fn:'opCounterchange', par:true, deps:[],
-    params:[['Mode',0,3,1,1,['stripes','checker','pinwheel','rings']],['Cell',0.02,2,0.01,0.5],['Angle\u00b0',-180,180,1,0]],
-    glsl:`vec2 opCounterchange(vec2 q, vec4 P, inout float par){
+  { name:'Counterchange', fn:'opCounterchange', ccop:true, deps:[],
+    params:[['Mode',0,3,1,1,['stripes','checker','pinwheel','rings']],['Cell',0.02,2,0.01,0.5],['Angle°',-180,180,1,0],['Recolor',0,4,1,1,['off','negate','hue 180°','desaturate','tint']]],
+    glsl:`vec2 opCounterchange(vec2 q, vec4 P, inout float par, inout float ccOp){
   float mode = P.x;
   float cell = max(P.y, 0.02);
   float a = P.z * DEG;
@@ -119,6 +119,7 @@ const OPS = [
     odd = mod(floor(length(u) / cell), 2.0);
   }
   par = mod(par + odd, 2.0);
+  ccOp = P.w;
   return q;
 }` },
   { name:'Kleinian', fn:'opKleinian', p2:true, deps:['ctanh'],
