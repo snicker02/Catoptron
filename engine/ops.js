@@ -894,5 +894,79 @@ const OPS = [
   float rp = pow(max(r, 1e-9), dist / power);
   return rp * vec2(cos(a), sin(a));
 }` },
+  { name:'BusyBrad', fn:'opBusybrad', deps:[],
+    params:[['Mode',0,2,1,2,['Susan','Jess','Combined']],['Grid size',0,4,0.01,1],['X offset',-2,2,0.01,0],['Y offset',-2,2,0.01,0],['Spin',-3.15,3.15,0.01,0.1],['Twist',-3,3,0.01,0.2],['Space',-2,2,0.01,0.4],['N',2,12,1,4],['Corner',1,8,1,1],['Mod spin',-3,3,0.01,0],['Mod twist',-3,3,0.01,0],['Sensen',0,1,1,0,['off','on']],['Sensen fold',0,4,0.01,1],['Amount',0.1,3,0.01,1]],
+    glsl:`vec2 opBusybrad(vec2 q, vec4 P, vec4 P2, vec4 P3, vec4 P4){
+  const float M_PI = 3.14159265359;
+  float mode = P.x;
+  float gridSize = P.y;
+  float xOffset = P.z;
+  float yOffset = P.w;
+  float spin = P2.x;
+  float twist = P2.y;
+  float space = P2.z;
+  float n = max(P2.w, 2.0);
+  float mod_spin = P3.y;
+  float mod_twist = P3.z;
+  float sensen_on = P3.w;
+  float sensen_fold = P4.x;
+  float amount = (P4.y <= 0.0) ? 1.0 : P4.y;
+
+  float cellCenterX = (gridSize == 0.0) ? 0.0 : gridSize * floor(q.x/gridSize + 0.5);
+  float cellCenterY = (gridSize == 0.0) ? 0.0 : gridSize * floor(q.y/gridSize + 0.5);
+  float local_x = (q.x - cellCenterX) - xOffset;
+  float local_y = (q.y - cellCenterY) + yOffset;
+  float tX = 0.0, tY = 0.0;
+
+  if(mode < 0.5){                                   // Susan
+    float rr = sqrt(local_x*local_x + local_y*local_y);
+    if(rr < amount){
+      float ang = atan(local_y, local_x) + spin + twist*(amount - rr);
+      float r2 = amount * rr;
+      tX = r2*cos(ang); tY = r2*sin(ang);
+    } else {
+      float r2 = (rr != 0.0) ? amount*(1.0 + space/rr) : 0.0;
+      tX = r2*local_x; tY = r2*local_y;
+    }
+  } else if(mode < 1.5){                            // Jess
+    float modulus = sqrt(local_x*local_x + local_y*local_y);
+    float theta_check = atan(local_y, local_x);
+    float r_poly = amount * cos(M_PI/n) / cos(theta_check - TAU/n*floor(n*theta_check/TAU + 0.5));
+    if(modulus < r_poly){
+      float twist_effect = (r_poly > 1e-9) ? twist*(r_poly - modulus)/r_poly : 0.0;
+      float theta = theta_check + spin + twist_effect;
+      tX = modulus*cos(theta); tY = modulus*sin(theta);
+    } else {
+      float nm = (modulus != 0.0) ? amount*(1.0 + space/modulus) : 0.0;
+      tX = nm*local_x; tY = nm*local_y;
+    }
+  } else {                                          // Combined
+    float rr = sqrt(local_x*local_x + local_y*local_y);
+    float modv = (rr != 0.0) ? amount*(1.0 + space/rr) : 0.0;
+    float dspin = spin + modv*mod_spin;
+    float dtwist = twist + modv*mod_twist;
+    float modulus = rr;
+    float theta_check = atan(local_y, local_x);
+    float r_poly = amount * cos(M_PI/n) / cos(theta_check - TAU/n*floor(n*theta_check/TAU + 0.5));
+    if(modulus < r_poly){
+      float twist_effect = (r_poly > 1e-9) ? dtwist*(r_poly - modulus)/r_poly : 0.0;
+      float theta = theta_check + dspin + twist_effect;
+      tX = modulus*cos(theta); tY = modulus*sin(theta);
+    } else {
+      tX = modv*local_x; tY = modv*local_y;
+    }
+  }
+
+  if(sensen_on > 0.5 && sensen_fold != 0.0){        // Sensen fold post-effect
+    float nr_x = floor(tX * sensen_fold);
+    float mx = mod(nr_x, 2.0);
+    if((nr_x >= 0.0 && mx > 0.5) || (nr_x < 0.0 && mx < 0.5)) tX = -tX;
+    float nr_y = floor(tY * sensen_fold);
+    float my = mod(nr_y, 2.0);
+    if((nr_y >= 0.0 && my > 0.5) || (nr_y < 0.0 && my < 0.5)) tY = -tY;
+  }
+
+  return vec2(cellCenterX + tX - xOffset, cellCenterY + tY + yOffset);
+}` },
 ];
 export { OPS };
