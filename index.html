@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hall of Mirrors</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#0b0e13;
+  --panel:#141922;
+  --panel2:#1a2130;
+  --edge:#2b3547;
+  --txt:#dde5f1;
+  --dim:#8a96ab;
+  --ice1:#8ab8ff;
+  --ice2:#c8ecff;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg);
+  color:var(--txt);
+  font-family:'Space Grotesk',system-ui,sans-serif;
+  overflow:hidden;
+  display:flex;flex-direction:column;
+}
+header{
+  display:flex;align-items:baseline;gap:14px;
+  padding:12px 18px 10px;
+  border-bottom:1px solid var(--edge);
+  background:linear-gradient(180deg,#131824,#0e1119);
+  flex:0 0 auto;
+}
+header h1{
+  font-size:17px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  background:linear-gradient(100deg,#f2f7ff 0%,var(--ice1) 45%,#f2f7ff 60%,#6f87ad 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+header .sub{font-family:var(--mono);font-size:11px;color:var(--dim)}
+header .spacer{flex:1}
+header .hint{font-family:var(--mono);font-size:10.5px;color:#5c6880}
+header button{
+  font-family:var(--mono);font-size:11px;font-weight:500;
+  color:var(--txt);background:linear-gradient(180deg,#232c3e,#1a2130);
+  border:1px solid #34405a;border-radius:6px;padding:4px 12px;cursor:pointer;
+  align-self:center;transition:border-color .15s,color .15s;
+}
+header button:hover{border-color:var(--ice1);color:var(--ice2)}
+header button.on{border-color:var(--ice1);color:var(--ice2);box-shadow:inset 0 0 10px rgba(138,184,255,.15)}
+main{flex:1;display:flex;min-height:0}
+#stage{
+  flex:1;position:relative;min-width:0;
+  background:radial-gradient(1200px 700px at 50% 40%, #121826 0%, #0a0d12 70%);
+  display:flex;align-items:center;justify-content:center;
+}
+#glc{width:100%;height:100%;display:block;cursor:crosshair;touch-action:none}
+#stage.drag::after{
+  content:"drop image";
+  position:absolute;inset:14px;border:1px dashed var(--ice1);border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:13px;letter-spacing:.2em;color:var(--ice2);
+  background:rgba(10,16,28,.55);backdrop-filter:blur(2px);
+  pointer-events:none;
+}
+#panel{
+  flex:0 0 312px;overflow-y:auto;
+  background:var(--panel);
+  border-left:1px solid var(--edge);
+  padding:14px 14px 40px;
+  scrollbar-width:thin;scrollbar-color:#2c3850 transparent;
+}
+.group{
+  border:1px solid var(--edge);border-radius:8px;
+  background:linear-gradient(180deg,var(--panel2),#161c28);
+  padding:10px 12px 12px;margin-bottom:12px;
+  position:relative;
+}
+.group::before{
+  content:"";position:absolute;inset:0;border-radius:8px;pointer-events:none;
+  border-top:1px solid rgba(200,230,255,.10);
+}
+.group h2{
+  font-size:10px;font-weight:500;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:9px;font-family:var(--mono);
+}
+.row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.row:last-child{margin-bottom:0}
+.row label{flex:0 0 78px;font-size:12px;color:#b7c2d6}
+
+/* Clean, inline text field treatment for slider readouts */
+.row .val {
+  flex:0 0 52px;
+  text-align:right;
+  font-family:var(--mono);
+  font-size:11px;
+  color:var(--ice2);
+  background:transparent;
+  border:none;
+  border-bottom:1px dashed #3a4a68;
+  padding:0;
+  outline:none;
+  min-width:0;
+  cursor:text;
+}
+.row .val:hover{border-bottom-color:#5a6f98}
+.row .val:focus{border-bottom-color:var(--ice1);color:#ffffff}
+.row .val::-webkit-inner-spin-button, .row .val::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+.row .val { -moz-appearance:textfield; }
+span.val { border-bottom:none !important; cursor:default !important; }
+
+input[type=range]{
+  flex:1;appearance:none;height:3px;border-radius:2px;
+  background:linear-gradient(90deg,#33415c,#22293a);outline:none;min-width:0;
+}
+input[type=range]::-webkit-slider-thumb{
+  appearance:none;width:13px;height:13px;border-radius:50%;
+  background:linear-gradient(160deg,#eef6ff,#8ab8ff 70%);
+  border:1px solid #0b0e13;box-shadow:0 0 0 1px #48597a;cursor:ew-resize;
+}
+input[type=range]::-moz-range-thumb{
+  width:12px;height:12px;border-radius:50%;
+  background:linear-gradient(160deg,#eef6ff,#8ab8ff 70%);
+  border:1px solid #0b0e13;box-shadow:0 0 0 1px #48597a;cursor:ew-resize;
+}
+.btns{display:flex;gap:6px;flex-wrap:wrap}
+button,.filebtn,select{
+  font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:500;
+  color:var(--txt);background:linear-gradient(180deg,#232c3e,#1a2130);
+  border:1px solid #34405a;border-radius:6px;padding:7px 10px;cursor:pointer;
+  transition:border-color .15s, color .15s;
+  flex:1;text-align:center;white-space:nowrap;
+}
+button:hover,.filebtn:hover,select:hover{border-color:var(--ice1);color:var(--ice2)}
+select{text-align:left}
+select option, select optgroup{
+  background:#10141c;
+  color:#f2f6fc;
+}
+select option:checked{
+  background:#2c3c5c;
+  color:#ffffff;
+}
+button.mode.on{
+  background:linear-gradient(180deg,#2c3c5c,#233048);
+  border-color:var(--ice1);color:var(--ice2);
+  box-shadow:inset 0 0 12px rgba(138,184,255,.12);
+}
+button.toggle.on{border-color:var(--ice1);color:var(--ice2)}
+button.rec.on{border-color:#ff7a7a;color:#ffb3b3;box-shadow:inset 0 0 12px rgba(255,122,122,.12)}
+input[type=color]{
+  flex:0 0 34px;height:24px;border:1px solid #34405a;border-radius:5px;
+  background:none;padding:1px;cursor:pointer;
+}
+input[type=file]{display:none}
+.note{font-family:var(--mono);font-size:10px;color:#5f6c84;line-height:1.5;margin-top:8px}
+/* fold stack */
+.op{
+  border:1px solid #26304a;border-radius:6px;background:#151b28;
+  padding:7px 8px 8px;margin-bottom:8px;
+}
+.ophead{display:flex;gap:4px;margin-bottom:6px}
+.ophead select{flex:1;padding:5px 8px}
+.ophead button{flex:0 0 26px;padding:4px 0;font-family:var(--mono);font-size:11px}
+.op .row label{flex:0 0 64px;font-size:11px}
+.op .row .val{flex:0 0 46px;font-size:10.5px}
+#stackList:empty::after{
+  content:"empty stack — the raw photo feeds the renderer";
+  display:block;font-family:var(--mono);font-size:10px;color:#5f6c84;
+  padding:4px 2px 8px;
+}
+#toast{
+  position:absolute;left:50%;bottom:18px;transform:translateX(-50%) translateY(8px);
+  font-family:var(--mono);font-size:11px;color:var(--ice2);
+  background:#141b28e6;border:1px solid #34405a;border-radius:6px;
+  padding:6px 12px;opacity:0;transition:opacity .25s, transform .25s;pointer-events:none;
+  max-width:80%;text-align:center;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media (max-width:760px){
+  body{overflow:auto}
+  main{flex-direction:column}
+  #stage{flex:0 0 55vh}
+  #panel{flex:1;border-left:none;border-top:1px solid var(--edge)}
+}
+@media (prefers-reduced-motion:reduce){ #toast{transition:none} }
+</style>
+</head>
+<body>
+<header>
+  <h1>Hall of Mirrors</h1>
+  <span class="sub">fold-stack photo reflector</span>
+  <span class="spacer"></span>
+  <button id="pauseBtn" title="Pause / resume animation (Space)">&#10074;&#10074;</button>
+  <span class="hint">drop / paste an image &nbsp;·&nbsp; drag canvas = vanishing point &nbsp;·&nbsp; dbl-click = recenter</span>
+</header>
+<main>
+  <div id="stage">
+    <canvas id="glc"></canvas>
+    <div id="toast"></div>
+  </div>
+  <div id="panel">
+
+    <div class="group">
+      <h2>Image</h2>
+      <div class="btns">
+        <label class="filebtn" for="file">Load image</label>
+        <button id="exportBtn">Export PNG</button>
+        <select id="exportScale" style="flex:0 0 auto" title="Export size (× viewer resolution — export matches exactly what you see)">
+          <option value="1">1×</option>
+          <option value="2" selected>2×</option>
+          <option value="4">4×</option>
+        </select>
+      </div>
+      <div class="btns" style="margin-top:6px">
+        <button id="hqStillBtn">HQ Still</button>
+        <select id="hqStillSize" style="flex:0 0 auto" title="HQ still height — rendered at 2× and downsampled for anti-aliasing">
+          <option value="1080" selected>1080p</option>
+          <option value="1440">1440p</option>
+          <option value="2160">2160p</option>
+        </select>
+      </div>
+      <input type="file" id="file" accept="image/*">
+      <div class="row" style="margin-top:8px">
+        <label style="flex:0 0 60px">Source</label>
+        <select id="srcSel" style="flex:1" title="Load a photo or pick a built-in probe pattern">
+          <option value="user">user image</option>
+          <option value="orbs" selected>orbs</option>
+          <option value="plasma">plasma</option>
+          <option value="grid">grid probe</option>
+          <option value="polar">polar probe</option>
+          <option value="checker">checker probe</option>
+        </select>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label style="flex:0 0 60px">Aspect</label>
+        <select id="aspectSel" style="flex:1" title="Lock the viewer (and exports) to a fixed aspect ratio">
+          <option value="free" selected>free (window)</option>
+          <option value="src">source image</option>
+          <option value="1:1">1:1 square</option>
+          <option value="4:5">4:5 portrait</option>
+          <option value="3:4">3:4 portrait</option>
+          <option value="2:3">2:3 portrait</option>
+          <option value="9:16">9:16 reel</option>
+          <option value="4:3">4:3 landscape</option>
+          <option value="3:2">3:2 landscape</option>
+          <option value="16:9">16:9 wide</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>Presets</h2>
+      <div class="btns">
+        <select id="presetSel" style="flex:1 1 100%"></select>
+      </div>
+      <div class="btns" style="margin-top:6px">
+        <button id="savePreset">Save</button>
+        <button id="exportPresets">Export</button>
+        <label class="filebtn" for="importPresets">Import</label>
+      </div>
+      <div class="btns" style="margin-top:6px">
+        <button id="copyPreset" title="Copy the current recipe to the clipboard as JSON">Copy</button>
+        <button id="pastePreset" title="Load a recipe from clipboard JSON">Paste</button>
+      </div>
+      <input type="file" id="importPresets" accept=".json,application/json">
+      <div class="row" id="saveRow" style="display:none; margin-top:6px; gap:6px">
+        <input type="text" id="saveName" placeholder="preset name" style="flex:1">
+        <button id="saveOk">OK</button>
+        <button id="saveCancel">Cancel</button>
+      </div>
+      <div class="row" id="clipRow" style="display:none; margin-top:6px; gap:6px; flex-wrap:wrap">
+        <input type="text" id="clipText" placeholder="recipe JSON" style="flex:1 1 100%">
+        <button id="clipLoad">Load</button>
+        <button id="clipClose">Close</button>
+      </div>
+      <div class="note">Save snapshots the whole recipe. Export / import moves your preset library as JSON.</div>
+    </div>
+
+    <div class="group">
+      <h2>Fold stack</h2>
+      <div id="stackList"></div>
+      <div class="btns">
+        <select id="addOpSel" style="flex:1"></select>
+        <button id="addOp" style="flex:0 0 auto">+ add</button>
+      </div>
+      <div class="note">Folds run top to bottom, then feed the renderer. Order matters — reordering the same folds makes a different mirror.</div>
+    </div>
+
+    <div class="group">
+      <h2>Renderer</h2>
+      <div class="btns" style="margin-bottom:8px">
+        <button class="mode on" data-rend="0">Panes</button>
+        <button class="mode" data-rend="1">Droste</button>
+        <button class="mode" data-rend="2">Room</button>
+        <button class="mode" data-rend="3">Tube</button>
+        <button class="mode" data-rend="4">Strip</button>
+        <button class="mode" data-rend="5">Feedback</button>
+      </div>
+      <div class="row" id="depthRow"><label>Depth</label><input type="range" id="depth" min="1" max="60" step="1" value="14"><span class="val" id="depthV"></span></div>
+      <div class="row" id="fbRow" style="display:none"><label>Feedback</label><input type="range" id="fbAmt" min="0" max="0.98" step="0.005" value="0.9"><span class="val" id="fbAmtV"></span></div>
+      <div class="row"><label id="stepLbl">Step scale</label><input type="range" id="step" min="0.42" max="0.94" step="0.005" value="0.72"><span class="val" id="stepV"></span></div>
+      <div class="row"><label id="twistLbl">Twist</label><input type="range" id="twist" min="-90" max="90" step="0.5" value="8"><span class="val" id="twistV"></span></div>
+      <div class="row"><label>Shift X</label><input type="range" id="shiftX" min="-0.2" max="0.2" step="0.001" value="0"><span class="val" id="shiftXV"></span></div>
+      <div class="row"><label>Shift Y</label><input type="range" id="shiftY" min="-0.2" max="0.2" step="0.001" value="0"><span class="val" id="shiftYV"></span></div>
+      <div class="row"><label>Zoom</label><input type="range" id="zoom" min="0.02" max="2.5" step="0.005" value="1"><span class="val" id="zoomV"></span></div>
+      <div class="row">
+        <label>Alt. flip</label>
+        <button class="toggle on" id="flip" style="flex:0 0 auto;padding:5px 12px">mirrored</button>
+      </div>
+      <div class="note" id="rendNote"></div>
+    </div>
+
+    <div class="group">
+      <h2>Glass</h2>
+      <div class="row"><label>Frame</label><input type="range" id="frame" min="0" max="1" step="0.01" value="0.45"><span class="val" id="frameV"></span></div>
+      <div class="row"><label>Frame width</label><input type="range" id="frameW" min="0.004" max="0.15" step="0.001" value="0.035"><span class="val" id="frameWV"></span></div>
+      <div class="row"><label>Tint</label><input type="color" id="tintC" value="#5d8f86"><input type="range" id="tintA" min="0" max="1" step="0.01" value="0.30"><span class="val" id="tintAV"></span></div>
+      <div class="row">
+        <label title="What the Counterchange fold does to odd cells">Counterchange</label>
+        <select id="ccMode" style="flex:1">
+          <option value="0" selected>off</option>
+          <option value="1">negate</option>
+          <option value="2">hue 180&deg;</option>
+          <option value="3">desaturate</option>
+          <option value="4">tint</option>
+        </select>
+        <input type="color" id="ccTint" value="#ff5d7a">
+      </div>
+      <div class="note">Two-colour symmetry: mirrors flip colour as well as position. Any reflection (Polar fold, Mirror line, Frieze, Wallpaper, Pleat) feeds this; the Counterchange fold adds an explicit stripe/checker parity.</div>
+      <div class="row"><label>Hue / depth</label><input type="range" id="hue" min="-60" max="60" step="0.5" value="0"><span class="val" id="hueV"></span></div>
+      <div class="row"><label>Chroma</label><input type="range" id="chroma" min="0" max="3" step="0.01" value="0"><span class="val" id="chromaV"></span></div>
+      <div class="row"><label>Ripple</label><input type="range" id="ripple" min="0" max="1" step="0.01" value="0"><span class="val" id="rippleV"></span></div>
+      <div class="row"><label>Vignette</label><input type="range" id="vign" min="0" max="1" step="0.01" value="0.35"><span class="val" id="vignV"></span></div>
+      <div class="row"><label>Grain</label><input type="range" id="grain" min="0" max="1" step="0.01" value="0.06"><span class="val" id="grainV"></span></div>
+    </div>
+
+    <div class="group">
+      <h2>Motion</h2>
+      <div class="row"><label>Drift</label><input type="range" id="drift" min="-1" max="1" step="0.01" value="0.15"><span class="val" id="driftV"></span></div>
+      <div class="row"><label>Spin</label><input type="range" id="spin" min="-1" max="1" step="0.01" value="0"><span class="val" id="spinV"></span></div>
+      <div class="row"><label>Rotate</label><input type="range" id="rot" min="-180" max="180" step="1" value="0"><span class="val" id="rotV"></span></div>
+      <div class="row"><label>Wobble</label><input type="range" id="wobble" min="0" max="2" step="0.01" value="0.6"><span class="val" id="wobbleV"></span></div>
+      <div class="note">Drift falls through the reflections, spin rotates everything, wobble animates sine-warp folds &amp; ripple.</div>
+    </div>
+
+    <div class="group">
+      <h2>Record</h2>
+      <div class="btns">
+        <select id="recFps" style="flex:1"><option value="30">30 fps</option><option value="60" selected>60 fps</option></select>
+        <select id="recQ" style="flex:1"><option value="8">8 Mbps</option><option value="16" selected>16 Mbps</option><option value="32">32 Mbps</option></select>
+        <select id="recLen" style="flex:1">
+          <option value="loop1" selected>1 loop</option>
+          <option value="loop2">2 loops</option>
+          <option value="5">5 s</option>
+          <option value="10">10 s</option>
+          <option value="30">30 s</option>
+          <option value="manual">manual</option>
+        </select>
+      </div>
+      <div class="btns" style="margin-top:6px"><button id="recBtn" class="rec">Record WebM</button></div>
+      <div class="btns" style="margin-top:6px">
+        <select id="hqSize" style="flex:1">
+          <option value="1080" selected>1080p</option>
+          <option value="1440">1440p</option>
+          <option value="2160">2160p</option>
+        </select>
+        <button id="hqBtn" class="rec" style="flex:1.2">HQ Video</button>
+      </div>
+      <div class="note">Record captures the live canvas in realtime. HQ Video renders offline frame-by-frame via WebCodecs &mdash; loops close exactly, and Feedback history is rebuilt at export resolution. HQ Still lives up in the Image group.</div>
+    </div>
+
+    <div class="group">
+      <h2>Chance</h2>
+      <div class="btns">
+        <button id="rand">Randomize</button>
+        <button id="reseed">Reseed</button>
+        <button id="reset">Reset</button>
+      </div>
+      <div class="note">Randomize invents a fold stack. Reseed rerolls Shatter patterns.</div>
+    </div>
+
+  </div>
+</main>
+<script type="module" src="./main.js"></script>
+</body>
+</html>

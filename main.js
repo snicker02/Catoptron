@@ -1,0 +1,1461 @@
+"use strict";
+import { OPS } from './engine/ops.js';
+import { MAX_OPS } from './engine/assemble.js';
+import { createProgramCache } from './engine/glcache.js';
+
+/* ================= GL setup ================= */
+const canvas = document.getElementById('glc');
+const gl = canvas.getContext('webgl', {preserveDrawingBuffer:true, antialias:true});
+if(!gl){ document.getElementById('stage').textContent = 'WebGL is not available in this browser.'; }
+
+const VS = `
+attribute vec2 aPos;
+varying vec2 vUv;
+void main(){ vUv = aPos*0.5+0.5; gl_Position = vec4(aPos,0.,1.); }`;
+
+/* post pass for the feedback renderer: vignette + grain applied outside the loop */
+const POSTFS = `
+precision highp float;
+varying vec2 vUv;
+uniform sampler2D uSrc;
+uniform float uVign;
+uniform float uGrain;
+uniform float uWavePh;
+uniform float uSeed;
+float hash1(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)) + uSeed)*43758.5453); }
+void main(){
+  vec3 col = texture2D(uSrc, vUv).rgb;
+  vec2 vq = vUv - 0.5;
+  col *= 1.0 - uVign * smoothstep(0.35, 0.95, dot(vq, vq)*2.2);
+  if(uGrain > 0.001){
+    col += (hash1(gl_FragCoord.xy * 0.71 + fract(uWavePh)*7.0) - 0.5) * uGrain * 0.14;
+  }
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+function compile(type, src){
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+  return s;
+}
+
+/* shared fullscreen-triangle buffer (bound per-program to that program's aPos location) */
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+
+function bindQuad(loc2){
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.enableVertexAttribArray(loc2);
+  gl.vertexAttribPointer(loc2, 2, gl.FLOAT, false, 0, 0);
+}
+
+/* post program (feedback vignette/grain pass) — static */
+const postProg = gl.createProgram();
+gl.attachShader(postProg, compile(gl.VERTEX_SHADER, VS));
+gl.attachShader(postProg, compile(gl.FRAGMENT_SHADER, POSTFS));
+gl.linkProgram(postProg);
+if(!gl.getProgramParameter(postProg, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(postProg));
+const PU = {};
+['uSrc','uVign','uGrain','uWavePh','uSeed'].forEach(n => PU[n] = gl.getUniformLocation(postProg, n));
+const postLoc = gl.getAttribLocation(postProg, 'aPos');
+
+/* ================= assembled-program cache ================= */
+/* the fold shader is assembled per stack+renderer; each program has its own uniform locations */
+const UNIFORM_SCALARS = ['uTex','uCanvas','uImg','uDepth','uStep','uTwist','uFlip','uCenter','uShift',
+  'uZoom','uFrame','uFrameW','uTint','uTintA','uHueK','uChroma','uRipple','uVign','uGrain','uPhase',
+  'uSpinA','uWavePh','uSeed','uPrev','uFbAmt','uCcMode','uCcTint','uPost'];
+const UNIFORM_NAMES = [...UNIFORM_SCALARS];
+for(let i = 0; i < MAX_OPS; i++) UNIFORM_NAMES.push(`uOpP[${i}]`, `uOpP2[${i}]`, `uOpO[${i}]`);
+const cache = createProgramCache(gl, UNIFORM_NAMES);
+let curEntry = null;
+let shaderErrShown = false;
+
+/* ================= texture ================= */
+const tex = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, tex);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+let imgW = 1024, imgH = 1024;
+
+function setImage(source, w, h){
+  imgW = w; imgH = h;
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+}
+
+/* ================= source generators (probes) ================= */
+function srand(seed){
+  let a = (Math.floor(seed * 1e6) >>> 0) || 1;
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function genGrid(x, s){
+  x.fillStyle = '#f4f1ea'; x.fillRect(0, 0, s, s);
+  const q = [['#dce8f8',0,0], ['#f8ecdc',s/2,0], ['#dff3df',0,s/2], ['#f5dfee',s/2,s/2]];
+  x.globalAlpha = 0.55;
+  q.forEach(([c,px,py])=>{ x.fillStyle = c; x.fillRect(px, py, s/2, s/2); });
+  x.globalAlpha = 1;
+  const line = (x1,y1,x2,y2)=>{ x.beginPath(); x.moveTo(x1,y1); x.lineTo(x2,y2); x.stroke(); };
+  x.strokeStyle = 'rgba(60,80,110,0.22)'; x.lineWidth = 1;
+  for(let i = 0; i <= 32; i++){ const p = i*s/32; line(p,0,p,s); line(0,p,s,p); }
+  x.strokeStyle = 'rgba(40,58,88,0.45)'; x.lineWidth = 2;
+  for(let i = 0; i <= 8; i++){ const p = i*s/8; line(p,0,p,s); line(0,p,s,p); }
+  x.lineWidth = 5;
+  x.strokeStyle = '#c0392b'; line(0, s/2, s, s/2);      // x-axis
+  x.strokeStyle = '#2b5fc0'; line(s/2, 0, s/2, s);      // y-axis
+  x.strokeStyle = '#0e7d6d'; x.lineWidth = 4;
+  x.beginPath(); x.arc(s/2, s/2, s*0.25, 0, 7); x.stroke();
+  x.setLineDash([10, 8]);
+  x.beginPath(); x.arc(s/2, s/2, s*0.375, 0, 7); x.stroke();
+  x.setLineDash([]);
+  x.fillStyle = '#1b2333';
+  x.beginPath(); x.arc(s/2, s/2, 8, 0, 7); x.fill();
+}
+
+function genPolar(x, s){
+  const cx = s/2, cy = s/2, R = s*0.75;
+  for(let a = 0; a < 360; a++){
+    x.fillStyle = `hsl(${a},70%,55%)`;
+    x.beginPath(); x.moveTo(cx, cy);
+    x.arc(cx, cy, R, (a-90)*Math.PI/180, (a-88.85)*Math.PI/180);
+    x.fill();
+  }
+  x.strokeStyle = 'rgba(10,12,22,0.6)';
+  for(let i = 1; i <= 12; i++){
+    x.lineWidth = (i % 4 === 0) ? 4 : 1.5;
+    x.beginPath(); x.arc(cx, cy, i*s/16, 0, 7); x.stroke();
+  }
+  for(let a = 0; a < 360; a += 15){
+    const heavy = a % 90 === 0;
+    x.strokeStyle = heavy ? 'rgba(255,255,255,0.9)' : 'rgba(10,12,22,0.5)';
+    x.lineWidth = heavy ? 4 : 1.5;
+    x.beginPath(); x.moveTo(cx, cy);
+    x.lineTo(cx + R*Math.cos((a-90)*Math.PI/180), cy + R*Math.sin((a-90)*Math.PI/180));
+    x.stroke();
+  }
+  x.fillStyle = '#fff';
+  x.beginPath(); x.arc(cx, cy, 10, 0, 7); x.fill();
+}
+
+function genChecker(x, s){
+  const hues = [210, 40, 150, 320];
+  const n = 8;
+  for(let j = 0; j < n; j++) for(let i = 0; i < n; i++){
+    const qi = (i < n/2 ? 0 : 1) + (j < n/2 ? 0 : 2);
+    const dark = (i + j) % 2 === 0;
+    x.fillStyle = `hsl(${hues[qi]},55%,${dark ? 30 : 72}%)`;
+    x.fillRect(i*s/n, j*s/n, s/n, s/n);
+  }
+  x.strokeStyle = 'rgba(255,255,255,0.85)'; x.lineWidth = 3;
+  x.beginPath(); x.moveTo(s/2, 0); x.lineTo(s/2, s); x.moveTo(0, s/2); x.lineTo(s, s/2); x.stroke();
+  /* orientation arrows: one per quadrant, pointing to its outer corner (flips become visible) */
+  const arrow = (cx, cy, ang)=>{
+    x.save(); x.translate(cx, cy); x.rotate(ang);
+    x.strokeStyle = '#fff'; x.fillStyle = '#fff'; x.lineWidth = 8; x.lineCap = 'round';
+    x.beginPath(); x.moveTo(-s*0.07, 0); x.lineTo(s*0.06, 0); x.stroke();
+    x.beginPath(); x.moveTo(s*0.06, -s*0.035); x.lineTo(s*0.11, 0); x.lineTo(s*0.06, s*0.035); x.closePath(); x.fill();
+    x.restore();
+  };
+  arrow(s*0.25, s*0.25, -3*Math.PI/4);
+  arrow(s*0.75, s*0.25, -Math.PI/4);
+  arrow(s*0.25, s*0.75,  3*Math.PI/4);
+  arrow(s*0.75, s*0.75,  Math.PI/4);
+}
+
+function genPlasma(x, s, R){
+  const oct = 4, lat = [];
+  for(let o = 0; o < oct; o++){
+    const n = (1 << o)*4 + 1;
+    const g = new Float32Array(n*n);
+    for(let i = 0; i < n*n; i++) g[i] = R();
+    lat.push({n, g});
+  }
+  const sm = t => t*t*(3 - 2*t);
+  const val = (o, u, v)=>{
+    const {n, g} = lat[o];
+    const X = u*(n-1), Y = v*(n-1);
+    const xi = Math.min(n-2, X|0), yi = Math.min(n-2, Y|0);
+    const fx = sm(X - xi), fy = sm(Y - yi);
+    const a = g[yi*n+xi], b = g[yi*n+xi+1], c = g[(yi+1)*n+xi], e = g[(yi+1)*n+xi+1];
+    return a + (b-a)*fx + (c-a)*fy + (a-b-c+e)*fx*fy;
+  };
+  const ph = R();
+  const img = x.createImageData(s, s), d = img.data;
+  const pal = (t, c, dd)=> 0.5 + 0.5*Math.cos(6.28318*(c*t + dd));
+  let p = 0;
+  for(let y = 0; y < s; y++){
+    const v = y/s;
+    for(let xx = 0; xx < s; xx++){
+      const u = xx/s;
+      let t = 0, amp = 0.5, tot = 0;
+      for(let o = 0; o < oct; o++){ t += val(o, u, v)*amp; tot += amp; amp *= 0.55; }
+      t /= tot;
+      d[p++] = 255*pal(t, 1.0, ph);
+      d[p++] = 255*pal(t, 0.9, ph + 0.18);
+      d[p++] = 255*pal(t, 0.8, ph + 0.38);
+      d[p++] = 255;
+    }
+  }
+  x.putImageData(img, 0, 0);
+}
+
+function genOrbs(x, s, R){
+  const g = x.createLinearGradient(0, 0, s, s);
+  const h0 = R()*360;
+  g.addColorStop(0, `hsl(${h0},45%,16%)`);
+  g.addColorStop(0.5, `hsl(${(h0+90)%360},40%,28%)`);
+  g.addColorStop(1, `hsl(${(h0+200)%360},55%,45%)`);
+  x.fillStyle = g; x.fillRect(0, 0, s, s);
+  for(let i = 0; i < 8; i++){
+    const px = R()*s, py = R()*s, r = s*(0.08 + R()*0.22);
+    const hue = (h0 + R()*220) % 360;
+    const rg = x.createRadialGradient(px, py, r*0.1, px, py, r);
+    rg.addColorStop(0, `hsla(${hue},85%,68%,0.85)`);
+    rg.addColorStop(1, 'hsla(0,0%,0%,0)');
+    x.fillStyle = rg;
+    x.beginPath(); x.arc(px, py, r, 0, 7); x.fill();
+  }
+  x.strokeStyle = 'rgba(255,255,255,0.5)'; x.lineWidth = 5;
+  x.beginPath();
+  x.arc(s*(0.3 + R()*0.4), s*(0.3 + R()*0.4), s*(0.1 + R()*0.12), R()*3, 3 + R()*3);
+  x.stroke();
+}
+
+const GENS = {
+  grid:    {seeded: false, fn: genGrid},
+  polar:   {seeded: false, fn: genPolar},
+  checker: {seeded: false, fn: genChecker},
+  plasma:  {seeded: true,  fn: genPlasma},
+  orbs:    {seeded: true,  fn: genOrbs},
+};
+
+function applySource(){
+  if(!GENS[state.src]) return;   // 'user': leave the loaded texture alone
+  const s = 1024, cv = document.createElement('canvas');
+  cv.width = cv.height = s;
+  const ctx = cv.getContext('2d');
+  GENS[state.src].fn(ctx, s, srand(state.seed));
+  setImage(cv, s, s);
+}
+
+/* ================= state ================= */
+function defaultOp(t){
+  return { t, p: OPS[t].params.map(pr => pr[4]), o: [0, 0] };
+}
+const state = {
+  rend: 0,
+  stack: [],
+  depth: 14, step: 0.72, twist: 8, flip: 1,
+  shiftX: 0, shiftY: 0, zoom: 1,
+  frame: 0.45, frameW: 0.035, tint: '#5d8f86', tintA: 0.30,
+  hue: 0, chroma: 0, ripple: 0, vign: 0.35, grain: 0.06,
+  drift: 0.15, spin: 0, wobble: 0.6, rot: 0,
+  cx: 0.5, cy: 0.5, seed: 7.13, aspect: 'free', fbAmt: 0.9, src: 'orbs',
+  ccMode: 0, ccTint: '#ff5d7a'
+};
+const defaults = JSON.parse(JSON.stringify(state));
+
+const rendNotes = [
+  'Facing mirrors: discrete panes scale toward the vanishing point. Depth = pane count.',
+  'Continuous log-polar spiral. Twist shears the spiral; depth is infinite.',
+  'Perspective raycast down an infinite mirrored box. Step = pane length, twist = spiral roll.',
+  'Infinite mirrored pipe: cylindrical raycast down the bore. Step = pane length, twist = spiral roll.',
+  'Parallel facing mirrors seen side-on: bands recede both directions. Step = band width, twist = skew.',
+  'Optical feedback: every frame re-enters through the folds. Pull draws inward, Feedback sets persistence, glass applies per generation. Causal \u2014 loop recordings won\u2019t seam.'
+];
+
+/* ================= presets (lite set uses operator indices 0\u201314) ================= */
+const FACTORY = [
+  {name:'Corridor',            d:{rend:0, stack:[], step:0.72, twist:8, depth:14}},
+  {name:'Kaleido',             d:{rend:0, stack:[{t:0,p:[8,0]}], step:0.72, twist:8, depth:14}},
+  {name:'Droste spiral',       d:{rend:1, stack:[], step:0.72, twist:12}},
+  {name:'Mirror pipe',         d:{rend:3, stack:[], step:0.62, twist:4}},
+  {name:'Infinity room',       d:{rend:2, stack:[], step:0.72, twist:0}},
+  {name:'Between mirrors',     d:{rend:4, stack:[], step:0.7, twist:0}},
+  {name:'Feedback well',       d:{rend:5, stack:[], step:0.6, twist:12}},
+  {name:'Feedback mandala',    d:{rend:5, stack:[{t:0,p:[6,0]}], step:0.66, twist:8}},
+  {name:'Shattered',           d:{rend:0, stack:[{t:6,p:[3,0.8]}], step:0.72, twist:0, depth:8}},
+  {name:'Swirl well',          d:{rend:1, stack:[{t:4,p:[2.5]}], step:0.7, twist:0}},
+  {name:'Spiral bloom',        d:{rend:1, stack:[{t:5,p:[0.8]},{t:0,p:[10,0]}], step:0.68, twist:20}},
+  {name:'Bipolar bands',       d:{rend:0, stack:[{t:7,p:[1,0]}], step:0.75, twist:0, depth:10, src:'grid'}},
+  {name:'Elliptic strip',      d:{rend:0, stack:[{t:8,p:[1,0]}], step:0.75, twist:0, depth:10, src:'grid'}},
+  {name:'Kleinian gasket',     d:{rend:0, stack:[{t:10,p:[5,1,16,0.9,1,0,0,0]}], step:0.8, twist:0, depth:4, src:'plasma'}},
+  {name:'Kleinian spiral',     d:{rend:0, stack:[{t:10,p:[6,0.96,18,0.9,1,18,0,0]}], step:0.8, twist:0, depth:4, src:'plasma'}},
+  {name:'Kleinian strip',      d:{rend:0, stack:[{t:10,p:[5,1,16,1.1,1,0,0,1]}], step:0.8, twist:0, depth:4, src:'plasma'}},
+  {name:'Mobius warp',         d:{rend:0, stack:[{t:11,p:[1.5,0.5,0,0,2,0,0.5,-0.5]}], step:0.8, twist:0, depth:6, src:'grid'}},
+  {name:'Fuchsian torus',      d:{rend:0, stack:[{t:12,p:[3,0,3,0,0,3,0,16]}], step:0.8, twist:0, depth:5, src:'grid'}},
+  {name:'Quasi-Fuchsian',      d:{rend:0, stack:[{t:12,p:[1.91,0.05,2,0,0,0,0,16]}], step:0.8, twist:0, depth:5, src:'plasma'}},
+  {name:'Juliascope',          d:{rend:0, stack:[{t:13,p:[5,1,0,1]}], step:0.8, twist:0, depth:6, src:'plasma'}},
+  {name:'Juliascope 2-color',  d:{rend:0, stack:[{t:13,p:[6,1,0,1]}], step:0.8, twist:0, depth:6, src:'plasma', ccMode:1}},
+  {name:'Golden spiral',       d:{rend:0, stack:[{t:14,p:[1.618,90,1,0]}], step:0.8, twist:0, depth:6, src:'plasma'}},
+  {name:'Similarity rings',    d:{rend:0, stack:[{t:14,p:[2,0,1,0]}], step:0.8, twist:0, depth:6, src:'grid'}},
+  {name:'Counterchange kaleido',d:{rend:0, stack:[{t:0,p:[6,0]}], step:0.8, twist:0, depth:8, src:'plasma', ccMode:1}},
+  {name:'Counterchange checker',d:{rend:0, stack:[{t:9,p:[1,0.5,0]}], step:0.8, twist:0, depth:6, src:'plasma', ccMode:4}},
+  {name:'Mosaic well',         d:{rend:1, stack:[{t:3,p:[22]},{t:5,p:[1.5]}], step:0.7, twist:0}},
+];
+let customPresets = [];
+
+/* ================= UI plumbing ================= */
+const $ = id => document.getElementById(id);
+const sliders = [
+  ['depth','depthV',    v=>v.toFixed(0)],
+  ['fbAmt','fbAmtV',   v=>v.toFixed(3)],
+  ['step','stepV',     v=>v.toFixed(3)],
+  ['twist','twistV',    v=>v.toFixed(1)],
+  ['shiftX','shiftXV',v=>v.toFixed(3)],
+  ['shiftY','shiftYV',v=>v.toFixed(3)],
+  ['zoom','zoomV',    v=>v.toFixed(3)],
+  ['frame','frameV',  v=>v.toFixed(2)],
+  ['frameW','frameWV',v=>v.toFixed(3)],
+  ['tintA','tintAV',  v=>v.toFixed(2)],
+  ['hue','hueV',      v=>v.toFixed(1)],
+  ['chroma','chromaV',v=>v.toFixed(2)],
+  ['ripple','rippleV',v=>v.toFixed(2)],
+  ['vign','vignV',    v=>v.toFixed(2)],
+  ['grain','grainV',  v=>v.toFixed(2)],
+  ['drift','driftV',  v=>v.toFixed(2)],
+  ['spin','spinV',    v=>v.toFixed(2)],
+  ['rot','rotV',      v=>v.toFixed(0)],
+  ['wobble','wobbleV',v=>v.toFixed(2)],
+];
+
+// Convert standard text wrappers into custom editable text input blocks smoothly
+sliders.forEach(([id, vid]) => {
+  const el = $(vid);
+  if (el) {
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.className = 'val';
+    input.id = vid;
+
+    const tgt = $(id);
+    if (tgt) {
+      input.min = tgt.min;
+      input.max = tgt.max;
+      input.step = tgt.step;
+    }
+
+    el.parentNode.replaceChild(input, el);
+
+    input.addEventListener('input', e => {
+      let val = parseFloat(e.target.value);
+      if (!isNaN(val) && tgt) {
+        const min = parseFloat(tgt.min), max = parseFloat(tgt.max);
+        if (val < min) val = min;
+        if (val > max) val = max;
+        state[id] = val;
+        tgt.value = val;
+      }
+    });
+  }
+});
+
+function syncUI(){
+  sliders.forEach(([id, vid, fmt])=>{
+    const slider = $(id);
+    const valInput = $(vid);
+    if (slider) slider.value = state[id];
+    if (valInput && document.activeElement !== valInput) {
+      valInput.value = fmt(+state[id]);
+    }
+  });
+  $('tintC').value = state.tint;
+  $('aspectSel').value = state.aspect || 'free';
+  $('srcSel').value = state.src || 'user';
+  $('ccMode').value = state.ccMode || 0;
+  $('ccTint').value = state.ccTint || '#ff5d7a';
+  document.querySelectorAll('button.mode').forEach(b=>
+    b.classList.toggle('on', +b.dataset.rend === state.rend));
+  $('flip').classList.toggle('on', !!state.flip);
+  $('flip').textContent = state.flip ? 'mirrored' : 'plain';
+  $('depthRow').style.display = state.rend===0 ? '' : 'none';
+  $('fbRow').style.display    = state.rend===5 ? '' : 'none';
+  $('stepLbl').textContent  = (state.rend===2||state.rend===3) ? 'Pane length'
+                            : (state.rend===4 ? 'Band width'
+                            : (state.rend===5 ? 'Pull' : 'Step scale'));
+  $('twistLbl').textContent = state.rend===1 ? 'Spiral'
+                            : ((state.rend===2||state.rend===3) ? 'Roll'
+                            : (state.rend===4 ? 'Skew'
+                            : (state.rend===5 ? 'Rotate' : 'Twist')));
+  $('rendNote').textContent = rendNotes[state.rend];
+  renderStack();
+}
+
+sliders.forEach(([id, vid, fmt])=>{
+  const slider = $(id);
+  if (slider) {
+    slider.addEventListener('input', e=>{
+      state[id] = +e.target.value;
+      const valInput = $(vid);
+      if (valInput) valInput.value = fmt(state[id]);
+    });
+  }
+});
+$('tintC').addEventListener('input', e=> state.tint = e.target.value);
+$('ccMode').addEventListener('change', e=> state.ccMode = +e.target.value);
+$('ccTint').addEventListener('input', e=> state.ccTint = e.target.value);
+$('srcSel').addEventListener('change', e=>{
+  state.src = e.target.value;
+  if(state.src === 'user'){
+    toast('load or paste an image');
+  } else {
+    applySource();
+    toast(state.src + (GENS[state.src].seeded ? ' \u00b7 reseed rerolls it' : ''));
+  }
+});
+document.querySelectorAll('button.mode').forEach(b=>{
+  b.addEventListener('click', ()=>{ state.rend = +b.dataset.rend; syncUI(); });
+});
+$('flip').addEventListener('click', ()=>{ state.flip = state.flip?0:1; syncUI(); });
+
+/* ---- fold stack UI ---- */
+/* display order is alphabetical; option values stay the stable type indices */
+const OPS_ALPHA = OPS.map((op, i)=>[op.name, i]).sort((a, b)=> a[0].localeCompare(b[0]));
+const opSel = $('addOpSel');
+OPS_ALPHA.forEach(([name, i])=>{
+  const o = document.createElement('option');
+  o.value = i; o.textContent = name;
+  opSel.appendChild(o);
+});
+$('addOp').addEventListener('click', ()=>{
+  if(state.stack.length >= MAX_OPS){ toast(`stack is full (${MAX_OPS} folds max)`); return; }
+  state.stack.push(defaultOp(+opSel.value));
+  renderStack();
+});
+
+function renderStack(){
+  const list = $('stackList');
+  list.innerHTML = '';
+  state.stack.forEach((slot, idx)=>{
+    const opDef = OPS[slot.t];
+    const div = document.createElement('div');
+    div.className = 'op';
+
+    const head = document.createElement('div');
+    head.className = 'ophead';
+    const sel = document.createElement('select');
+    OPS_ALPHA.forEach(([name, i])=>{
+      const o = document.createElement('option');
+      o.value = i; o.textContent = name;
+      if(i === slot.t) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', ()=>{
+      state.stack[idx] = defaultOp(+sel.value);
+      renderStack();
+    });
+    head.appendChild(sel);
+
+    const mk = (txt, fn, dis)=>{
+      const b = document.createElement('button');
+      b.textContent = txt; b.disabled = !!dis;
+      if(dis) b.style.opacity = 0.35;
+      b.addEventListener('click', fn);
+      head.appendChild(b);
+    };
+    mk('\u2191', ()=>{ const s=state.stack; [s[idx-1],s[idx]]=[s[idx],s[idx-1]]; renderStack(); }, idx===0);
+    mk('\u2193', ()=>{ const s=state.stack; [s[idx+1],s[idx]]=[s[idx],s[idx+1]]; renderStack(); }, idx===state.stack.length-1);
+    mk('\u00d7', ()=>{ state.stack.splice(idx,1); renderStack(); });
+    div.appendChild(head);
+
+    opDef.params.forEach((pr, pi)=>{
+      const [label, mn, mx, st, , names] = pr;
+      const row = document.createElement('div');
+      row.className = 'row';
+      const lab = document.createElement('label');
+      lab.textContent = label;
+
+      const rng = document.createElement('input');
+      rng.type = 'range'; rng.min = mn; rng.max = mx; rng.step = st;
+      rng.value = slot.p[pi];
+
+      let val;
+      if (names) {
+        val = document.createElement('span');
+        val.className = 'val';
+        val.textContent = names[Math.round(slot.p[pi])];
+      } else {
+        val = document.createElement('input');
+        val.type = 'number'; val.className = 'val';
+        val.min = mn; val.max = mx; val.step = st;
+        const fmt = v => (+v).toFixed(st >= 1 ? 0 : (st >= 0.1 ? 1 : 2));
+        val.value = fmt(slot.p[pi]);
+
+        val.addEventListener('input', e => {
+          let num = parseFloat(e.target.value);
+          if (!isNaN(num)) {
+            if (num < mn) num = mn;
+            if (num > mx) num = mx;
+            slot.p[pi] = num;
+            rng.value = num;
+          }
+        });
+      }
+
+      rng.addEventListener('input', ()=>{
+        slot.p[pi] = +rng.value;
+        if (names) {
+          val.textContent = names[Math.round(+rng.value)];
+        } else {
+          const fmt = v => (+v).toFixed(st >= 1 ? 0 : (st >= 0.1 ? 1 : 2));
+          val.value = fmt(rng.value);
+        }
+      });
+
+      row.appendChild(lab); row.appendChild(rng); row.appendChild(val);
+      div.appendChild(row);
+    });
+
+    slot.o = slot.o || [0, 0];
+    const orow = document.createElement('div');
+    orow.className = 'row';
+    const olab = document.createElement('label');
+    olab.textContent = 'Origin';
+    olab.style.flex = '0 0 44px';
+    orow.appendChild(olab);
+
+    const oval = document.createElement('span');
+    oval.className = 'val';
+    oval.style.flex = '0 0 66px';
+    const ofmt = ()=> `${slot.o[0].toFixed(2)}, ${slot.o[1].toFixed(2)}`;
+
+    [0,1].forEach(axis=>{
+      const rg = document.createElement('input');
+      rg.type = 'range'; rg.min = -1; rg.max = 1; rg.step = 0.005;
+      rg.value = slot.o[axis];
+      rg.title = axis ? 'Origin Y' : 'Origin X';
+      rg.addEventListener('input', ()=>{
+        slot.o[axis] = +rg.value;
+        oval.textContent = ofmt();
+      });
+      orow.appendChild(rg);
+    });
+    oval.textContent = ofmt();
+    orow.appendChild(oval);
+    const pick = document.createElement('button');
+    pick.textContent = '\u2295';
+    pick.title = 'Drag on the canvas to place this fold\u2019s origin';
+    pick.className = 'toggle' + (pickOp === idx ? ' on' : '');
+    pick.style.flex = '0 0 26px';
+    pick.style.padding = '4px 0';
+    pick.addEventListener('click', ()=>{
+      pickOp = (pickOp === idx) ? -1 : idx;
+      renderStack();
+      if(pickOp >= 0) toast('drag on the canvas to place the fold origin');
+    });
+    orow.appendChild(pick);
+    div.appendChild(orow);
+
+    list.appendChild(div);
+  });
+}
+
+/* ---- presets ---- */
+function rebuildPresetSel(){
+  const sel = $('presetSel');
+  sel.innerHTML = '';
+  const g1 = document.createElement('optgroup'); g1.label = 'Factory';
+  FACTORY.map((p, i)=>[p.name, i])
+    .sort((a, b)=> a[0].localeCompare(b[0]))
+    .forEach(([name, i])=>{
+      const o = document.createElement('option');
+      o.value = 'f'+i; o.textContent = name;
+      g1.appendChild(o);
+    });
+  sel.appendChild(g1);
+  if(customPresets.length){
+    const g2 = document.createElement('optgroup'); g2.label = 'Yours';
+    customPresets.map((p, i)=>[p.name, i])
+      .sort((a, b)=> a[0].localeCompare(b[0]))
+      .forEach(([name, i])=>{
+        const o = document.createElement('option');
+        o.value = 'c'+i; o.textContent = name;
+        g2.appendChild(o);
+      });
+    sel.appendChild(g2);
+  }
+}
+function applyPreset(val){
+  if(val[0] === 'f'){
+    const p = FACTORY[+val.slice(1)];
+    const d = JSON.parse(JSON.stringify(p.d));
+    state.rend = d.rend;
+    state.stack = d.stack;
+    if('step'  in d) state.step  = d.step;
+    if('twist' in d) state.twist = d.twist;
+    if('depth' in d) state.depth = d.depth;
+    if('fbAmt' in d) state.fbAmt = d.fbAmt;
+    if('drift' in d) state.drift = d.drift;
+    if('spin'  in d) state.spin  = d.spin;
+    if('wobble' in d) state.wobble = d.wobble;
+    if('rot'   in d) state.rot   = d.rot;
+    if('flip'  in d) state.flip  = d.flip;
+    if('hue'   in d) state.hue   = d.hue;
+    if('chroma' in d) state.chroma = d.chroma;
+    if('ripple' in d) state.ripple = d.ripple;
+    if('vign'  in d) state.vign  = d.vign;
+    if('grain' in d) state.grain = d.grain;
+    if('tint'  in d) state.tint  = d.tint;
+    if('tintA' in d) state.tintA = d.tintA;
+    if('zoom'  in d) state.zoom  = d.zoom;
+    if('src'   in d){ state.src = d.src; applySource(); }
+    if('ccMode' in d) state.ccMode = d.ccMode;
+    if('ccTint' in d) state.ccTint = d.ccTint;
+  } else {
+    const p = customPresets[+val.slice(1)];
+    Object.assign(state, JSON.parse(JSON.stringify(p.state)));
+    if(GENS[state.src]) applySource();   // 'user' keeps whatever is loaded
+  }
+  syncUI();
+  toast('applied preset');
+}
+$('presetSel').addEventListener('change', e=> applyPreset(e.target.value));
+$('savePreset').addEventListener('click', ()=>{
+  let name;
+  try {
+    name = prompt('Preset name:', 'untitled-' + (customPresets.length+1));
+    if(name === undefined) throw new Error('no prompt');
+  } catch(_){
+    name = null;   // prompt() is blocked in sandboxed viewers
+  }
+  if(name === null){
+    // fallback: inline name field (works where prompt() is blocked)
+    const row = $('saveRow');
+    if(row){ row.style.display = 'flex'; $('saveName').value = 'untitled-' + (customPresets.length+1); $('saveName').focus(); $('saveName').select(); }
+    return;
+  }
+  if(!name) return;
+  commitPreset(name);
+});
+function commitPreset(name){
+  customPresets.push({name, state: JSON.parse(JSON.stringify(state))});
+  rebuildPresetSel();
+  $('presetSel').value = 'c' + (customPresets.length-1);
+  toast(`saved "${name}"`);
+}
+$('saveOk').addEventListener('click', ()=>{
+  const n = $('saveName').value.trim();
+  if(!n) return;
+  $('saveRow').style.display = 'none';
+  commitPreset(n);
+});
+$('saveCancel').addEventListener('click', ()=>{ $('saveRow').style.display = 'none'; });
+$('saveName').addEventListener('keydown', e=>{
+  if(e.key === 'Enter'){ e.preventDefault(); $('saveOk').click(); }
+  else if(e.key === 'Escape'){ $('saveRow').style.display = 'none'; }
+});
+
+/* apply a pasted/loaded preset object {name, state} */
+function loadPresetObject(p){
+  if(!p || !p.state || !Array.isArray(p.state.stack)) return false;
+  Object.assign(state, JSON.parse(JSON.stringify(p.state)));
+  if(GENS[state.src]) applySource();
+  syncUI();
+  return true;
+}
+
+$('copyPreset').addEventListener('click', async ()=>{
+  const payload = JSON.stringify({
+    name: 'clip-' + Date.now(),
+    state: JSON.parse(JSON.stringify(state))
+  });
+  let ok = false;
+  try {
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(payload);
+      ok = true;
+    }
+  } catch(_){ ok = false; }
+  if(!ok){
+    const row = $('clipRow');
+    if(row){ row.style.display = 'flex'; $('clipText').value = payload; $('clipText').focus(); $('clipText').select(); }
+    toast('clipboard blocked here \u2014 copy the text shown');
+    return;
+  }
+  toast('recipe copied to clipboard');
+});
+
+$('pastePreset').addEventListener('click', async ()=>{
+  let txt = null;
+  try {
+    if(navigator.clipboard && navigator.clipboard.readText){
+      txt = await navigator.clipboard.readText();
+    }
+  } catch(_){ txt = null; }
+  if(txt === null){
+    const row = $('clipRow');
+    if(row){ row.style.display = 'flex'; $('clipText').value = ''; $('clipText').placeholder = 'paste recipe JSON here, then press Load'; $('clipText').focus(); }
+    toast('clipboard blocked here \u2014 paste into the field, then Load');
+    return;
+  }
+  applyClipText(txt);
+});
+
+function applyClipText(txt){
+  try {
+    const p = JSON.parse(txt);
+    if(loadPresetObject(p)){ toast('recipe pasted'); $('clipRow').style.display = 'none'; }
+    else toast('not a valid recipe');
+  } catch(_){ toast('could not parse recipe JSON'); }
+}
+$('clipLoad').addEventListener('click', ()=> applyClipText($('clipText').value));
+$('clipClose').addEventListener('click', ()=>{ $('clipRow').style.display = 'none'; });
+$('exportPresets').addEventListener('click', ()=>{
+  if(!customPresets.length){ toast('no custom presets to export'); return; }
+  const blob = new Blob([JSON.stringify(customPresets, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'hall-of-mirrors-presets.json';
+  a.click();
+  setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
+});
+$('importPresets').addEventListener('change', e=>{
+  const f = e.target.files[0];
+  if(!f) return;
+  f.text().then(txt=>{
+    try{
+      const arr = JSON.parse(txt);
+      if(!Array.isArray(arr)) throw 0;
+      let n = 0;
+      arr.forEach(p=>{
+        if(p && typeof p.name === 'string' && p.state && Array.isArray(p.state.stack)){
+          customPresets.push({name: p.name, state: p.state});
+          n++;
+        }
+      });
+      rebuildPresetSel();
+      toast(`imported ${n} preset${n===1?'':'s'}`);
+    }catch(_){ toast('could not parse that file'); }
+  });
+  e.target.value = '';
+});
+rebuildPresetSel();
+
+/* ---- chance ---- */
+$('reset').addEventListener('click', ()=>{
+  const keep = state.seed;
+  Object.assign(state, JSON.parse(JSON.stringify(defaults)));
+  state.seed = keep;
+  syncUI(); toast('reset');
+});
+$('reseed').addEventListener('click', ()=>{
+  state.seed = Math.random()*100;
+  if(GENS[state.src] && GENS[state.src].seeded) applySource();
+  toast('reseeded');
+});
+$('rand').addEventListener('click', ()=>{
+  const r=(a,b)=>a+Math.random()*(b-a);
+  const coin=p=>Math.random()<p;
+  const n = 1 + Math.floor(r(0,3));
+  state.stack = [];
+  for(let i=0;i<n;i++){
+    const t = Math.floor(r(0, OPS.length));
+    const op = defaultOp(t);
+    op.p = OPS[t].params.map(pr=>{
+      const [,mn,mx,st] = pr;
+      let v = r(mn, mx);
+      if(st >= 1) v = Math.round(v);
+      return +v.toFixed(3);
+    });
+    op.o = coin(0.6) ? [0,0] : [+r(-0.4,0.4).toFixed(3), +r(-0.4,0.4).toFixed(3)];
+    state.stack.push(op);
+  }
+  state.rend  = Math.floor(r(0,6));
+  state.fbAmt = +r(0.75,0.95).toFixed(3);
+  state.depth = Math.floor(r(6,40));
+  state.step  = r(0.5,0.9);
+  state.twist = coin(0.3) ? 0 : r(-60,60);
+  state.shiftX = coin(0.6) ? 0 : r(-0.08,0.08);
+  state.shiftY = coin(0.6) ? 0 : r(-0.08,0.08);
+  state.zoom  = coin(0.5) ? 1 : r(0.7,1.6);
+  state.flip  = coin(0.7) ? 1 : 0;
+  state.frame = r(0,0.8);
+  state.frameW= r(0.01,0.08);
+  state.tintA = r(0.05,0.6);
+  state.tint  = '#'+[0,0,0].map(()=>Math.floor(r(40,230)).toString(16).padStart(2,'0')).join('');
+  state.hue   = coin(0.5) ? 0 : r(-35,35);
+  state.chroma= coin(0.5) ? 0 : r(0.2,1.8);
+  state.ripple= coin(0.6) ? 0 : r(0.1,0.7);
+  state.cx = r(0.3,0.7); state.cy = r(0.3,0.7);
+  state.seed = Math.random()*100;
+  if(GENS[state.src] && GENS[state.src].seeded) applySource();
+  syncUI(); toast('randomized');
+});
+
+/* vanishing point + fold-origin picking */
+let dragging = false, pickOp = -1;
+function setCenter(e){
+  const r = canvas.getBoundingClientRect();
+  state.cx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  state.cy = Math.min(1, Math.max(0, 1 - (e.clientY - r.top) / r.height));
+}
+function setOpOrigin(e){
+  const slot = state.stack[pickOp];
+  if(!slot){ pickOp = -1; return; }
+  const r = canvas.getBoundingClientRect();
+  const ux = (e.clientX - r.left) / r.width;
+  const uy = 1 - (e.clientY - r.top) / r.height;
+  const ca = r.width / r.height;
+  slot.o = [
+    Math.min(1, Math.max(-1, (ux - state.cx) * ca)),
+    Math.min(1, Math.max(-1, (uy - state.cy)))
+  ];
+}
+canvas.addEventListener('pointerdown', e=>{
+  dragging = true; canvas.setPointerCapture(e.pointerId);
+  if(pickOp >= 0) setOpOrigin(e); else setCenter(e);
+});
+canvas.addEventListener('pointermove', e=>{
+  if(!dragging) return;
+  if(pickOp >= 0) setOpOrigin(e); else setCenter(e);
+});
+canvas.addEventListener('pointerup', ()=>{
+  dragging = false;
+  if(pickOp >= 0){
+    pickOp = -1;
+    renderStack();
+    toast('fold origin set');
+  }
+});
+canvas.addEventListener('dblclick',    ()=>{ state.cx = 0.5; state.cy = 0.5; toast('recentered'); });
+
+/* file loading */
+function loadFile(file){
+  if(!file || !file.type.startsWith('image/')) return;
+  const url = URL.createObjectURL(file);
+  const im = new Image();
+  im.onload = ()=>{
+    const max = 4096;
+    let w = im.naturalWidth, h = im.naturalHeight;
+    if(Math.max(w,h) > max){
+      const s = max / Math.max(w,h);
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(w*s); cv.height = Math.round(h*s);
+      cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+      setImage(cv, cv.width, cv.height);
+    } else {
+      setImage(im, w, h);
+    }
+    URL.revokeObjectURL(url);
+    state.src = 'user';
+    $('srcSel').value = 'user';
+    toast(`${file.name} \u00b7 ${imgW}\u00d7${imgH}`);
+  };
+  im.src = url;
+}
+$('file').addEventListener('change', e=> loadFile(e.target.files[0]));
+const stage = document.getElementById('stage');
+['dragenter','dragover'].forEach(ev=> window.addEventListener(ev, e=>{
+  e.preventDefault(); stage.classList.add('drag');
+}));
+['dragleave','drop'].forEach(ev=> window.addEventListener(ev, e=>{
+  e.preventDefault(); if(ev==='drop' || e.target===document.documentElement || !e.relatedTarget) stage.classList.remove('drag');
+}));
+window.addEventListener('drop', e=>{
+  stage.classList.remove('drag');
+  loadFile(e.dataTransfer.files[0]);
+});
+window.addEventListener('paste', e=>{
+  const item = [...(e.clipboardData?.items || [])].find(i=>i.type.startsWith('image/'));
+  if(item) loadFile(item.getAsFile());
+});
+
+/* toast */
+let toastT;
+function toast(msg){
+  const t = $('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(()=> t.classList.remove('show'), 1800);
+}
+
+/* ================= render loop ================= */
+function hexToRgb(h){ return [1,3,5].map(i=> parseInt(h.slice(i,i+2),16)/255); }
+let phase = 0, spinA = 0, wavePh = 0, lastT = performance.now();
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* aspect lock: letterbox the canvas inside the stage */
+function aspectRatio(){
+  if(!state.aspect || state.aspect === 'free') return 0;
+  if(state.aspect === 'src') return imgW / imgH;
+  const m = String(state.aspect).split(':');
+  const r = parseFloat(m[0]) / parseFloat(m[1]);
+  return (isFinite(r) && r > 0) ? r : 0;
+}
+let lastFit = '';
+function fitCanvas(){
+  const r = aspectRatio();
+  const st = stage.getBoundingClientRect();
+  let cssW = st.width, cssH = st.height;
+  if(r){
+    if(st.width / st.height > r){ cssH = st.height; cssW = st.height * r; }
+    else { cssW = st.width; cssH = st.width / r; }
+  }
+  const key = cssW.toFixed(1) + 'x' + cssH.toFixed(1);
+  if(key !== lastFit){
+    lastFit = key;
+    canvas.style.width  = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+  }
+}
+$('aspectSel').addEventListener('change', e=>{
+  state.aspect = e.target.value;
+  fitCanvas();
+});
+
+/* feedback ping-pong framebuffers */
+let fbTex = [], fbFbo = [], fbW = 0, fbH = 0, fbRead = 0;
+function ensureFB(w, h){
+  if(fbW === w && fbH === h && fbTex.length === 2) return;
+  fbTex.forEach(t => gl.deleteTexture(t));
+  fbFbo.forEach(f => gl.deleteFramebuffer(f));
+  fbTex = []; fbFbo = [];
+  for(let i = 0; i < 2; i++){
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    const f = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    fbTex.push(t); fbFbo.push(f);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  fbW = w; fbH = h; fbRead = 0;
+}
+
+/* upload the full uniform set to the current assembled program (its own locations) */
+function setUniforms(entry, w, h){
+  const L = entry.locs;
+  gl.uniform1i(L.uTex, 0);
+  gl.uniform2f(L.uCanvas, w, h);
+  gl.uniform2f(L.uImg, imgW, imgH);
+  for(let i = 0; i < MAX_OPS; i++){
+    const slot = state.stack[i];
+    const p = slot ? slot.p : [];
+    gl.uniform4f(L[`uOpP[${i}]`], p[0]||0, p[1]||0, p[2]||0, p[3]||0);
+    gl.uniform4f(L[`uOpP2[${i}]`], p[4]||0, p[5]||0, p[6]||0, p[7]||0);
+    const o = (slot && slot.o) ? slot.o : [0, 0];
+    gl.uniform2f(L[`uOpO[${i}]`], o[0], o[1]);
+  }
+  gl.uniform1f(L.uDepth, state.depth);
+  gl.uniform1f(L.uStep, state.step);
+  gl.uniform1f(L.uTwist, state.twist * Math.PI/180);
+  gl.uniform1f(L.uFlip, state.flip);
+  gl.uniform2f(L.uCenter, state.cx, state.cy);
+  gl.uniform2f(L.uShift, state.shiftX, state.shiftY);
+  gl.uniform1f(L.uZoom, state.zoom);
+  gl.uniform1f(L.uFrame, state.frame);
+  gl.uniform1f(L.uFrameW, state.frameW);
+  const t = hexToRgb(state.tint);
+  gl.uniform3f(L.uTint, t[0], t[1], t[2]);
+  gl.uniform1f(L.uTintA, state.tintA);
+  gl.uniform1f(L.uHueK, state.hue * Math.PI/180);
+  gl.uniform1f(L.uChroma, state.chroma);
+  gl.uniform1f(L.uRipple, state.ripple);
+  gl.uniform1f(L.uVign, state.vign);
+  gl.uniform1f(L.uGrain, state.grain);
+  gl.uniform1f(L.uPhase, phase);
+  gl.uniform1f(L.uSpinA, spinA + (state.rot || 0) * Math.PI / 180);
+  gl.uniform1f(L.uWavePh, wavePh);
+  gl.uniform1f(L.uSeed, state.seed);
+  gl.uniform1i(L.uPrev, 1);
+  gl.uniform1f(L.uFbAmt, state.fbAmt);
+  gl.uniform1f(L.uCcMode, state.ccMode);
+  const ct = hexToRgb(state.ccTint);
+  gl.uniform3f(L.uCcTint, ct[0], ct[1], ct[2]);
+  gl.uniform1f(L.uPost, state.rend === 5 ? 0 : 1);
+}
+
+function presentFeedback(w, h, srcTexIdx){
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, w, h);
+  gl.useProgram(postProg);
+  bindQuad(postLoc);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, fbTex[srcTexIdx]);
+  gl.uniform1i(PU.uSrc, 0);
+  gl.uniform1f(PU.uVign, state.vign);
+  gl.uniform1f(PU.uGrain, state.grain);
+  gl.uniform1f(PU.uWavePh, wavePh);
+  gl.uniform1f(PU.uSeed, state.seed);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+function renderScene(w, h){
+  /* pick (or reuse) the assembled program for this stack + renderer */
+  const req = cache.request(state.stack.map(s => s.t), state.rend);
+  if(req.ready) curEntry = req.entry;
+  if(req.error && !shaderErrShown){ shaderErrShown = true; toast('shader error \u2014 see console'); console.error(req.error); }
+  if(!curEntry) return;              // first program still linking; nothing to draw yet
+  const entry = curEntry;
+
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+
+  if(state.rend === 5){
+    const sizeChanged = !(fbW === w && fbH === h && fbTex.length === 2);
+    ensureFB(w, h);
+    if(paused && !exporting && !sizeChanged){
+      presentFeedback(w, h, fbRead);   // frozen: re-present last generation
+      return;
+    }
+    const write = 1 - fbRead;
+    /* pass 1: assembled feedback program into the write buffer, reading last frame */
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbFbo[write]);
+    gl.viewport(0, 0, w, h);
+    gl.useProgram(entry.prog);
+    bindQuad(entry.aPos);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, fbTex[fbRead]);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    setUniforms(entry, w, h);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    /* pass 2: vignette + grain to screen */
+    presentFeedback(w, h, write);
+    fbRead = write;
+  } else {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, w, h);
+    gl.useProgram(entry.prog);
+    bindQuad(entry.aPos);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    setUniforms(entry, w, h);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+}
+
+let exporting = false;
+let paused = false;
+
+function togglePause(){
+  paused = !paused;
+  const b = $('pauseBtn');
+  b.innerHTML = paused ? '&#9654;' : '&#10074;&#10074;';
+  b.classList.toggle('on', paused);
+  toast(paused ? 'paused' : 'playing');
+}
+$('pauseBtn').addEventListener('click', togglePause);
+window.addEventListener('keydown', e=>{
+  if(e.code === 'Space'){
+    const t = document.activeElement && document.activeElement.tagName;
+    if(t === 'INPUT' || t === 'SELECT' || t === 'TEXTAREA' || t === 'BUTTON') return;
+    e.preventDefault();
+    togglePause();
+  }
+});
+
+function frame(now){
+  const dt = Math.min(0.05, (now - lastT)/1000); lastT = now;
+  if(exporting){ requestAnimationFrame(frame); return; }
+  if(!reduced && !paused){
+    phase  += dt * state.drift * 0.6;
+    spinA  += dt * state.spin * 0.5;
+    wavePh += dt * state.wobble * 1.5;
+  }
+  const period = state.flip ? 2 : 1;
+  phase = ((phase % period) + period) % period;
+
+  fitCanvas();
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.round(canvas.clientWidth * dpr);
+  const h = Math.round(canvas.clientHeight * dpr);
+  if(canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; }
+
+  renderScene(w, h);
+  requestAnimationFrame(frame);
+}
+applySource();
+requestAnimationFrame(frame);
+syncUI();
+
+/* ================= record animation ================= */
+let recorder = null, recChunks = [], recTimer = null;
+const recBtn = $('recBtn');
+
+function loopSeconds(){
+  const period = state.flip ? 2 : 1;
+  const rate = Math.abs(state.drift) * 0.6;
+  return rate > 1e-3 ? period / rate : 0;
+}
+
+recBtn.addEventListener('click', ()=>{
+  if(recorder){ recorder.stop(); return; }
+  if(exporting){ toast('HQ export in progress'); return; }
+  if(typeof MediaRecorder === 'undefined' || !canvas.captureStream){
+    toast('recording not supported in this browser'); return;
+  }
+  const fps  = +$('recFps').value;
+  const mbps = +$('recQ').value;
+  const lenSel = $('recLen').value;
+  let dur = 0;
+  if(lenSel === 'loop1' || lenSel === 'loop2'){
+    const L = loopSeconds();
+    if(!L){ toast('set a non-zero drift for loop recording'); return; }
+    dur = L * (lenSel === 'loop2' ? 2 : 1);
+  } else if(lenSel !== 'manual'){
+    dur = +lenSel;
+  }
+  const mimes = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+  const mime = mimes.find(m2=> MediaRecorder.isTypeSupported(m2)) || '';
+  const stream = canvas.captureStream(fps);
+  recChunks = [];
+  try{
+    recorder = new MediaRecorder(stream, {
+      mimeType: mime || undefined,
+      videoBitsPerSecond: mbps * 1e6
+    });
+  }catch(err){
+    toast('could not start recorder'); recorder = null; return;
+  }
+  recorder.ondataavailable = e=>{ if(e.data.size) recChunks.push(e.data); };
+  recorder.onstop = ()=>{
+    clearInterval(recTimer); recTimer = null;
+    const blob = new Blob(recChunks, {type: mime || 'video/webm'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `hall-of-mirrors-${Date.now()}.webm`;
+    a.click();
+    setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
+    recorder = null;
+    recBtn.textContent = 'Record WebM';
+    recBtn.classList.remove('on');
+    toast('saved animation');
+  };
+  phase = 0;
+  const t0 = performance.now();
+  recorder.start(250);
+  recBtn.classList.add('on');
+  recTimer = setInterval(()=>{
+    const el = (performance.now() - t0) / 1000;
+    recBtn.textContent = dur
+      ? `\u25cf ${el.toFixed(1)} / ${dur.toFixed(1)}s`
+      : `\u25cf ${el.toFixed(1)}s \u2014 stop`;
+    if(dur && el >= dur && recorder) recorder.stop();
+  }, 100);
+});
+
+/* ================= HQ export: WebCodecs + inline WebM muxer ================= */
+/* minimal Matroska/WebM writer: one video track, clusters split on keyframes */
+function WebMMuxer(width, height, codecId){
+  const chunks = [];
+  const txt = s => new TextEncoder().encode(s);
+  const cat = arrs => {
+    let n = 0; arrs.forEach(a => n += a.length);
+    const o = new Uint8Array(n); let p = 0;
+    arrs.forEach(a => { o.set(a, p); p += a.length; });
+    return o;
+  };
+  const vint = n => {                       // EBML size, minimal length
+    let len = 1;
+    while(n > Math.pow(2, 7*len) - 2 && len < 8) len++;
+    const o = new Uint8Array(len);
+    let v = n;
+    for(let i = len-1; i >= 0; i--){ o[i] = v & 0xff; v = Math.floor(v/256); }
+    o[0] |= 0x80 >> (len-1);
+    return o;
+  };
+  const u = n => {                          // unsigned int, minimal bytes
+    const b = [];
+    do { b.unshift(n & 0xff); n = Math.floor(n/256); } while(n > 0);
+    return new Uint8Array(b);
+  };
+  const f64b = x => { const b = new Uint8Array(8); new DataView(b.buffer).setFloat64(0, x); return b; };
+  const el = (idBytes, payload) => cat([new Uint8Array(idBytes), vint(payload.length), payload]);
+
+  this.add = chunk => {
+    const data = new Uint8Array(chunk.byteLength);
+    chunk.copyTo(data);
+    chunks.push({ ts: Math.round(chunk.timestamp/1000), key: chunk.type === 'key', data });
+  };
+  this.finish = () => {
+    const head = el([0x1A,0x45,0xDF,0xA3], cat([
+      el([0x42,0x86], u(1)),  el([0x42,0xF7], u(1)),
+      el([0x42,0xF2], u(4)),  el([0x42,0xF3], u(8)),
+      el([0x42,0x82], txt('webm')),
+      el([0x42,0x87], u(2)),  el([0x42,0x85], u(2)),
+    ]));
+    const durMs = chunks.length ? chunks[chunks.length-1].ts +
+      (chunks.length > 1 ? chunks[1].ts - chunks[0].ts : 33) : 0;
+    const info = el([0x15,0x49,0xA9,0x66], cat([
+      el([0x2A,0xD7,0xB1], u(1000000)),
+      el([0x44,0x89], f64b(durMs)),
+      el([0x4D,0x80], txt('hall-of-mirrors')),
+      el([0x57,0x41], txt('hall-of-mirrors')),
+    ]));
+    const tracks = el([0x16,0x54,0xAE,0x6B],
+      el([0xAE], cat([
+        el([0xD7], u(1)),
+        el([0x73,0xC5], u(1)),
+        el([0x83], u(1)),
+        el([0x86], txt(codecId)),
+        el([0xE0], cat([ el([0xB0], u(width)), el([0xBA], u(height)) ])),
+      ]))
+    );
+    const clusters = [];
+    let cur = null, base = 0;
+    for(const c of chunks){
+      if(c.key || !cur || (c.ts - base) > 30000){
+        if(cur) clusters.push(el([0x1F,0x43,0xB6,0x75], cat(cur)));
+        base = c.ts;
+        cur = [ el([0xE7], u(base)) ];
+      }
+      const rel = c.ts - base;
+      const bh = new Uint8Array([0x81, (rel >> 8) & 0xff, rel & 0xff, c.key ? 0x80 : 0x00]);
+      cur.push(el([0xA3], cat([bh, c.data])));
+    }
+    if(cur) clusters.push(el([0x1F,0x43,0xB6,0x75], cat(cur)));
+    const segment = el([0x18,0x53,0x80,0x67], cat([info, tracks, ...clusters]));
+    return new Blob([head, segment], { type: 'video/webm' });
+  };
+}
+
+const hqBtn = $('hqBtn');
+let hqAbort = false;
+
+async function pickCodec(w, h, bitrate, fps){
+  const tries = [['vp09.00.10.08','V_VP9'], ['vp8','V_VP8']];
+  for(const [codec, idc] of tries){
+    try{
+      const s = await VideoEncoder.isConfigSupported({codec, width:w, height:h, bitrate, framerate:fps});
+      if(s.supported) return [codec, idc];
+    }catch(_){}
+  }
+  return null;
+}
+
+hqBtn.addEventListener('click', async ()=>{
+  if(exporting){ hqAbort = true; return; }
+  if(recorder){ toast('stop the live recording first'); return; }
+  if(typeof VideoEncoder === 'undefined'){ toast('WebCodecs not supported in this browser'); return; }
+
+  const fps  = +$('recFps').value;
+  const mbps = +$('recQ').value;
+  const lenSel = $('recLen').value;
+  if(lenSel === 'manual'){ toast('manual length is live-record only \u2014 pick a duration'); return; }
+  const period = state.flip ? 2 : 1;
+  let dur;
+  if(lenSel === 'loop1' || lenSel === 'loop2'){
+    const L = loopSeconds();
+    if(!L){ toast('set a non-zero drift for loop export'); return; }
+    dur = L * (lenSel === 'loop2' ? 2 : 1);
+  } else dur = +lenSel;
+  const frames = Math.max(1, Math.round(dur * fps));
+
+  /* exact per-frame clock steps: loops close by construction */
+  let phaseStep;
+  if(lenSel === 'loop1')      phaseStep = period / frames;
+  else if(lenSel === 'loop2') phaseStep = 2 * period / frames;
+  else                        phaseStep = (1/fps) * state.drift * 0.6;
+  const spinStep = (1/fps) * state.spin * 0.5;
+  const waveStep = (1/fps) * state.wobble * 1.5;
+
+  /* target size at current aspect, even dims, capped */
+  const arNow = canvas.width / Math.max(1, canvas.height);
+  const cap = Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE), 4096);
+  let eh = +$('hqSize').value;
+  let ew = Math.round(eh * arNow);
+  const shrink = Math.min(1, cap / Math.max(ew, eh));
+  ew = Math.floor(ew * shrink / 2) * 2;
+  eh = Math.floor(eh * shrink / 2) * 2;
+
+  const picked = await pickCodec(ew, eh, mbps*1e6, fps);
+  if(!picked){ toast('no supported video codec (VP9/VP8)'); return; }
+  const [codec, codecId] = picked;
+
+  const mux = new WebMMuxer(ew, eh, codecId);
+  let encErr = null;
+  const encoder = new VideoEncoder({
+    output: chunk => mux.add(chunk),
+    error:  e => { encErr = e; }
+  });
+  encoder.configure({codec, width:ew, height:eh, bitrate:mbps*1e6, framerate:fps});
+
+  exporting = true; hqAbort = false;
+  hqBtn.classList.add('on');
+  const save = {phase, spinA, wavePh, cw:canvas.width, ch:canvas.height};
+  canvas.width = ew; canvas.height = eh;
+  if(lenSel === 'loop1' || lenSel === 'loop2') phase = 0;
+
+  const step = ()=>{
+    phase += phaseStep; spinA += spinStep; wavePh += waveStep;
+    phase = ((phase % period) + period) % period;
+  };
+  const breathe = ()=> new Promise(r => requestAnimationFrame(r));
+
+  try{
+    /* feedback: rebuild causal history at export resolution */
+    if(state.rend === 5){
+      ensureFB(ew, eh);
+      const warm = Math.min(600, Math.max(60, Math.round(6 / (1 - state.fbAmt + 0.001))));
+      for(let i = 0; i < warm && !hqAbort; i++){
+        renderScene(ew, eh);
+        step();
+        if(i % 15 === 0){ hqBtn.textContent = `warmup ${i}/${warm}`; await breathe(); }
+      }
+      if(lenSel === 'loop1' || lenSel === 'loop2') phase = 0;
+    }
+
+    for(let n = 0; n < frames && !hqAbort && !encErr; n++){
+      renderScene(ew, eh);
+      const vf = new VideoFrame(canvas, {
+        timestamp: Math.round(n * 1e6 / fps),
+        duration:  Math.round(1e6 / fps)
+      });
+      encoder.encode(vf, { keyFrame: n % (fps * 2) === 0 });
+      vf.close();
+      step();
+      while(encoder.encodeQueueSize > 4) await new Promise(r => setTimeout(r, 1));
+      if(n % 5 === 0){
+        hqBtn.textContent = `\u25cf ${n}/${frames} \u2014 tap to cancel`;
+        await breathe();
+      }
+    }
+
+    if(!hqAbort && !encErr){
+      hqBtn.textContent = 'encoding\u2026';
+      await encoder.flush();
+      encoder.close();
+      const blob = mux.finish();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `hall-of-mirrors-hq-${Date.now()}.webm`;
+      a.click();
+      setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
+      toast(`HQ export: ${ew}\u00d7${eh}, ${frames} frames, ${codecId.replace('V_','')}`);
+    } else {
+      try{ encoder.close(); }catch(_){}
+      toast(encErr ? 'encoder error \u2014 try a lower resolution' : 'HQ export cancelled');
+    }
+  } catch(err){
+    try{ encoder.close(); }catch(_){}
+    toast('HQ export failed');
+  } finally {
+    canvas.width = save.cw; canvas.height = save.ch;
+    phase = save.phase; spinA = save.spinA; wavePh = save.wavePh;
+    exporting = false;
+    hqBtn.classList.remove('on');
+    hqBtn.textContent = 'HQ Video';
+  }
+});
+
+/* ================= HQ still: offline supersampled PNG ================= */
+$('hqStillBtn').addEventListener('click', async ()=>{
+  if(exporting){ toast('HQ export in progress'); return; }
+  if(recorder){ toast('stop the live recording first'); return; }
+  const stillBtn = $('hqStillBtn');
+  const arNow = canvas.width / Math.max(1, canvas.height);
+  const cap = Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE), 8192);
+  let th = +$('hqStillSize').value;
+  let tw = Math.round(th * arNow);
+  const fit = Math.min(1, cap / Math.max(tw, th));
+  tw = Math.max(2, Math.floor(tw * fit));
+  th = Math.max(2, Math.floor(th * fit));
+  const ss = (Math.max(tw, th) * 2 <= cap) ? 2 : 1;   // supersample if the GPU allows
+  const rw = tw * ss, rh = th * ss;
+
+  exporting = true;
+  const save = {phase, spinA, wavePh, cw: canvas.width, ch: canvas.height};
+  stillBtn.textContent = 'rendering\u2026';
+  try{
+    canvas.width = rw; canvas.height = rh;
+    if(state.rend === 5){
+      /* rebuild feedback history at render resolution */
+      ensureFB(rw, rh);
+      const period = state.flip ? 2 : 1;
+      const warm = Math.min(600, Math.max(60, Math.round(6 / (1 - state.fbAmt + 0.001))));
+      for(let i = 0; i < warm; i++){
+        renderScene(rw, rh);
+        phase  += (1/60) * state.drift * 0.6;
+        spinA  += (1/60) * state.spin * 0.5;
+        wavePh += (1/60) * state.wobble * 1.5;
+        phase = ((phase % period) + period) % period;
+        if(i % 20 === 0){
+          stillBtn.textContent = `warmup ${i}/${warm}`;
+          await new Promise(r => requestAnimationFrame(r));
+        }
+      }
+    }
+    renderScene(rw, rh);
+
+    /* downsample for anti-aliasing */
+    const out = document.createElement('canvas');
+    out.width = tw; out.height = th;
+    const ctx = out.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(canvas, 0, 0, tw, th);
+    await new Promise((res, rej)=> out.toBlob(b=>{
+      if(!b){ rej(new Error('encode failed')); return; }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(b);
+      a.download = `hall-of-mirrors-still-${Date.now()}.png`;
+      a.click();
+      setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
+      res();
+    }, 'image/png'));
+    toast(`HQ still: ${tw}\u00d7${th}${ss === 2 ? ' (2\u00d7 supersampled)' : ''}`);
+  } catch(_){
+    toast('HQ still failed');
+  } finally {
+    canvas.width = save.cw; canvas.height = save.ch;
+    phase = save.phase; spinA = save.spinA; wavePh = save.wavePh;
+    exporting = false;
+    stillBtn.textContent = 'HQ Still';
+  }
+});
+
+/* ================= export PNG ================= */
+$('exportBtn').addEventListener('click', ()=>{
+  if(recorder){ toast('stop recording first'); return; }
+  if(exporting){ toast('HQ export in progress'); return; }
+  if(state.rend === 5){
+    /* feedback history is causal — snapshot the live frame as-is */
+    canvas.toBlob(blob=>{
+      if(!blob){ toast('export failed'); return; }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `hall-of-mirrors-${Date.now()}.png`;
+      a.click();
+      setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
+      toast(`exported ${canvas.width}\u00d7${canvas.height} (feedback exports live at 1\u00d7)`);
+    }, 'image/png');
+    return;
+  }
+  const scale = +$('exportScale').value;
+  const pw = canvas.width, ph2 = canvas.height;   // current viewer framing
+  const max = Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE), 8192);
+  let ow = Math.round(pw * scale), oh = Math.round(ph2 * scale);
+  const s = Math.min(1, max / Math.max(ow, oh));
+  ow = Math.round(ow * s); oh = Math.round(oh * s);
+  canvas.width = ow; canvas.height = oh;
+  renderScene(ow, oh);
+  canvas.toBlob(blob=>{
+    canvas.width = pw; canvas.height = ph2;
+    if(!blob){ toast('export failed'); return; }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `hall-of-mirrors-${Date.now()}.png`;
+    a.click();
+    setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
+    toast(`exported ${ow}\u00d7${oh}`);
+  }, 'image/png');
+});
