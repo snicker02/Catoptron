@@ -130,21 +130,28 @@ function resolveHelpers(types){
 
 function foldCall(t, i){
   const op = OPS[t];
-  let args = `q, uOpP[${i}]`;
-  if(op.p2)         args += `, uOpP2[${i}]`;
-  else if(op.ccop)  args += `, par, ccOp`;
-  else if(op.par)   args += `, par`;
-  else if(op.crack) args += `, crack`;
-  return `  q -= uOpO[${i}];\n  q = ${op.fn}(${args});\n  q += uOpO[${i}];`;
+  const banks = Math.max(1, Math.ceil(op.params.length / 4));
+  const bankArgs = [];
+  for(let b = 0; b < banks; b++) bankArgs.push(`uP${i}_${b}`);
+  let args = 'q, ' + bankArgs.join(', ');
+  if(op.ccop)       args += ', par, ccOp';
+  else if(op.par)   args += ', par';
+  else if(op.crack) args += ', crack';
+  return `  q -= uO${i};\n  q = ${op.fn}(${args});\n  q += uO${i};`;
 }
 
 function assemble(stack, rend = 0){
   const helperSrc = resolveHelpers(stack);
   const opSrc = [...new Set(stack)].map(t => OPS[t].glsl).join('\n');
   const folds = stack.map((t, i) => foldCall(t, i)).join('\n');
-  const arrays = `uniform vec4 uOpP[${MAX_OPS}];\nuniform vec4 uOpP2[${MAX_OPS}];\nuniform vec2 uOpO[${MAX_OPS}];`;
+  const decls = stack.map((t, i) => {
+    const banks = Math.max(1, Math.ceil(OPS[t].params.length / 4));
+    let d = '';
+    for(let b = 0; b < banks; b++) d += `uniform vec4 uP${i}_${b};\n`;
+    return d + `uniform vec2 uO${i};`;
+  }).join('\n');
   return `${PRELUDE}
-${arrays}
+${decls}
 ${helperSrc}
 ${opSrc}
 void main(){
