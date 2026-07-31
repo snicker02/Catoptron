@@ -132,6 +132,7 @@ function foldCall(t, i){
   const op = OPS[t];
   let args = `q, uOpP[${i}]`;
   if(op.p2)         args += `, uOpP2[${i}]`;
+  else if(op.ccop)  args += `, par, ccOp`;
   else if(op.par)   args += `, par`;
   else if(op.crack) args += `, crack`;
   return `  q -= uOpO[${i}];\n  q = ${op.fn}(${args});\n  q += uOpO[${i}];`;
@@ -155,17 +156,19 @@ void main(){
   q = rot(uSpinA) * q;
   float crack = 1.0;
   float par = 0.0;
+  float ccOp = 0.0;
 ${folds}
   uv = q / vec2(ca, 1.0) + c;
   vec3 col = vec3(0.0);
   float period = (uFlip > 0.5) ? 2.0 : 1.0;
   float ph = mod(uPhase, period);
 ${RENDERERS[rend]}
-  if(par > 0.5 && uCcMode > 0.5){
-    if(uCcMode < 1.5)       col = vec3(1.0) - col;
-    else if(uCcMode < 2.5)  col = hueShift(col, 3.14159265);
-    else if(uCcMode < 3.5)  col = vec3(dot(col, vec3(0.299,0.587,0.114)));
-    else                    col = col * uCcTint;
+  float effCc = uCcMode > 0.5 ? uCcMode : ccOp;
+  if(par > 0.5 && effCc > 0.5){
+    if(effCc < 1.5)       col = vec3(1.0) - col;
+    else if(effCc < 2.5)  col = hueShift(col, 3.14159265);
+    else if(effCc < 3.5)  col = vec3(dot(col, vec3(0.299,0.587,0.114)));
+    else                  col = col * uCcTint;
   }
   col *= crack;
   if(uPost > 0.5){
