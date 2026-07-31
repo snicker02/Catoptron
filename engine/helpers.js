@@ -53,5 +53,28 @@ const HELPERS = {
   float k = t.y*97.0 + t.x;
   if(k < bk){ bk = k; b = t; bp = pr; }
 }` },
+  wv: { deps:[], src:`float wv(float x, float t){
+  if(t < 0.5) return sin(x);
+  if(t < 1.5) return 1.0 - 4.0*abs(fract(x/TAU) - 0.5);
+  if(t < 2.5) return 2.0*fract(x/TAU) - 1.0;
+  return clamp(sin(x)*6.0, -1.0, 1.0);
+}` },
+  dmwrap: { deps:[], src:`float dmwrap(float v, float m){
+  float r = 2.0 * m;
+  if(v >  m) return -m + mod(v + m, r);
+  if(v < -m) return  m - mod(m - v, r);
+  return v;
+}` },
+  apVertex: { deps:[], src:`vec2 apVertex(vec2 p, float N, float c, float gam){
+  vec2 v = vec2(0.0);
+  for(int k = 0; k < 7; k++){
+    if(float(k) >= N) break;
+    float ang = 3.14159265 * float(k) / N;
+    vec2 n = vec2(cos(ang), sin(ang));
+    float K = floor(dot(p, n) / c - gam);
+    v += K * n;
+  }
+  return v * (c * 2.0 / N);
+}` },
 };
 export {HELPERS};

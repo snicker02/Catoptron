@@ -277,5 +277,621 @@ const OPS = [
   }
   return exp(u) * vec2(cos(v), sin(v));
 }` },
+  { name:'Triangle fold', fn:'opTri', deps:[],
+    params:[['Scale',0.5,8,0.1,3]],
+    glsl:`vec2 opTri(vec2 q, vec4 P){
+  vec2 p = q * P.x * 2.0;
+  const vec2 n30 = vec2(-0.5, 0.86602540);
+  for(int i = 0; i < 9; i++){
+    p.x = 1.0 - abs(mod(p.x, 2.0) - 1.0);
+    p.y = abs(p.y);
+    float d = dot(p, n30);
+    if(d > 0.0) p -= 2.0*d*n30;
+  }
+  return p / (P.x * 2.0);
+}` },
+  { name:'Mirror tile', fn:'opTile', par:true, deps:[],
+    params:[['Tiles X',0.5,8,0.1,3],['Tiles Y',0.5,8,0.1,3],['Mode',0,3,1,0,['mirror','mirror X','mirror Y','repeat']]],
+    glsl:`vec2 opTile(vec2 q, vec4 P, inout float par){
+  float tx = P.x;
+  float ty = (P.y < 0.01) ? P.x : P.y;
+  vec2 g = q * vec2(tx, ty) + 0.5;
+  vec2 m = mir(g);
+  vec2 r = fract(g);
+  vec2 fl = floor(g);
+  float px = mod(fl.x, 2.0);
+  float py = mod(fl.y, 2.0);
+  vec2 o;
+  float pp;
+  if(P.z < 0.5)      { o = m;                 pp = px + py; }
+  else if(P.z < 1.5) { o = vec2(m.x, r.y);    pp = px;      }
+  else if(P.z < 2.5) { o = vec2(r.x, m.y);    pp = py;      }
+  else               { o = r;                 pp = 0.0;     }
+  par = mod(par + pp, 2.0);
+  return (o - 0.5) / vec2(tx, ty);
+}` },
+  { name:'Ring fold', fn:'opRings', deps:[],
+    params:[['Density',0.5,8,0.1,3]],
+    glsl:`vec2 opRings(vec2 q, vec4 P){
+  float r = length(q);
+  float a = atan(q.y, q.x);
+  float rr = (1.0 - abs(mod(r*P.x, 2.0) - 1.0)) / P.x;
+  return vec2(cos(a), sin(a)) * rr;
+}` },
+  { name:'Lens', fn:'opLens', deps:[],
+    params:[['Curve',-4,4,0.05,1.5]],
+    glsl:`vec2 opLens(vec2 q, vec4 P){
+  float r = max(length(q), 1e-5);
+  float c = abs(P.x) + 1e-4;
+  if(P.x >= 0.0) return q * (atan(r*c) / (r*c));
+  return q * (tan(min(r*c, 1.35)) / (r*c));
+}` },
+  { name:'Bubbles', fn:'opBubbles', deps:[],
+    params:[['Scale',0.5,6,0.1,3],['Floor',0.05,0.6,0.01,0.15],['Iters',1,7,1,5]],
+    glsl:`vec2 opBubbles(vec2 q, vec4 P){
+  vec2 p = q * P.x * 0.9;
+  float itn = (P.z < 0.5) ? 7.0 : P.z;
+  for(int i = 0; i < 7; i++){
+    if(float(i) >= itn) break;
+    p = -1.0 + 2.0*fract(0.5*p + 0.5);
+    float dd = dot(p, p);
+    if(dd < 1.0) p /= max(dd, P.y);
+  }
+  return p / (P.x * 0.9);
+}` },
+  { name:'Wave warp', fn:'opWarp', deps:['wv'],
+    params:[['Amp',0,1,0.01,0.3],['Freq',0.5,8,0.1,2],['Wave',0,3,1,0,['sine','triangle','saw','square']]],
+    glsl:`vec2 opWarp(vec2 q, vec4 P){
+  float w = P.x * 0.12;
+  return q + w * vec2(wv(q.y*P.y*TAU + uWavePh, P.z),
+                      wv(q.x*P.y*TAU*1.37 - uWavePh*1.3, P.z));
+}` },
+  { name:'Shift', fn:'opShift', deps:[],
+    params:[['X',-1,1,0.005,0.2],['Y',-1,1,0.005,0]],
+    glsl:`vec2 opShift(vec2 q, vec4 P){ return q + P.xy; }` },
+  { name:'Shear', fn:'opShear', deps:[],
+    params:[['X',-1.5,1.5,0.01,0.4],['Y',-1.5,1.5,0.01,0]],
+    glsl:`vec2 opShear(vec2 q, vec4 P){
+  q.x += P.x * q.y;
+  q.y += P.y * q.x;
+  return q;
+}` },
+  { name:'Petal', fn:'opPetal', deps:[],
+    params:[['Lobes',2,16,1,6],['Amp',0,0.5,0.005,0.12]],
+    glsl:`vec2 opPetal(vec2 q, vec4 P){
+  float r = length(q);
+  float a = atan(q.y, q.x);
+  r += sin(a * P.x) * P.y;
+  return vec2(cos(a), sin(a)) * r;
+}` },
+  { name:'Spherical', fn:'opSpherical', deps:[],
+    params:[['Radius',0.1,2,0.01,0.6]],
+    glsl:`vec2 opSpherical(vec2 q, vec4 P){
+  float r2 = max(dot(q, q), 1e-5);
+  return q * (P.x * P.x) / r2;
+}` },
+  { name:'Complex', fn:'opComplex', deps:['sinhf','coshf','clog','csqrt','casin','catan'],
+    params:[['Func',0,18,1,9,['cos','cosh','cot','coth','csc','csch','exp','sec','sech','sin','sinh','tan','tanh','log','sqrt','asin','acos','atan','z^freqX']],['Amount',0.1,3,0.01,1],['Freq X',0.1,8,0.05,1],['Freq Y',0.1,8,0.05,1]],
+    glsl:`vec2 opComplex(vec2 q, vec4 P){
+  float f = P.x;
+  float A = P.y;
+  float x = q.x * P.z;
+  float y = q.y * P.w;
+  vec2 o;
+  if(f < 0.5){
+    o = vec2(cos(x)*coshf(y), -sin(x)*sinhf(y));
+  } else if(f < 1.5){
+    o = vec2(coshf(x)*cos(y), sinhf(x)*sin(y));
+  } else if(f < 2.5){
+    float d = coshf(y) - cos(x);
+    if(abs(d) < 1e-6) return q;
+    o = vec2(sin(x), -sinhf(y)) / d;
+  } else if(f < 3.5){
+    float d = coshf(x) - cos(y);
+    if(abs(d) < 1e-6) return q;
+    o = vec2(sinhf(x), sin(y)) / d;
+  } else if(f < 4.5){
+    float d = coshf(2.0*q.y) - cos(2.0*q.x);
+    if(abs(d) < 1e-6) return q;
+    o = (2.0/d) * vec2(sin(x)*coshf(y), -cos(x)*sinhf(y));
+  } else if(f < 5.5){
+    float d = coshf(2.0*q.x) - cos(2.0*q.y);
+    if(abs(d) < 1e-6) return q;
+    o = (2.0/d) * vec2(sinhf(x)*cos(y), -coshf(x)*sin(y));
+  } else if(f < 6.5){
+    float e = exp(x);
+    o = vec2(e*cos(y), e*sin(y));
+  } else if(f < 7.5){
+    float d = cos(2.0*q.x) + coshf(2.0*q.y);
+    if(abs(d) < 1e-6) return q;
+    o = (2.0/d) * vec2(cos(x)*coshf(y), sin(x)*sinhf(y));
+  } else if(f < 8.5){
+    float d = cos(2.0*q.y) + coshf(2.0*q.x);
+    if(abs(d) < 1e-6) return q;
+    o = (2.0/d) * vec2(coshf(x)*cos(y), -sinhf(x)*sin(y));
+  } else if(f < 9.5){
+    o = vec2(sin(x)*coshf(y), cos(x)*sinhf(y));
+  } else if(f < 10.5){
+    o = vec2(sinhf(x)*cos(y), coshf(x)*sin(y));
+  } else if(f < 11.5){
+    float d = cos(x) + coshf(y);
+    if(abs(d) < 1e-6) return q;
+    o = vec2(sin(x), sinhf(y)) / d;
+  } else if(f < 12.5){
+    float d = cos(y) + coshf(x);
+    if(abs(d) < 1e-6) return q;
+    o = vec2(sinhf(x), sin(y)) / d;
+  } else if(f < 13.5){
+    if(dot(vec2(x,y), vec2(x,y)) < 1e-12) return q;
+    o = clog(vec2(x, y));
+  } else if(f < 14.5){
+    o = csqrt(vec2(x, y));
+  } else if(f < 15.5){
+    o = casin(vec2(x, y));
+  } else if(f < 16.5){
+    vec2 s = casin(vec2(x, y));
+    o = vec2(1.57079632679 - s.x, -s.y);
+  } else if(f < 17.5){
+    o = catan(vec2(x, y));
+  } else {
+    float rr = max(length(q), 1e-6);
+    float aa = atan(q.y, q.x);
+    o = pow(rr, P.z) * vec2(cos(aa*P.z), sin(aa*P.z));
+  }
+  return A * o;
+}` },
+  { name:'KIFS', fn:'opKifs', deps:[],
+    params:[['Iters',1,12,1,6],['Fold',0,1,0.005,0.25],['Angle\u00b0',-180,180,0.5,25],['Scale',0.5,1.8,0.005,1.05]],
+    glsl:`vec2 opKifs(vec2 q, vec4 P){
+  mat2 R = rot(P.z * DEG) * P.w;
+  vec2 p = q;
+  for(int i = 0; i < 12; i++){
+    if(float(i) >= P.x) break;
+    p = abs(p) - P.y;
+    p = R * p;
+  }
+  return p;
+}` },
+  { name:'Koch fold', fn:'opKoch', deps:[],
+    params:[['Iters',0,6,1,4],['Scale',0.3,4,0.05,1]],
+    glsl:`vec2 opKoch(vec2 q, vec4 P){
+  const float PI = 3.14159265359;
+  vec2 p = q * P.y;
+  float a53 = 5.0/6.0 * PI;
+  p.x = abs(p.x);
+  p.y += tan(a53) * 0.5;
+  vec2 n = vec2(sin(a53), cos(a53));
+  float d = dot(p - vec2(0.5, 0.0), n);
+  p -= n * max(0.0, d) * 2.0;
+  n = vec2(sin(2.0/3.0 * PI), cos(2.0/3.0 * PI));
+  p.x += 0.5;
+  float sc = 1.0;
+  for(int i = 0; i < 6; i++){
+    if(float(i) >= P.x) break;
+    p *= 3.0; sc *= 3.0;
+    p.x -= 1.5;
+    p.x = abs(p.x);
+    p.x -= 0.5;
+    p -= n * 2.0 * min(dot(p, n), 0.0);
+  }
+  return (p / sc) / P.y;
+}` },
+  { name:'Radial pow', fn:'opRadPow', deps:[],
+    params:[['Amount',0.1,3,0.01,1],['Power',-3,3,0.01,1.5]],
+    glsl:`vec2 opRadPow(vec2 q, vec4 P){
+  float r = max(length(q), 1e-6);
+  float rn = P.x * pow(r, P.y);
+  return q * (rn / r);
+}` },
+  { name:'Fresnel', fn:'opFresnel', deps:[],
+    params:[['Rings',0.5,12,0.1,3],['Gain',0.2,3,0.01,1]],
+    glsl:`vec2 opFresnel(vec2 q, vec4 P){
+  float r = length(q);
+  float s = fract(r * P.x) / max(P.y, 0.01);
+  return q * s;
+}` },
+  { name:'DModulus', fn:'opDModulus', deps:['dmwrap'],
+    params:[['Size X',0.01,3,0.01,0.6],['Size Y',0.01,3,0.01,0.6],['Angle\u00b0',0,90,0.5,45],['Iters',1,8,1,3]],
+    glsl:`vec2 opDModulus(vec2 q, vec4 P){
+  float mx = max(P.x, 1e-3), my = max(P.y, 1e-3);
+  float a = P.z * DEG;
+  float ca = cos(a), sa = sin(a);
+  float cc = ca*ca, ss = sa*sa, sc = sa*ca;
+  vec2 p = q;
+  for(int i = 0; i < 8; i++){
+    if(float(i) >= P.w) break;
+    vec2 tid = floor((p + vec2(mx, my)) / (2.0 * vec2(mx, my)));
+    p.x = dmwrap(p.x, mx);
+    p.y = dmwrap(p.y, my);
+    float rr = hash1(tid * 17.31 + vec2(float(i)*13.19 + 3.7, float(i)*7.31 + 1.3));
+    if(rr < cc){
+      p = vec2( p.x*cc + p.y*sc + mx,
+               -p.x*sc + p.y*cc - my);
+    } else {
+      p = vec2( p.x*sc + p.y*ss,
+               -p.x*ss + p.y*sc);
+    }
+    p.x = dmwrap(p.x, mx);
+    p.y = dmwrap(p.y, my);
+  }
+  return p;
+}` },
+  { name:'Wallpaper', fn:'opWallpaper', par:true, deps:['wc'],
+    params:[['Group',0,16,1,16,['p1','p2','pm','pg','cm','pmm','pmg','pgg','cmm','p4','p4m','p4g','p3','p3m1','p31m','p6','p6m']],['Cell',0.2,4,0.05,1.2],['Angle\u00b0',-90,90,0.5,0]],
+    glsl:`vec2 opWallpaper(vec2 q, vec4 P, inout float par){
+  float gp = P.x;
+  float cell = max(P.y, 0.05);
+  vec2 g = rot(-P.z * DEG) * q / cell;
+  vec2 b;
+  float bp = 0.0;
+  if(gp < 11.5){
+    vec2 f = fract(g);
+    float x = f.x, y = f.y;
+    b = f;
+    float bk = f.y*97.0 + f.x;
+    if(gp < 0.5){ }
+    else if(gp < 1.5){ wc(vec2(-x,-y),0.0,b,bk,bp); }
+    else if(gp < 2.5){ wc(vec2(x,-y),1.0,b,bk,bp); }
+    else if(gp < 3.5){ wc(vec2(x+0.5,-y),1.0,b,bk,bp); }
+    else if(gp < 4.5){ wc(vec2(x,-y),1.0,b,bk,bp);
+                       wc(vec2(x+0.5,y+0.5),0.0,b,bk,bp);
+                       wc(vec2(x+0.5,0.5-y),1.0,b,bk,bp); }
+    else if(gp < 5.5){ wc(vec2(-x,-y),0.0,b,bk,bp); wc(vec2(x,-y),1.0,b,bk,bp);
+                       wc(vec2(-x,y),1.0,b,bk,bp); }
+    else if(gp < 6.5){ wc(vec2(-x,-y),0.0,b,bk,bp); wc(vec2(x+0.5,-y),1.0,b,bk,bp);
+                       wc(vec2(0.5-x,y),1.0,b,bk,bp); }
+    else if(gp < 7.5){ wc(vec2(-x,-y),0.0,b,bk,bp);
+                       wc(vec2(x+0.5,0.5-y),1.0,b,bk,bp);
+                       wc(vec2(0.5-x,y+0.5),1.0,b,bk,bp); }
+    else if(gp < 8.5){ wc(vec2(-x,-y),0.0,b,bk,bp); wc(vec2(x,-y),1.0,b,bk,bp);
+                       wc(vec2(-x,y),1.0,b,bk,bp);
+                       wc(vec2(x+0.5,y+0.5),0.0,b,bk,bp); wc(vec2(0.5-x,0.5-y),0.0,b,bk,bp);
+                       wc(vec2(x+0.5,0.5-y),1.0,b,bk,bp); wc(vec2(0.5-x,y+0.5),1.0,b,bk,bp); }
+    else if(gp < 9.5){ wc(vec2(-y,x),0.0,b,bk,bp); wc(vec2(-x,-y),0.0,b,bk,bp);
+                       wc(vec2(y,-x),0.0,b,bk,bp); }
+    else if(gp < 10.5){ wc(vec2(-y,x),0.0,b,bk,bp); wc(vec2(-x,-y),0.0,b,bk,bp);
+                        wc(vec2(y,-x),0.0,b,bk,bp);
+                        wc(vec2(y,x),1.0,b,bk,bp); wc(vec2(-x,y),1.0,b,bk,bp);
+                        wc(vec2(-y,-x),1.0,b,bk,bp); wc(vec2(x,-y),1.0,b,bk,bp); }
+    else { wc(vec2(-y,x),0.0,b,bk,bp); wc(vec2(-x,-y),0.0,b,bk,bp);
+           wc(vec2(y,-x),0.0,b,bk,bp);
+           wc(vec2(y+0.5,x+0.5),1.0,b,bk,bp); wc(vec2(0.5-x,y+0.5),1.0,b,bk,bp);
+           wc(vec2(0.5-y,0.5-x),1.0,b,bk,bp); wc(vec2(x+0.5,0.5-y),1.0,b,bk,bp); }
+    par = mod(par + bp, 2.0);
+    return rot(P.z * DEG) * (b * cell);
+  }
+  mat2 MH = mat2(1.0, 0.0, 0.5, 0.86602540);
+  mat2 MI = mat2(1.0, 0.0, -0.57735027, 1.15470054);
+  vec2 f = fract(MI * g);
+  float rotN; float mir; mat2 SM = mat2(1.0);
+  if(gp < 12.5){ rotN = 3.0; mir = 0.0; }
+  else if(gp < 13.5){ rotN = 3.0; mir = 1.0;
+                      SM = mat2(-1.0, 0.0, -1.0, 1.0); }
+  else if(gp < 14.5){ rotN = 3.0; mir = 1.0;
+                      SM = mat2(1.0, 0.0, 1.0, -1.0); }
+  else if(gp < 15.5){ rotN = 6.0; mir = 0.0; }
+  else { rotN = 6.0; mir = 1.0;
+         SM = mat2(1.0, 0.0, 1.0, -1.0); }
+  mat2 A = (rotN > 4.0) ? mat2(0.0, 1.0, -1.0, 1.0)
+                        : mat2(-1.0, 1.0, -1.0, 0.0);
+  b = f;
+  float bk = f.y*97.0 + f.x;
+  vec2 cur = f;
+  for(int k = 0; k < 6; k++){
+    if(float(k) >= rotN) break;
+    wc(cur, 0.0, b, bk, bp);
+    if(mir > 0.5) wc(SM * cur, 1.0, b, bk, bp);
+    cur = fract(A * cur);
+  }
+  par = mod(par + bp, 2.0);
+  return rot(P.z * DEG) * ((MH * b) * cell);
+}` },
+  { name:'Mirror line', fn:'opMirrorLine', par:true, deps:[],
+    params:[['Angle\u00b0',-180,180,0.5,0],['Side',0,1,1,0,['side A','side B']]],
+    glsl:`vec2 opMirrorLine(vec2 q, vec4 P, inout float par){
+  float a = P.x * DEG;
+  vec2 n = vec2(-sin(a), cos(a));
+  if(P.y > 0.5) n = -n;
+  float d = dot(q, n);
+  if(d > 0.0){ q -= 2.0*d*n; par = mod(par + 1.0, 2.0); }
+  return q;
+}` },
+  { name:'Circle mirror', fn:'opCircleMirror', deps:[],
+    params:[['Radius',0.05,1.5,0.005,0.4],['Mode',0,1,1,0,['ball','window']]],
+    glsl:`vec2 opCircleMirror(vec2 q, vec4 P){
+  float R2 = P.x * P.x;
+  float r2 = max(dot(q, q), 1e-9);
+  if(P.y < 0.5){
+    if(r2 < R2) q *= R2 / r2;
+  } else {
+    if(r2 > R2) q *= R2 / r2;
+  }
+  return q;
+}` },
+  { name:'Frieze', fn:'opFrieze', par:true, deps:[],
+    params:[['Group',0,6,1,1,['p1 hop','p11g step','p1m1 sidle','p2 spin hop','p2mg spin sidle','p11m jump','p2mm spin jump']],['Angle\u00b0',-90,90,0.5,0],['Period',0.1,3,0.01,0.8]],
+    glsl:`vec2 opFrieze(vec2 q, vec4 P, inout float par){
+  float gn = P.x;
+  float a = P.y * DEG;
+  float L = max(P.z, 0.05);
+  vec2 u = rot(-a) * q;
+  float f = fract(u.x / L);
+  float y = u.y;
+  float pp = 0.0;
+  if(gn < 0.5){ }
+  else if(gn < 1.5){
+    if(f >= 0.5){ f -= 0.5; y = -y; pp += 1.0; }
+  }
+  else if(gn < 2.5){
+    if(f > 0.5) pp += 1.0;
+    f = 0.5 - abs(f - 0.5);
+  }
+  else if(gn < 3.5){
+    if(f >= 0.5){ f = 1.0 - f; y = -y; }
+  }
+  else if(gn < 4.5){
+    if(y < 0.0){ y = -y; f = fract(f + 0.5); pp += 1.0; }
+    if(f > 0.5) pp += 1.0;
+    f = 0.5 - abs(f - 0.5);
+  }
+  else if(gn < 5.5){
+    if(y < 0.0) pp += 1.0;
+    y = abs(y);
+  }
+  else {
+    if(y < 0.0) pp += 1.0;
+    y = abs(y);
+    if(f > 0.5) pp += 1.0;
+    f = 0.5 - abs(f - 0.5);
+  }
+  par = mod(par + pp, 2.0);
+  u = vec2(f * L, y);
+  return rot(a) * u;
+}` },
+  { name:'Pleat', fn:'opPleat', par:true, deps:[],
+    params:[['Angle\u00b0',-90,90,0.5,0],['Width',0.05,1.5,0.005,0.3],['Tilt\u00b0',-45,45,0.5,12]],
+    glsl:`vec2 opPleat(vec2 q, vec4 P, inout float par){
+  float a = P.x * DEG;
+  float W = max(P.y, 0.02);
+  float tilt = P.z * DEG;
+  vec2 u = rot(-a) * q;
+  float i = floor(u.x / W);
+  float pr = mod(i, 2.0);
+  float cx = (i + 0.5) * W;
+  vec2 loc = vec2(u.x - cx, u.y);
+  if(pr >= 1.0){ loc.x = -loc.x; tilt = -tilt; par = mod(par + 1.0, 2.0); }
+  loc = rot(tilt) * loc;
+  u = vec2(cx, 0.0) + loc;
+  return rot(a) * u;
+}` },
+  { name:'Hyperbolic', fn:'opHyperbolic', deps:[],
+    params:[['p',3,12,1,4],['q',3,12,1,5],['Scale',0.2,2,0.01,0.7]],
+    glsl:`vec2 opHyperbolic(vec2 q, vec4 P){
+  float p  = max(floor(P.x + 0.5), 3.0);
+  float qn = max(floor(P.y + 0.5), 3.0);
+  float sc = max(P.z, 0.05);
+  vec2 z = q * sc;
+  float rad0 = length(z);
+  if(rad0 > 0.999) z *= 0.999 / rad0;
+  float seg = TAU / (2.0 * p);
+  float C = cos(TAU / (2.0 * qn)) / max(sin(seg), 1e-4);
+  bool hyp = C > 1.0001;
+  float xm = hyp ? sqrt((C - 1.0) / (C + 1.0)) : 0.0;
+  float d  = hyp ? 0.5 * (xm + 1.0 / xm) : 0.0;
+  float rm = hyp ? 0.5 * (1.0 / xm - xm) : 0.0;
+  float rm2 = rm * rm;
+  for(int i = 0; i < 24; i++){
+    float ang = atan(z.y, z.x);
+    float rr  = length(z);
+    ang = mod(ang, 2.0 * seg);
+    if(ang > seg) ang = 2.0 * seg - ang;
+    z = rr * vec2(cos(ang), sin(ang));
+    if(!hyp) break;
+    vec2 dz = z - vec2(d, 0.0);
+    float l2 = dot(dz, dz);
+    if(l2 >= rm2) break;
+    z = vec2(d, 0.0) + dz * (rm2 / l2);
+  }
+  return z / sc;
+}` },
+  { name:'Polyhedral', fn:'opPolyhedral', deps:[],
+    params:[['p',3,5,1,3],['q',3,5,1,5],['Scale',0.2,2,0.01,0.7]],
+    glsl:`vec2 opPolyhedral(vec2 q, vec4 P){
+  float p  = max(floor(P.x + 0.5), 3.0);
+  float qn = max(floor(P.y + 0.5), 3.0);
+  float sc = max(P.z, 0.05);
+  vec2 z = q * sc;
+  float seg = TAU / (2.0 * p);
+  float C = cos(TAU / (2.0 * qn)) / max(sin(seg), 1e-4);
+  bool sph = C < 0.9999;
+  float xm = sph ? sqrt((1.0 - C) / (1.0 + C)) : 0.0;
+  float D  = sph ? 0.5 * (xm - 1.0/xm) : 0.0;
+  float Rm = sph ? 0.5 * (xm + 1.0/xm) : 0.0;
+  float Rm2 = Rm * Rm;
+  for(int i = 0; i < 24; i++){
+    float ang = atan(z.y, z.x);
+    float rr  = length(z);
+    ang = mod(ang, 2.0 * seg);
+    if(ang > seg) ang = 2.0 * seg - ang;
+    z = rr * vec2(cos(ang), sin(ang));
+    if(!sph) break;
+    vec2 dz = z - vec2(D, 0.0);
+    float l2 = dot(dz, dz);
+    if(l2 <= Rm2) break;
+    z = vec2(D, 0.0) + dz * (Rm2 / l2);
+  }
+  return z / sc;
+}` },
+  { name:'Mobius', fn:'opMobius', deps:[],
+    params:[['Offset X',-0.95,0.95,0.01,0.3],['Offset Y',-0.95,0.95,0.01,0],['Rotate\u00b0',-180,180,1,0]],
+    glsl:`vec2 opMobius(vec2 q, vec4 P){
+  vec2 a = vec2(P.x, P.y);
+  float al = length(a);
+  if(al > 0.95) a *= 0.95 / al;
+  vec2 z = q;
+  vec2 n = z - a;
+  vec2 den = vec2(1.0 - (a.x*z.x + a.y*z.y), -(a.x*z.y - a.y*z.x));
+  float dd = max(dot(den, den), 1e-6);
+  vec2 w = vec2(n.x*den.x + n.y*den.y, n.y*den.x - n.x*den.y) / dd;
+  return rot(P.z * DEG) * w;
+}` },
+  { name:'Apollonian', fn:'opApollonian', deps:[],
+    params:[['Iters',1,20,1,8],['Radius',0.5,1.2,0.01,1],['Scale',0.2,2,0.01,0.8]],
+    glsl:`vec2 opApollonian(vec2 q, vec4 P){
+  float sc = max(P.z, 0.05);
+  float rc = 0.86602540 * clamp(P.y, 0.3, 1.5);
+  float rc2 = rc * rc;
+  vec2 c0 = vec2(0.0, 1.0);
+  vec2 c1 = vec2(-0.86602540, -0.5);
+  vec2 c2 = vec2(0.86602540, -0.5);
+  vec2 z = q * sc;
+  for(int i = 0; i < 20; i++){
+    if(float(i) >= P.x) break;
+    bool inv = false;
+    vec2 d0 = z - c0; float l0 = dot(d0, d0);
+    if(l0 < rc2){ z = c0 + d0 * (rc2 / max(l0, 1e-6)); inv = true; }
+    else {
+      vec2 d1 = z - c1; float l1 = dot(d1, d1);
+      if(l1 < rc2){ z = c1 + d1 * (rc2 / max(l1, 1e-6)); inv = true; }
+      else {
+        vec2 d2 = z - c2; float l2 = dot(d2, d2);
+        if(l2 < rc2){ z = c2 + d2 * (rc2 / max(l2, 1e-6)); inv = true; }
+      }
+    }
+    if(!inv) break;
+  }
+  return z / sc;
+}` },
+  { name:'Rosette Cn', fn:'opRosette', deps:[],
+    params:[['Segments',2,24,1,6],['Offset\u00b0',-180,180,1,0]],
+    glsl:`vec2 opRosette(vec2 q, vec4 P){
+  float N = max(floor(P.x + 0.5), 2.0);
+  float seg = TAU / N;
+  float ang = atan(q.y, q.x) + P.y * DEG;
+  float r = length(q);
+  ang = mod(ang, seg);
+  return r * vec2(cos(ang), sin(ang));
+}` },
+  { name:'Aperiodic', fn:'opAperiodic', p2:true, deps:['apVertex'],
+    params:[['Grids',2,7,1,5],['Cell',0.02,1.5,0.005,0.3],['Gamma',-1,1,0.01,0.2],['Mode',0,1,1,0,['cells','local']],['Levels',1,6,1,1],['Inflation',1.05,4,0.001,1.618]],
+    glsl:`vec2 opAperiodic(vec2 q, vec4 P, vec4 P2){
+  float N = clamp(floor(P.x + 0.5), 2.0, 7.0);
+  float cell = max(P.y, 0.02);
+  float gam = P.z;
+  float L = clamp(floor(P2.x + 0.5), 1.0, 6.0);
+  float lam = max(P2.y, 1.05);
+  vec2 acc = vec2(0.0);
+  vec2 p = q;
+  float c = cell;
+  for(int i = 0; i < 6; i++){
+    if(float(i) >= L) break;
+    vec2 v = apVertex(p, N, c, gam);
+    acc += v;
+    p -= v;
+    c /= lam;
+  }
+  if(P.w < 0.5) return acc;
+  return p;
+}` },
+  { name:'Disc', fn:'opDisc', deps:['sinhf','coshf'],
+    params:[['Mode',0,8,1,0,['disc','idisc','wdisc','fdisc','edisc','spiral','squircle','tan','sech']],['Amount',0.1,30,0.1,1],['Twist',-3,3,0.01,0],['Petal',0,8,1,1]],
+    glsl:`vec2 opDisc(vec2 q, vec4 P){
+  float mode = P.x;
+  float A = P.y;
+  float tw = P.z;
+  float petal = max(P.w, 0.0);
+  float rr = length(q);
+  float phi = atan(q.y, q.x) * petal;
+  const float PI  = 3.14159265359;
+  const float M1PI = 0.31830988618;
+  vec2 o;
+  if(mode < 3.5){
+    float a, r;
+    if(mode < 0.5){
+      a = PI * rr;
+      r = phi * M1PI;
+      o = vec2(sin(a), cos(a)) * r;
+    } else if(mode < 1.5){
+      a = PI / (rr + 1.0);
+      r = phi * M1PI;
+      o = vec2(cos(a), sin(a)) * r;
+    } else if(mode < 2.5){
+      a = PI / (rr + 1.0);
+      r = phi * M1PI;
+      if(r > 0.0) a = PI - a;
+      o = vec2(cos(a), sin(a)) * r;
+    } else {
+      float af = 2.0*PI / (rr + 1.0);
+      float rf = (phi * M1PI + 1.0) * 0.5;
+      o = rf * vec2(cos(af), sin(af));
+    }
+    if(abs(tw) > 1e-5){
+      float oa = atan(o.y, o.x) + tw * length(o);
+      o = length(o) * vec2(cos(oa), sin(oa));
+    }
+    return A * o;
+  }
+  if(mode > 3.5 && mode < 4.5){
+    float sumsq = dot(q, q);
+    float tmp = sumsq + 1.0;
+    float tmp2 = 2.0 * q.x;
+    float r1 = sqrt(max(tmp + tmp2, 0.0));
+    float r2 = sqrt(max(tmp - tmp2, 0.0));
+    float xmax = (r1 + r2) * 0.5;
+    float a1 = log(max(xmax + sqrt(max(xmax - 1.0, 0.0)), 1e-9));
+    float a2 = -acos(clamp(q.x / max(xmax, 1e-9), -1.0, 1.0));
+    float w = A / 11.57034632;
+    float snv = sin(a1), csv = cos(a1);
+    float snhu = sinhf(a2), cshu = coshf(a2);
+    if(q.y > 0.0) snv = -snv;
+    return vec2(w * cshu * csv, w * snhu * snv);
+  }
+  {
+    float pn = petal < 0.001 ? 1.0 : petal;
+    float a, r;
+    if(mode < 5.5){
+      a = PI * rr + tw * phi;
+      r = phi * M1PI;
+      o = vec2(sin(a), cos(a)) * r;
+    } else if(mode < 6.5){
+      float pm = 1.0 + petal;
+      float rn = pow(pow(abs(q.x), pm) + pow(abs(q.y), pm), 1.0 / pm);
+      float ph2 = atan(q.y, q.x);
+      a = PI * rn;
+      r = ph2 * M1PI;
+      o = vec2(sin(a), cos(a)) * r;
+      if(abs(tw) > 1e-5){ float oa = atan(o.y,o.x) + tw*length(o); o = length(o)*vec2(cos(oa),sin(oa)); }
+    } else if(mode < 7.5){
+      float k = 1.0 + abs(tw);
+      a = PI * rr;
+      r = (tan(clamp(phi, -1.5, 1.5) * k * 0.5) / max(k, 1e-3)) * M1PI;
+      o = vec2(sin(a), cos(a)) * r;
+    } else {
+      float env = 1.0 / coshf(rr * (0.3 + abs(tw)));
+      a = PI * rr;
+      r = phi * M1PI * env;
+      o = vec2(sin(a), cos(a)) * r;
+    }
+    return A * o;
+  }
+}` },
+  { name:'Julian', fn:'opJulian', deps:[],
+    params:[['Power',1,20,1,5],['Dist',-2,3,0.01,1],['Wedge cover',0,1,1,1,['fan','random']]],
+    glsl:`vec2 opJulian(vec2 q, vec4 P){
+  float power = max(floor(P.x + 0.5), 1.0);
+  float dist = P.y;
+  float phi = atan(q.y, q.x);
+  float r = length(q);
+  float k;
+  if(P.z < 0.5){
+    k = floor((phi + 3.14159265) / TAU * power);
+  } else {
+    float seg = floor((phi + 3.14159265) / (TAU / power));
+    k = floor(hash1(vec2(seg * 7.13, 1.7)) * power);
+  }
+  float a = (phi + TAU * k) / power;
+  float rp = pow(max(r, 1e-9), dist / power);
+  return rp * vec2(cos(a), sin(a));
+}` },
 ];
 export { OPS };
