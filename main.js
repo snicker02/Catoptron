@@ -62,13 +62,9 @@ const PU = {};
 const postLoc = gl.getAttribLocation(postProg, 'aPos');
 
 /* ================= assembled-program cache ================= */
-/* the fold shader is assembled per stack+renderer; each program has its own uniform locations */
-const UNIFORM_SCALARS = ['uTex','uCanvas','uImg','uDepth','uStep','uTwist','uFlip','uCenter','uShift',
-  'uZoom','uFrame','uFrameW','uTint','uTintA','uHueK','uChroma','uRipple','uVign','uGrain','uPhase',
-  'uSpinA','uWavePh','uSeed','uPrev','uFbAmt','uCcMode','uCcTint','uPost'];
-const UNIFORM_NAMES = [...UNIFORM_SCALARS];
-for(let i = 0; i < MAX_OPS; i++) UNIFORM_NAMES.push(`uOpP[${i}]`, `uOpP2[${i}]`, `uOpO[${i}]`);
-const cache = createProgramCache(gl, UNIFORM_NAMES);
+/* the fold shader is assembled per stack+renderer; each program has its own uniform locations,
+   discovered automatically by the cache, so operators declare as many param banks as they need */
+const cache = createProgramCache(gl);
 let curEntry = null;
 let shaderErrShown = false;
 
@@ -335,6 +331,11 @@ const FACTORY = [
   {name:"eDisc",              d:{rend:0, stack:[{t:42,p:[4,1,0,1]}], step:0.8, twist:0, depth:6, src:"grid"}},
   {name:"Julian",             d:{rend:0, stack:[{t:43,p:[5,1,0]}], step:0.8, twist:0, depth:6, src:"plasma"}},
   {name:"Petal kaleido",      d:{rend:0, stack:[{t:23,p:[8,0.15]},{t:0,p:[12,0]}], step:0.75, twist:14, depth:16}},
+  {name:'BusyBrad Susan',      d:{rend:0, stack:[{t:44,p:[0,1,0,0,0.1,0.2,0.4,4,1,0,0,0,1,1]}], step:0.75, twist:0, depth:8, src:'grid'}},
+  {name:'BusyBrad Jess',       d:{rend:0, stack:[{t:44,p:[1,1,0,0,0.15,0.3,0.4,6,1,0,0,0,1,1]}], step:0.75, twist:0, depth:8, src:'plasma'}},
+  {name:'BusyBrad Combined',   d:{rend:0, stack:[{t:44,p:[2,1,0,0,0.1,0.2,0.4,6,1,1.5,1.2,0,1,1]}], step:0.78, twist:0, depth:6, src:'plasma'}},
+  {name:'BusyBrad Sensen',     d:{rend:0, stack:[{t:44,p:[0,1.2,0,0,0.15,0.3,0.4,4,1,0,0,1,2,1]}], step:0.78, twist:0, depth:6, src:'grid'}},
+  {name:'BusyBrad feedback',   d:{rend:5, stack:[{t:44,p:[2,1,0,0,0.1,0.25,0.4,5,1,1.0,0.8,0,1,1]}], step:0.62, twist:6, fbAmt:0.9, src:'plasma'}},
 ];
 let customPresets = [];
 
@@ -983,13 +984,17 @@ function setUniforms(entry, w, h){
   gl.uniform1i(L.uTex, 0);
   gl.uniform2f(L.uCanvas, w, h);
   gl.uniform2f(L.uImg, imgW, imgH);
-  for(let i = 0; i < MAX_OPS; i++){
+  for(let i = 0; i < state.stack.length; i++){
     const slot = state.stack[i];
-    const p = slot ? slot.p : [];
-    gl.uniform4f(L[`uOpP[${i}]`], p[0]||0, p[1]||0, p[2]||0, p[3]||0);
-    gl.uniform4f(L[`uOpP2[${i}]`], p[4]||0, p[5]||0, p[6]||0, p[7]||0);
-    const o = (slot && slot.o) ? slot.o : [0, 0];
-    gl.uniform2f(L[`uOpO[${i}]`], o[0], o[1]);
+    const p = slot.p || [];
+    const banks = Math.max(1, Math.ceil(OPS[slot.t].params.length / 4));
+    for(let b = 0; b < banks; b++){
+      const loc = L[`uP${i}_${b}`];
+      if(loc) gl.uniform4f(loc, p[4*b]||0, p[4*b+1]||0, p[4*b+2]||0, p[4*b+3]||0);
+    }
+    const o = slot.o || [0, 0];
+    const ol = L[`uO${i}`];
+    if(ol) gl.uniform2f(ol, o[0], o[1]);
   }
   gl.uniform1f(L.uDepth, state.depth);
   gl.uniform1f(L.uStep, state.step);
