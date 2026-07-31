@@ -8,7 +8,7 @@ import { assemble, signature } from './assemble.js';
 const VS = `attribute vec2 aPos; varying vec2 vUv;
 void main(){ vUv = aPos*0.5+0.5; gl_Position = vec4(aPos,0.,1.); }`;
 
-export function createProgramCache(gl, uniformNames){
+export function createProgramCache(gl){
   const ext = gl.getExtension('KHR_parallel_shader_compile');
   const cache = new Map();          // sig -> entry
   let seededOnce = false;           // first program blocks so we never show a blank frame
@@ -41,7 +41,13 @@ export function createProgramCache(gl, uniformNames){
       entry.error = 'link: ' + gl.getProgramInfoLog(entry.prog);
     else {
       entry.locs = {};
-      for(const n of uniformNames) entry.locs[n] = gl.getUniformLocation(entry.prog, n);
+      const count = gl.getProgramParameter(entry.prog, gl.ACTIVE_UNIFORMS);
+      for(let i = 0; i < count; i++){
+        const info = gl.getActiveUniform(entry.prog, i);
+        if(!info) continue;
+        const nm = info.name;
+        entry.locs[nm] = gl.getUniformLocation(entry.prog, nm);
+      }
       entry.aPos = gl.getAttribLocation(entry.prog, 'aPos');
     }
     entry.ready = true;
