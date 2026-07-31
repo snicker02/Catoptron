@@ -435,7 +435,12 @@ sliders.forEach(([id, vid, fmt])=>{
   }
 });
 $('tintC').addEventListener('input', e=> state.tint = e.target.value);
-$('ccMode').addEventListener('change', e=> state.ccMode = +e.target.value);
+$('ccMode').addEventListener('change', e=>{
+  state.ccMode = +e.target.value;
+  if(state.ccMode > 0 && !state.stack.some(s => OPS[s.t].par || OPS[s.t].ccop)){
+    toast('needs a reflecting fold (Polar, Mirror, Wallpaper…) or the Counterchange fold in the stack');
+  }
+});
 $('ccTint').addEventListener('input', e=> state.ccTint = e.target.value);
 $('srcSel').addEventListener('change', e=>{
   state.src = e.target.value;
