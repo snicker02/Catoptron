@@ -115,5 +115,76 @@ const HELPERS = {
   if(m < 26.5) return casinh(crecip(z));                  // acosech
   return catanh(crecip(z));                               // acoth
 }` },
+  whash:  { deps:[], src:`float whash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123); }` },
+  asinh_f:{ deps:[], src:`float asinh_f(float x){ return log(x + sqrt(x*x + 1.0)); }` },
+  sqr_f:  { deps:[], src:`float sqr_f(float x){ return x*x; }` },
+  tanh_f: { deps:[], src:`float tanh_f(float x){ float e2 = exp(2.0*x); return (e2 - 1.0)/(e2 + 1.0); }` },
+  vib_mod:{ deps:[], src:`float vib_mod(float amp, float freq, float x){ return amp * cos(x * freq * 6.28318); }` },
+  gauss4: { deps:['whash'], src:`float gauss4(vec2 p, float s){ return (whash(p+vec2(s,1.0))+whash(p+vec2(s*2.1,2.4))+whash(p+vec2(s*3.5,3.8))+whash(p+vec2(s*4.9,5.2))) - 2.0; }` },
+  cpow:   { deps:[], src:`vec2 cpow(vec2 z, float n){ float r = length(z) + 1e-10; float a = atan(z.y, z.x); return pow(r, n) * vec2(cos(a*n), sin(a*n)); }` },
+  hash_n: { deps:[], src:`float hash_n(vec2 p){ p = fract(p * vec2(127.1, 311.7)); p += dot(p, p + 19.19); return fract(p.x * p.y); }` },
+  vnoise: { deps:['hash_n'], src:`float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f); float a = hash_n(i); float b = hash_n(i + vec2(1.0,0.0)); float c = hash_n(i + vec2(0.0,1.0)); float d = hash_n(i + vec2(1.0,1.0)); return mix(mix(a,b,f.x), mix(c,d,f.x), f.y); }` },
+  fbm:    { deps:['vnoise'], src:`float fbm(vec2 p, float oct, float rough){ float val=0.0, amp=0.5, freq=1.0; for(int i=0;i<8;i++){ if(float(i)>=oct) break; val += amp*vnoise(p*freq); amp *= rough; freq *= 2.0; } return val; }` },
+  bessel_j1:{ deps:[], src:`float bessel_j1(float x){
+  float ax = abs(x); float ans;
+  if(ax < 8.0){
+    float y = x*x;
+    float n = x*(72362614232.0 + y*(-7895059235.0 + y*(242396853.1 + y*(-2972611.439 + y*(15704.48260 + y*(-30.16036606))))));
+    float d = 144725228442.0 + y*(2300535178.0 + y*(18583304.74 + y*(99447.43394 + y*(376.9991397 + y*1.0))));
+    ans = n/d;
+  } else {
+    float z = 8.0/ax; float y = z*z; float xx = ax - 2.356194491;
+    float p1 = 1.0 + y*(-0.001831163 + y*(0.3516396496e-4 + y*(-0.2457520174e-5 + y*0.240337019e-6)));
+    float p2 = 0.04687499995 + y*(-0.002002690873 + y*(0.8449199096e-4 + y*(-0.88228987e-5 + y*0.105787412e-5)));
+    ans = sqrt(0.636619772/ax)*(cos(xx)*p1 - z*sin(xx)*p2);
+    if(x < 0.0) ans = -ans;
+  }
+  return ans;
+}` },
+  jacobi_sn:{ deps:['tanh_f'], src:`float jacobi_sn(float uu, float emmc){
+  float CA = 3e-4;
+  float sn, cn, dn, a, b, c, d, emc, u;
+  emc = emmc; u = uu;
+  if(abs(emc) < 1e-7){ return tanh_f(u); }
+  bool bo = false; d = 0.0;
+  if(emc < 0.0){ bo = true; d = 1.0 - emc; emc = -emc/d; d = sqrt(d); u = d*u; }
+  a = 1.0; dn = 1.0; c = 0.0;
+  float em0,em1,em2,em3,em4,em5,em6,em7;
+  float en0,en1,en2,en3,en4,en5,en6,en7;
+  int lv = 0;
+  em0=a; emc=sqrt(abs(emc)); en0=emc; c=0.5*(a+emc);
+  if(abs(a-emc) > CA*a){ emc=a*emc; a=c; lv=1;
+  em1=a; emc=sqrt(abs(emc)); en1=emc; c=0.5*(a+emc);
+  if(abs(a-emc) > CA*a){ emc=a*emc; a=c; lv=2;
+  em2=a; emc=sqrt(abs(emc)); en2=emc; c=0.5*(a+emc);
+  if(abs(a-emc) > CA*a){ emc=a*emc; a=c; lv=3;
+  em3=a; emc=sqrt(abs(emc)); en3=emc; c=0.5*(a+emc);
+  if(abs(a-emc) > CA*a){ emc=a*emc; a=c; lv=4;
+  em4=a; emc=sqrt(abs(emc)); en4=emc; c=0.5*(a+emc);
+  if(abs(a-emc) > CA*a){ emc=a*emc; a=c; lv=5;
+  em5=a; emc=sqrt(abs(emc)); en5=emc; c=0.5*(a+emc);
+  if(abs(a-emc) > CA*a){ emc=a*emc; a=c; lv=6;
+  em6=a; emc=sqrt(abs(emc)); en6=emc; c=0.5*(a+emc);
+  if(abs(a-emc) > CA*a){ emc=a*emc; a=c; lv=7;
+  em7=a; emc=sqrt(abs(emc)); en7=emc; c=0.5*(a+emc);
+  }}}}}}}
+  u = c*u; sn = sin(u); cn = cos(u);
+  if(abs(sn) > 1e-7){
+    a = cn/sn; c = a*c;
+    if(lv >= 7){ b=em7; a=c*a; c=dn*c; dn=(en7+a)/(b+a); a=c/b; }
+    if(lv >= 6){ b=em6; a=c*a; c=dn*c; dn=(en6+a)/(b+a); a=c/b; }
+    if(lv >= 5){ b=em5; a=c*a; c=dn*c; dn=(en5+a)/(b+a); a=c/b; }
+    if(lv >= 4){ b=em4; a=c*a; c=dn*c; dn=(en4+a)/(b+a); a=c/b; }
+    if(lv >= 3){ b=em3; a=c*a; c=dn*c; dn=(en3+a)/(b+a); a=c/b; }
+    if(lv >= 2){ b=em2; a=c*a; c=dn*c; dn=(en2+a)/(b+a); a=c/b; }
+    if(lv >= 1){ b=em1; a=c*a; c=dn*c; dn=(en1+a)/(b+a); a=c/b; }
+    { b=em0; a=c*a; c=dn*c; dn=(en0+a)/(b+a); a=c/b; }
+    a = 1.0/sqrt(c*c + 1.0);
+    sn = (sn < 0.0) ? -a : a;
+    cn = c*sn;
+  }
+  if(bo){ float tmp = dn; dn = cn; cn = tmp; sn = sn/d; }
+  return sn;
+}` },
 };
 export {HELPERS};
