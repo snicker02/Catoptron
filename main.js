@@ -1541,3 +1541,16 @@ $('exportBtn').addEventListener('click', ()=>{
     toast(`exported ${ow}\u00d7${oh}`);
   }, 'image/png');
 });
+
+
+// ── user guide overlay ───────────────────────────────────────────────
+(function(){
+  const ov = document.getElementById('helpOverlay');
+  if(!ov) return;
+  const open  = ()=> ov.classList.add('show');
+  const close = ()=> ov.classList.remove('show');
+  const btn = document.getElementById('helpBtn');   if(btn) btn.addEventListener('click', open);
+  const x   = document.getElementById('helpClose'); if(x)   x.addEventListener('click', close);
+  ov.addEventListener('click', e=>{ if(e.target === ov) close(); });
+  document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && ov.classList.contains('show')) close(); });
+})();
