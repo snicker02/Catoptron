@@ -360,6 +360,12 @@ const FACTORY = [
   {name:"Lazy Jess",         d:{rend:0, stack:[{t:47,p:[2,0.6,0.4,0.2,0.1,0.1,0.2,1,0.5,1.5708,5,0.6,0.1,1,0,1]}], step:0.8, twist:0, depth:6, src:"grid"}},
   {name:"Lazy Jess star",    d:{rend:0, stack:[{t:47,p:[2,0.6,0.4,0.2,0.1,0.1,0.2,1,0.5,1.5708,3,0.4,0,2,0,1]}], step:0.8, twist:0, depth:6, src:"plasma"}},
   {name:"Lazy Sensen",       d:{rend:0, stack:[{t:47,p:[0,1,0.4,0.2,0.2,0.1,0.2,1,0.5,1.5708,4,3.14159,0,1,1,2]}], step:0.8, twist:0, depth:6, src:"grid"}},
+  {name:"Loonie",            d:{rend:0, stack:[{t:48,p:[0,1,1,4,0.15,0.25,0]}], step:0.8, twist:0, depth:8, src:"grid"}},
+  {name:"Loonie big bubble", d:{rend:0, stack:[{t:48,p:[0,0.9,1.8,4,0.15,0.25,0]}], step:0.8, twist:0, depth:8, src:"plasma"}},
+  {name:"Loonie2 square",    d:{rend:0, stack:[{t:48,p:[1,1,1,4,0.15,0.25,0]}], step:0.8, twist:0, depth:6, src:"grid"}},
+  {name:"Loonie2 star",      d:{rend:0, stack:[{t:48,p:[1,1,1,5,0.8,0.1,0]}], step:0.8, twist:0, depth:6, src:"plasma"}},
+  {name:"Loonie2 hex spin",  d:{rend:0, stack:[{t:48,p:[1,1,1,6,0.3,0.4,15]}], step:0.8, twist:0, depth:6, src:"grid"}},
+  {name:"Loonie3 lens",      d:{rend:0, stack:[{t:48,p:[2,1,1,4,0.15,0.25,0]}], step:0.8, twist:0, depth:6, src:"plasma"}},
 ];
 let customPresets = [];
 
