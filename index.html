@@ -187,6 +187,30 @@ input[type=file]{display:none}
   #panel{flex:1;border-left:none;border-top:1px solid var(--edge)}
 }
 @media (prefers-reduced-motion:reduce){ #toast{transition:none} }
+
+/* ── user guide overlay ─────────────────────────────────────────── */
+#helpBtn{font-family:var(--mono);font-weight:700}
+#helpOverlay{position:fixed;inset:0;z-index:60;display:none;background:rgba(6,9,14,.72);backdrop-filter:blur(4px);padding:38px 18px;overflow:auto}
+#helpOverlay.show{display:block}
+#helpPanel{max-width:920px;margin:0 auto;background:var(--panel);border:1px solid var(--edge);border-radius:14px;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+#helpPanel .help-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:12px;padding:14px 22px;border-bottom:1px solid var(--edge);background:linear-gradient(180deg,var(--panel2),#161c28);border-radius:14px 14px 0 0}
+#helpPanel .help-head h2{font-size:15px;letter-spacing:.4px;color:var(--ice2);margin:0}
+#helpPanel .help-head .spacer{flex:1}
+#helpClose{font-family:var(--mono);cursor:pointer}
+.help-doc{padding:22px 26px 40px;color:var(--txt);line-height:1.55;font-size:13.5px}
+.help-doc h2{font-size:15px;color:var(--ice1);margin:26px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--edge)}
+.help-doc h2:first-of-type{margin-top:0}
+.help-doc h3{font-size:12px;color:var(--ice2);margin:18px 0 6px;text-transform:uppercase;letter-spacing:.6px}
+.help-doc p{margin:0 0 10px;color:#c4cfe0}
+.help-doc ul{margin:0 0 12px 18px}.help-doc li{margin:3px 0;color:#c4cfe0}
+.help-doc b,.help-doc strong{color:var(--txt)}
+.help-doc code{font-family:var(--mono);font-size:12px;background:#0e1119;border:1px solid var(--edge);border-radius:4px;padding:1px 5px;color:var(--ice2)}
+.help-doc pre{font-family:var(--mono);font-size:11.5px;background:#0e1119;border:1px solid var(--edge);border-radius:8px;padding:12px 14px;overflow:auto;color:#9fb2cf;margin:0 0 14px;line-height:1.4}
+.help-doc table{width:100%;border-collapse:collapse;margin:6px 0 16px;font-size:12.5px}
+.help-doc th,.help-doc td{text-align:left;padding:6px 10px;border:1px solid var(--edge);vertical-align:top}
+.help-doc th{background:var(--panel2);color:var(--ice2);font-weight:500}
+.help-doc td:first-child{white-space:nowrap;color:var(--ice1);font-weight:500}
+.help-doc .tip{background:#121a22;border-left:3px solid var(--ice1);padding:8px 12px;border-radius:0 6px 6px 0;margin:0 0 12px}
 </style>
 </head>
 <body>
@@ -195,6 +219,7 @@ input[type=file]{display:none}
   <span class="sub">fold-stack photo reflector</span>
   <span class="spacer"></span>
   <button id="pauseBtn" title="Pause / resume animation (Space)">&#10074;&#10074;</button>
+  <button id="helpBtn" title="User guide">?</button>
   <span class="hint">drop / paste an image &nbsp;·&nbsp; drag canvas = vanishing point &nbsp;·&nbsp; dbl-click = recenter</span>
 </header>
 <main>
@@ -385,6 +410,174 @@ input[type=file]{display:none}
 
   </div>
 </main>
+<div id="helpOverlay">
+  <div id="helpPanel">
+    <div class="help-head">
+      <h2>Hall of Mirrors &mdash; User Guide</h2>
+      <span class="spacer"></span>
+      <button id="helpClose" title="Close (Esc)">&times; close</button>
+    </div>
+    <div class="help-doc">
+      <p>Hall of Mirrors turns a photo (or a built-in pattern) into kaleidoscopic, fractal, and conformal art. You build an effect by <b>stacking coordinate &ldquo;folds&rdquo;</b> and choosing a <b>renderer</b> that reflects and recurses the result, then dress it with color, framing, and motion. Everything runs live on the GPU &mdash; nothing is uploaded.</p>
+
+      <h2>The idea in one picture</h2>
+      <pre>SOURCE          FOLD STACK              RENDERER          GLASS           MOTION
+image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/Droste/&hellip; &rarr;   color/frame &rarr;   animate</pre>
+      <p>Read it left to right. Each <b>fold</b> bends the coordinate grid; folds <b>compose in order</b>, so the same folds in a different order give a different result. The <b>renderer</b> mirrors/repeats that bent grid into the final structure. <b>Glass</b> handles color and framing. <b>Motion</b> animates it for video.</p>
+      <div class="tip">Best habit: <b>add one fold, see what it does, then add the next.</b> Stacks of 2&ndash;4 folds already go a long way.</div>
+
+      <h2>Quick start</h2>
+      <ul>
+        <li><b>Source</b>: <b>Load image</b> for your own photo, or pick a built-in pattern (orbs, plasma, grid/polar/checker probe) to learn an effect against a clean reference.</li>
+        <li><b>Renderer</b>: start on <b>Panes</b>.</li>
+        <li><b>Fold stack</b>: pick an operator in the add dropdown and click <b>+</b>. Try <b>Polar fold</b> first &mdash; instant kaleidoscope.</li>
+        <li>Drag its sliders; add a second fold (Swirl or Spiral).</li>
+        <li>Open <b>Presets</b> to see full recipes. <b>Export PNG</b> when happy, or <b>Record / HQ Video</b> for animation.</li>
+      </ul>
+
+      <h2>Renderers</h2>
+      <p>The renderer decides how the folded plane is reflected and repeated. Same stack + different renderer = very different image, so switch often.</p>
+      <table><tr><th>Renderer</th><th>What it does</th><th>Good for</th></tr>
+        <tr><td>Panes</td><td>Straightforward mirrored tiling</td><td>Clean kaleidoscopes, learning a fold</td></tr>
+        <tr><td>Droste</td><td>Log-spiral recursion (image inside itself)</td><td>Infinite zoom, vortices</td></tr>
+        <tr><td>Room</td><td>Opposed-mirror corridor</td><td>Deep receding reflections</td></tr>
+        <tr><td>Tube</td><td>Wraps the plane around a cylinder</td><td>Tunnels, wormholes</td></tr>
+        <tr><td>Strip</td><td>Repeats along one band</td><td>Friezes, ribbons</td></tr>
+        <tr><td>Feedback</td><td>Feeds the previous frame back in</td><td>Trails, painterly buildup</td></tr>
+      </table>
+      <p>Shared controls: <b>Depth</b> (reflection/recursion steps), <b>Step scale</b> (zoom per level), <b>Twist</b> (rotation per level), <b>Shift X/Y</b> &amp; <b>Zoom</b> (pan/zoom), <b>mirrored</b> (flip alternating tiles), and <b>Feedback</b> amount (trail length, Feedback renderer only).</p>
+
+      <h2>The fold stack</h2>
+      <ul>
+        <li><b>Add</b> from the dropdown; it appends to the bottom.</li>
+        <li><b>Reorder</b> with &uarr;/&darr; &mdash; order matters (Swirl-then-Mirror &ne; Mirror-then-Swirl).</li>
+        <li><b>Remove</b> with &times;.</li>
+        <li>Numeric params are sliders; <b>choice params are dropdowns</b> (mode, style, symmetry group&hellip;).</li>
+        <li><b>Mode-aware:</b> multi-mode folds show only the current mode&rsquo;s parameters.</li>
+        <li><b>Origin (&oplus;):</b> click it and <b>drag on the canvas</b> to place that fold&rsquo;s center &mdash; great for off-center swirls and lenses.</li>
+      </ul>
+
+      <h2>Operator reference</h2>
+      <p>All 49 folds, grouped by what they do. The big multi-mode banks are described below the tables.</p>
+
+      <h3>Basic transforms</h3>
+      <table><tr><th>Fold</th><th>What it does</th><th>Key params</th></tr>
+        <tr><td>Rotate</td><td>Spins coordinates</td><td>Angle&deg;</td></tr>
+        <tr><td>Scale</td><td>Zooms coordinates</td><td>Factor</td></tr>
+        <tr><td>Shift</td><td>Translates the plane</td><td>X, Y</td></tr>
+        <tr><td>Shear</td><td>Slants the plane</td><td>X, Y</td></tr>
+        <tr><td>Mosaic</td><td>Snaps to a blocky grid</td><td>Cells</td></tr>
+      </table>
+
+      <h3>Kaleidoscope &amp; symmetry</h3>
+      <table><tr><th>Fold</th><th>What it does</th><th>Key params</th></tr>
+        <tr><td>Polar fold</td><td>Wedge kaleidoscope &mdash; mirrors N slices</td><td>Segments, Offset&deg;</td></tr>
+        <tr><td>Rosette Cn</td><td>Rotational (Cn) symmetry, no mirror &mdash; pinwheels</td><td>Segments, Offset&deg;</td></tr>
+        <tr><td>Triangle fold</td><td>Triangular kaleidoscope</td><td>Scale</td></tr>
+        <tr><td>Mirror line</td><td>Reflect across a line</td><td>Angle&deg;, Side</td></tr>
+        <tr><td>Mirror tile</td><td>Tiles X&times;Y with mirror/repeat</td><td>Tiles X/Y, Mode</td></tr>
+        <tr><td>Wallpaper</td><td>All 17 wallpaper groups</td><td>Group, Cell, Angle&deg;</td></tr>
+        <tr><td>Frieze</td><td>The 7 frieze (strip) groups</td><td>Group, Angle&deg;, Period</td></tr>
+        <tr><td>Hyperbolic</td><td>Hyperbolic {p,q} tiling (Poincar&eacute; disk)</td><td>p, q, Scale</td></tr>
+        <tr><td>Polyhedral</td><td>Spherical/polyhedral {p,q} symmetry</td><td>p, q, Scale</td></tr>
+        <tr><td>Aperiodic</td><td>Quasicrystal tilings (Penrose, Ammann)</td><td>Grids, Cell, Gamma, Mode, Levels, Inflation</td></tr>
+      </table>
+
+      <h3>Swirls, spirals &amp; waves</h3>
+      <table><tr><th>Fold</th><th>What it does</th><th>Key params</th></tr>
+        <tr><td>Swirl</td><td>Whirlpool &mdash; rotation grows with radius</td><td>Amount</td></tr>
+        <tr><td>Spiral</td><td>Spiral distortion</td><td>Amount</td></tr>
+        <tr><td>Log spiral</td><td>Logarithmic spiral arms</td><td>Scale, Turn&deg;, Arms, Mirror</td></tr>
+        <tr><td>Wave warp</td><td>Sine/triangle/saw/square displacement</td><td>Amp, Freq, Wave</td></tr>
+        <tr><td>Wave bank</td><td>17-style mega wave warper (below)</td><td>Style + per-style</td></tr>
+        <tr><td>Pleat</td><td>Folded-paper pleats</td><td>Angle&deg;, Width, Tilt&deg;</td></tr>
+        <tr><td>Petal</td><td>Flower-petal lobes</td><td>Lobes, Amp</td></tr>
+      </table>
+
+      <h3>Lenses, rings &amp; bubbles</h3>
+      <table><tr><th>Fold</th><th>What it does</th><th>Key params</th></tr>
+        <tr><td>Spherical</td><td>Spherical inversion (1/r&sup2;) &mdash; fisheye bubble</td><td>Radius</td></tr>
+        <tr><td>Lens</td><td>Radial magnification</td><td>Curve</td></tr>
+        <tr><td>Ring fold</td><td>Folds into concentric rings</td><td>Density</td></tr>
+        <tr><td>Fresnel</td><td>Concentric Fresnel rings</td><td>Rings, Gain</td></tr>
+        <tr><td>Bubbles</td><td>Circle-packing bubbles</td><td>Scale, Floor, Iters</td></tr>
+        <tr><td>Circle mirror</td><td>Reflect across a circle (ball/window)</td><td>Radius, Mode</td></tr>
+        <tr><td>Radial pow</td><td>Raises radius to a power</td><td>Amount, Power</td></tr>
+        <tr><td>Loonie</td><td>Circle-inversion bubbles (below)</td><td>Mode, Amount, +</td></tr>
+      </table>
+
+      <h3>Conformal &amp; complex maps</h3>
+      <table><tr><th>Fold</th><th>What it does</th><th>Key params</th></tr>
+        <tr><td>Complex</td><td>4-stage complex-function pipeline (below)</td><td>Stage 1&ndash;4, Freq, Reflect</td></tr>
+        <tr><td>Complex sum</td><td>26-weight complex accumulator (below)</td><td>weights, affine, Reflect</td></tr>
+        <tr><td>Mobius</td><td>Simple M&ouml;bius transform</td><td>Offset X/Y, Rotate&deg;</td></tr>
+        <tr><td>Mobius abcd</td><td>Full M&ouml;bius (az+b)/(cz+d)</td><td>Re/Im a,b,c,d</td></tr>
+        <tr><td>Bipolar</td><td>Bipolar conformal map &mdash; lens/eye</td><td>Amount, Shift</td></tr>
+        <tr><td>Elliptic</td><td>Elliptic conformal map</td><td>Amount, Mode</td></tr>
+        <tr><td>Disc</td><td>Disc-family maps (disc, idisc, spiral, squircle&hellip;)</td><td>Mode, Amount, Twist, Petal</td></tr>
+      </table>
+
+      <h3>Fractal folds</h3>
+      <table><tr><th>Fold</th><th>What it does</th><th>Key params</th></tr>
+        <tr><td>KIFS</td><td>Kaleidoscopic IFS fractal fold</td><td>Iters, Fold, Angle&deg;, Scale</td></tr>
+        <tr><td>Koch fold</td><td>Koch-curve folding</td><td>Iters, Scale</td></tr>
+        <tr><td>DModulus</td><td>Double-modulus fractal tiling</td><td>Size X/Y, Angle&deg;, Iters</td></tr>
+        <tr><td>Shatter</td><td>Tilted cells (shattered glass)</td><td>Cells, Tilt</td></tr>
+        <tr><td>Kleinian</td><td>Kleinian-group inversion fractal</td><td>Circles, Radius, Iters, Scale, Bound, Spin&deg;, Twist&deg;, Frame</td></tr>
+        <tr><td>Fuchsian</td><td>Fuchsian group (hyperbolic tilings)</td><td>trace ta/tb/tab, Iters</td></tr>
+        <tr><td>Apollonian</td><td>Apollonian gasket circle packing</td><td>Iters, Radius, Scale</td></tr>
+        <tr><td>Juliascope</td><td>Julia-set wedge mapping</td><td>Power, Dist, Wedge, Iters</td></tr>
+        <tr><td>Julian</td><td>Julia mapping</td><td>Power, Dist, Wedge</td></tr>
+      </table>
+
+      <h3>The big multi-mode banks</h3>
+      <ul>
+        <li><b>Complex</b> &mdash; up to <b>four</b> complex functions in sequence (1/z, z&sup2;, sqrt, exp, log, the trig/hyperbolic families and their inverses), with per-axis frequency and optional mirror.</li>
+        <li><b>Complex sum</b> &mdash; instead of chaining, <b>add</b> functions with individual weights: a pre-conditioner tier (reciprocal, log, sqrt, exp) plus a 15-function sum tier, with an input affine.</li>
+        <li><b>Wave bank</b> &mdash; one fold, <b>17 wave styles</b> (waves22, dc_gnarly&rsquo;s 8 nested-trig modes, vibration2, waves2b Jacobi/Bessel, waves_julia/spiral/noise/mobius/power/fisheye/swirl&hellip;). Pick <b>Style</b>; only that style&rsquo;s knobs show. <b>Weight</b> blends; <b>Seed</b> feeds input back.</li>
+        <li><b>Lazy</b> &mdash; the classic lazy-susan family: <b>Susan</b> (circular swirl, movable center via x/y), <b>Travis</b> (square swirl), <b>Jess</b> (n-gon swirl), plus a <b>Sensen</b> post-fold. For Travis/Jess try Amount &asymp; 0.5&ndash;0.6 to stay in frame.</li>
+        <li><b>Loonie</b> &mdash; circle-inversion bubbles: <b>Loonie</b> (circle), <b>Loonie2</b> (n-gon/star/circle blend), <b>Loonie3</b> (parabolic). <b>Radius</b> sizes the bubble independently of Amount; <b>Rotate</b> spins the Loonie2 polygon.</li>
+        <li><b>BusyBrad</b> &mdash; the grid version of the lazy family: tiles the plane (Grid size), each cell a Susan/Jess/Combined swirl, with Spin/Twist/Space/N and a Sensen fold. Grid size 0 = a single centered swirl.</li>
+      </ul>
+
+      <h3>Recolor</h3>
+      <p><b>Counterchange</b> is the one fold that changes <b>color, not geometry</b>: it splits the plane into stripes/checker/pinwheel/rings and recolors alternating regions (negate, hue 180&deg;, desaturate, tint). Use <b>Cell</b> for scale, <b>Angle&deg;</b> for orientation. (The Glass panel has a second, global counterchange.)</p>
+
+      <h2>Glass &mdash; color &amp; framing</h2>
+      <ul>
+        <li><b>Frame / Frame width</b> &mdash; border vignette-frame.</li>
+        <li><b>Tint</b> &mdash; color + blend amount.</li>
+        <li><b>Counterchange</b> (global) &mdash; off / negate / hue 180&deg; / desaturate / tint, with a fold scale.</li>
+        <li><b>Chroma</b> &mdash; chromatic-aberration fringing. <b>Ripple</b> &mdash; final rippling pass. <b>Vignette</b> &mdash; darken edges. <b>Grain</b> &mdash; film grain. <b>Hue / depth</b> &mdash; shift hue with recursion depth.</li>
+      </ul>
+
+      <h2>Motion &mdash; animation</h2>
+      <ul>
+        <li><b>Drift</b> slowly evolves fold parameters. <b>Spin</b> rotates the whole view. <b>Rotate</b> is a fixed (animatable) rotation. <b>Wobble</b> drives the time input of animated folds (Wave bank, etc.).</li>
+        <li>Loops are built to close seamlessly when exported as HQ Video.</li>
+      </ul>
+
+      <h2>Presets, export &amp; recording</h2>
+      <ul>
+        <li><b>Presets</b>: load a factory recipe, save your own, Randomize, Reseed, and Copy/Paste or Import/Export as text to share.</li>
+        <li><b>Export PNG</b> at 1&times;/2&times;/4&times;; <b>HQ Still</b> for a super-sampled frame.</li>
+        <li><b>Record (WebM)</b> captures the live canvas; <b>HQ Video</b> renders offline frame-by-frame (loops close exactly, Feedback rebuilt at full res).</li>
+        <li><b>Aspect</b> locks the composition to any common ratio before export.</li>
+      </ul>
+
+      <h2>Recipes to try</h2>
+      <ul>
+        <li><b>Kaleidoscope portrait</b>: Polar fold (6&ndash;12) &rarr; Swirl (small) &rarr; Panes + Tint.</li>
+        <li><b>Infinite vortex</b>: Spiral &rarr; Droste, raise Step scale &amp; Twist.</li>
+        <li><b>Stained glass</b>: Wallpaper (p6m) &rarr; Counterchange (checker, tint) &rarr; Panes.</li>
+        <li><b>Liquid chrome</b>: Wave bank (dc_gnarly) &rarr; Feedback, add Chroma + a little Drift.</li>
+        <li><b>Bubble field</b>: Loonie (Loonie2, sides 6, some Star) &rarr; Spherical &rarr; Room.</li>
+        <li><b>Spiral galaxy</b>: Log spiral &rarr; Wave bank (waves_spiral) &rarr; Droste, Vignette up.</li>
+      </ul>
+      <div class="tip">Muddy? <b>Remove the last fold</b> &mdash; over-stacking is the usual culprit. Flat? <b>Switch the renderer</b> before adding more folds.</div>
+    </div>
+  </div>
+</div>
 <script type="module" src="./main.js"></script>
 </body>
 </html>
