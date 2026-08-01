@@ -1071,5 +1071,91 @@ const OPS = [
   }
   return z;
 }` },
+  { name:'Lazy', fn:'opLazy', deps:['fmodf'],
+    params:[["Mode",0,2,1,0,["Susan","Travis","Jess"]],["Amount",0.1,3,0.01,1],["space",-2,2,0.01,0.4,null,[0,0]],["twist",-3,3,0.01,0.2,null,[0,0]],["spin",-3.15,3.15,0.01,0.1,null,[0,0]],["x",-2,2,0.01,0.1,null,[0,0]],["y",-2,2,0.01,0.2,null,[0,0]],["spin in",-3,3,0.01,1,null,[0,1]],["spin out",-3,3,0.01,0.5,null,[0,1]],["space",-3,3,0.01,1.5708,null,[0,1]],["N",2,12,1,4,null,[0,2]],["spin",-6.29,6.29,0.01,3.14159,null,[0,2]],["space",-2,2,0.01,0,null,[0,2]],["corner",1,8,1,1,null,[0,2]],["Sensen",0,1,1,0,["off","on"]],["Sensen fold",0,4,0.01,1,null,[14,1]]],
+    glsl:`vec2 opLazy(vec2 q, vec4 P, vec4 P2, vec4 P3, vec4 P4){
+  const float M_PI = 3.14159265359;
+  const float M_S2 = 1.41421356237;
+  int mode = int(P.x + 0.5);
+  float amount = (P.y <= 0.0) ? 1.0 : P.y;
+  vec2 o;
+  if(mode == 0){                                   // lazysusan (Michael Faber / Apo pack)
+    float sspace=P.z, stwist=P.w, sspin=P2.x, sx=P2.y, sy=P2.z;
+    float xx = q.x - sx;
+    float yy = q.y + sy;
+    float rr = sqrt(xx*xx + yy*yy);
+    if(rr < amount){
+      float a = atan(yy, xx) + sspin + stwist*(amount - rr);
+      float r2 = amount * rr;
+      o = vec2(r2*cos(a) + sx, r2*sin(a) - sy);
+    } else {
+      float r2 = amount*(1.0 + sspace/rr);
+      o = vec2(r2*xx + sx, r2*yy - sy);
+    }
+  } else if(mode == 1){                            // lazyTravis (Michael Faber)
+    float si = 4.0*P2.w, so = 4.0*P3.x, tspace = P3.y;
+    float ax = abs(q.x), ay = abs(q.y);
+    float s, p, x2, y2;
+    if(ax > amount || ay > amount){
+      if(ax > ay){ s = ax; if(q.x > 0.0) p = s + q.y + s*so; else p = 5.0*s - q.y + s*so; }
+      else       { s = ay; if(q.y > 0.0) p = 3.0*s - q.x + s*so; else p = 7.0*s + q.x + s*so; }
+      p = fmodf(p, s*8.0);
+      if(p <= 2.0*s){ x2 = s + tspace; y2 = -(s - p); y2 = y2 + y2/s*tspace; }
+      else if(p <= 4.0*s){ y2 = s + tspace; x2 = (3.0*s - p); x2 = x2 + x2/s*tspace; }
+      else if(p <= 6.0*s){ x2 = -(s + tspace); y2 = (5.0*s - p); y2 = y2 + y2/s*tspace; }
+      else { y2 = -(s + tspace); x2 = -(7.0*s - p); x2 = x2 + x2/s*tspace; }
+      o = vec2(amount*x2, amount*y2);
+    } else {
+      if(ax > ay){ s = ax; if(q.x > 0.0) p = s + q.y + s*si; else p = 5.0*s - q.y + s*si; }
+      else       { s = ay; if(q.y > 0.0) p = 3.0*s - q.x + s*si; else p = 7.0*s + q.x + s*si; }
+      p = fmodf(p, s*8.0);
+      if(p <= 2.0*s){ o = vec2(amount*s, -amount*(s - p)); }
+      else if(p <= 4.0*s){ o = vec2(amount*(3.0*s - p), amount*s); }
+      else if(p <= 6.0*s){ o = vec2(-amount*s, amount*(5.0*s - p)); }
+      else { o = vec2(-amount*(7.0*s - p), -amount*s); }
+    }
+  } else {                                         // lazyjess (FarDareisMai)
+    float jn = max(floor(P3.z + 0.5), 2.0);
+    float jspin = P3.w, jspace = P4.x, jcorner = P4.y;
+    float vertex = M_PI*(jn - 2.0)/(2.0*jn);
+    float sv = sin(vertex);
+    float pie = TAU/jn;
+    float hslice = pie*0.5;
+    float crot = (jcorner - 1.0)*pie;
+    float x = q.x, y = q.y;
+    float modulus = sqrt(x*x + y*y);
+    if(jn < 2.5){                                  // n == 2 special case
+      if(abs(x) < amount){
+        float theta = atan(y, x) + jspin;
+        float xr = amount*modulus*cos(theta);
+        float yr = amount*modulus*sin(theta);
+        if(abs(xr) < amount){ o = vec2(xr, yr); }
+        else { theta = atan(yr, xr) - jspin + crot; o = vec2(amount*modulus*cos(theta), -amount*modulus*sin(theta)); }
+      } else { float m = 1.0 + jspace/modulus; o = vec2(amount*m*x, amount*m*y); }
+    } else {
+      float theta = atan(y, x) + TAU;
+      float td = mod(theta + hslice, pie);
+      float r = amount*M_S2*sv/sin(M_PI - td - vertex);
+      if(modulus < r){
+        theta = atan(y, x) + jspin + TAU;
+        float xr = amount*modulus*cos(theta);
+        float yr = amount*modulus*sin(theta);
+        td = mod(theta + hslice, pie);
+        r = amount*M_S2*sv/sin(M_PI - td - vertex);
+        float m2 = sqrt(xr*xr + yr*yr);
+        if(m2 < r){ o = vec2(xr, yr); }
+        else { theta = atan(yr, xr) - jspin + crot + TAU; o = vec2(amount*m2*cos(theta), -amount*m2*sin(theta)); }
+      } else { float m = 1.0 + jspace/modulus; o = vec2(amount*m*x, amount*m*y); }
+    }
+  }
+  // Sensen post-fold (BusyBrad parity)
+  if(P4.z > 0.5 && P4.w != 0.0){
+    float nx = floor(o.x * P4.w); float mx = mod(nx, 2.0);
+    if((nx >= 0.0 && mx > 0.5) || (nx < 0.0 && mx < 0.5)) o.x = -o.x;
+    float ny = floor(o.y * P4.w); float my = mod(ny, 2.0);
+    if((ny >= 0.0 && my > 0.5) || (ny < 0.0 && my < 0.5)) o.y = -o.y;
+  }
+  return o;
+}` },
 ];
 export { OPS };
