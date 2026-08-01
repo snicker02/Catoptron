@@ -211,6 +211,16 @@ input[type=file]{display:none}
 .help-doc th{background:var(--panel2);color:var(--ice2);font-weight:500}
 .help-doc td:first-child{white-space:nowrap;color:var(--ice1);font-weight:500}
 .help-doc .tip{background:#121a22;border-left:3px solid var(--ice1);padding:8px 12px;border-radius:0 6px 6px 0;margin:0 0 12px}
+
+/* ── keyframe animation ─────────────────────────────────────────── */
+#kfSetBtn{font-family:var(--mono)}
+.kf-list{display:flex;flex-wrap:wrap;gap:5px;margin:2px 0 8px;min-height:26px}
+.kf-empty{font-family:var(--mono);font-size:10.5px;color:var(--dim);line-height:1.4}
+.kf-chip{min-width:26px;height:26px;padding:0 7px;border:1px solid var(--edge);background:var(--panel2);color:var(--txt);border-radius:6px;font-family:var(--mono);font-size:12px;cursor:pointer}
+.kf-chip:hover{border-color:var(--ice1);color:var(--ice2)}
+.kf-chip.sel{border-color:var(--ice1);color:var(--ice2);box-shadow:inset 0 0 8px rgba(138,184,255,.25)}
+.kf-tools{display:flex;gap:6px;margin-bottom:6px}
+.kf-tools button{flex:1}
 </style>
 </head>
 <body>
@@ -220,6 +230,7 @@ input[type=file]{display:none}
   <span class="spacer"></span>
   <button id="pauseBtn" title="Pause / resume animation (Space)">&#10074;&#10074;</button>
   <button id="helpBtn" title="User guide">?</button>
+  <button id="kfSetBtn" title="Set keyframe — capture current look">&#9670; Key</button>
   <span class="hint">drop / paste an image &nbsp;·&nbsp; drag canvas = vanishing point &nbsp;·&nbsp; dbl-click = recenter</span>
 </header>
 <main>
@@ -370,6 +381,20 @@ input[type=file]{display:none}
       <div class="row"><label>Rotate</label><input type="range" id="rot" min="-180" max="180" step="1" value="0"><span class="val" id="rotV"></span></div>
       <div class="row"><label>Wobble</label><input type="range" id="wobble" min="0" max="2" step="0.01" value="0.6"><span class="val" id="wobbleV"></span></div>
       <div class="note">Drift falls through the reflections, spin rotates everything, wobble animates sine-warp folds &amp; ripple.</div>
+    </div>
+
+    <div class="group">
+      <h2>Animation</h2>
+      <div id="kfList" class="kf-list"></div>
+      <div class="kf-tools">
+        <button id="kfAdd" title="Capture current look as a new keyframe">+ Key</button>
+        <button id="kfDup" title="Duplicate selected keyframe">Duplicate</button>
+        <button id="kfDel" title="Remove selected keyframe">Remove</button>
+      </div>
+      <div class="btns"><button id="kfPlay" style="flex:1">&#9654; Play</button><button id="kfSeam" class="on" title="Loop last → first seamlessly">seamless</button></div>
+      <div class="row"><label>Duration</label><input type="range" id="kfDur" min="1" max="30" step="0.5" value="6"><span class="val" id="kfDurV">6.0s</span></div>
+      <div class="row"><label>Scrub</label><input type="range" id="kfScrub" min="0" max="1000" step="1" value="0"><span class="val"></span></div>
+      <div class="note">Set keyframes at different parameter settings, then Play to morph between them. Keep the same folds in the stack across keyframes for smooth morphs — renderer &amp; mode changes snap. Play is captured by Record and HQ Video.</div>
     </div>
 
     <div class="group">
