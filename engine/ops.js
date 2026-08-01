@@ -1180,16 +1180,16 @@ const OPS = [
     float yrt = q.x*sin(rot) + q.y*cos(rot);
     float r2 = xrt*coss + abs(yrt)*sins;
     float circ = sqrt(xrt*xrt + yrt*yrt);
-    int i;
-    for(i = 0; i < 50; i++){
-      if(i >= sides - 1) break;
+    int lim = sides - 1;
+    for(int k = 0; k < 50; k++){
+      if(k >= lim) break;
       float swp = xrt*cosa - yrt*sina;
       yrt = xrt*sina + yrt*cosa;
       xrt = swp;
       r2 = max(r2, xrt*coss + abs(yrt)*sins);
     }
     r2 = r2*cosc + circ*sinc;
-    if(i > 1) r2 = r2*r2;
+    if(lim > 1) r2 = r2*r2;
     else r2 = abs(r2)*r2;
     float qq;
     if(r2 > 0.0 && r2 < sqrvvar) qq = amount*sqrt(abs(sqrvvar/r2 - 1.0));
