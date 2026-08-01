@@ -345,6 +345,14 @@ const FACTORY = [
   {name:'BusyBrad Combined',   d:{rend:0, stack:[{t:44,p:[2,1,0,0,0.1,0.2,0.4,6,1,1.5,1.2,0,1,1]}], step:0.78, twist:0, depth:6, src:'plasma'}},
   {name:'BusyBrad Sensen',     d:{rend:0, stack:[{t:44,p:[0,1.2,0,0,0.15,0.3,0.4,4,1,0,0,1,2,1]}], step:0.78, twist:0, depth:6, src:'grid'}},
   {name:'BusyBrad feedback',   d:{rend:5, stack:[{t:44,p:[2,1,0,0,0.1,0.25,0.4,5,1,1.0,0.8,0,1,1]}], step:0.62, twist:6, fbAmt:0.9, src:'plasma'}},
+  {name:"Wave dc_gnarly",    d:{rend:0, stack:[{t:46,p:[1,1,1,0.08,0.08,7,13,0,0,2,2,1,3.5,3.5,2,2,5,5,0.15,0,0,1.5708,1,0.25,1.5708,1.5708,1,0.25,0,0,1,1.5,1,1.5,1,0.25,2,10,0,2,0.1,0,1,-0.7,0.27,2,1.5,3,4,0.5,1,1,0,0,0,0,0,1,0,3,0,1.5,1.5,3,1]}], step:0.75, twist:0, depth:8, src:"plasma"}},
+  {name:"Wave waves22",      d:{rend:0, stack:[{t:46,p:[0,1,1,0.05,0.05,7,13,0,0,2,2,1,3.5,3.5,2,2,5,5,0,0,0,1.5708,1,0.25,1.5708,1.5708,1,0.25,0,0,1,1.5,1,1.5,1,0.25,2,10,0,2,0.1,0,1,-0.7,0.27,2,1.5,3,4,0.5,1,1,0,0,0,0,0,1,0,3,0,1.5,1.5,3,1]}], step:0.75, twist:0, depth:8, src:"grid"}},
+  {name:"Wave vibration2",   d:{rend:0, stack:[{t:46,p:[2,1,1,0.05,0.05,7,13,0,0,2,2,1,3.5,3.5,2,2,5,5,0,0,0,1.5708,2.5,0.45,1.5708,1.5708,1.5,0.3,0,0,1,1.5,1,1.5,1,0.25,2,10,0,2,0.1,0,1,-0.7,0.27,2,1.5,3,4,0.5,1,1,0,0,0,0,0,1,0,3,0,1.5,1.5,3,1]}], step:0.78, twist:0, depth:6, src:"plasma"}},
+  {name:"Wave Jacobi",       d:{rend:0, stack:[{t:46,p:[4,1,1,1.5,0.75,1.5,2.5,0,0,2,2,1,3.5,3.5,2,2,5,5,0,0,0,1.5708,1,0.25,1.5708,1.5708,1,0.25,0,0,0,0,1,1.5,1,0.75,2,10,0,2,0.1,0,1,-0.7,0.27,2,1.5,3,4,0.5,1,1,0,0,0,0,0,1,0,3,0,1.5,1.5,3,1]}], step:0.72, twist:0, depth:8, src:"grid"}},
+  {name:"Wave spiral",       d:{rend:0, stack:[{t:46,p:[11,1,1,0.12,0.05,7,13,0,0,2,2,1,3.5,3.5,2,2,5,5,0,0,0,1.5708,1,0.25,1.5708,1.5708,1,0.25,0,0,1,1.5,1,1.5,1,0.25,2,10,0,2,0.1,0,1,-0.7,0.27,2,2.5,5,4,0.5,1,1,0,0,0,0,0,1,0,3,0,1.5,1.5,3,1]}], step:0.78, twist:0, depth:6, src:"plasma"}},
+  {name:"Wave Mobius",       d:{rend:1, stack:[{t:46,p:[13,1,1,0.5,0.05,7,13,0,0,2,2,1,3.5,3.5,2,2,5,5,0,0,0,1.5708,1,0.25,1.5708,1.5708,1,0.25,0,0,1,1.5,1,1.5,1,0.25,2,10,0,2,0.1,0,1,-0.7,0.27,2,1.5,3,4,0.5,1,1,0,0,0,0.5,0,1,0,3,0,1.5,1.5,3,1]}], step:0.72, twist:0, depth:8, src:"grid"}},
+  {name:"Wave fisheye",      d:{rend:0, stack:[{t:46,p:[15,1,1,0.5,0.05,7,13,0,0,2,2,1,3.5,3.5,2,2,5,5,0,0,0,1.5708,1,0.25,1.5708,1.5708,1,0.25,0,0,1,1.5,1,1.5,1,0.25,2,10,0,2,0.1,0,1,-0.7,0.27,2,1.5,3,4,0.5,1,1,0,0,0,0,0,1,0,3,0,2,1.8,3,1]}], step:0.78, twist:0, depth:6, src:"plasma"}},
+  {name:"Wave swirl",        d:{rend:0, stack:[{t:46,p:[16,1,1,0.12,0.05,7,13,0,0,2,2,1,3.5,3.5,2,2,5,5,0,0,0,1.5708,1,0.25,1.5708,1.5708,1,0.25,0,0,1,1.5,1,1.5,1,0.25,2,10,0,2,0.1,0,1,-0.7,0.27,2,1.5,3,4,0.5,1,1,0,0,0,0,0,1,0,3,0,1.5,1.5,5,1.2]}], step:0.78, twist:0, depth:6, src:"grid"}},
 ];
 let customPresets = [];
 
@@ -516,8 +524,11 @@ function renderStack(){
     mk('\u00d7', ()=>{ state.stack.splice(idx,1); renderStack(); });
     div.appendChild(head);
 
+    const selIdxs = new Set(opDef.params.map(p=>p[6]).filter(Boolean).map(x=>x[0]));
     opDef.params.forEach((pr, pi)=>{
       const [label, mn, mx, st, , names] = pr;
+      const showIf = pr[6];
+      if(showIf){ const cur = Math.round(slot.p[showIf[0]]); if(showIf.slice(1).indexOf(cur) === -1) return; }
       const row = document.createElement('div');
       row.className = 'row';
       const lab = document.createElement('label');
@@ -558,6 +569,7 @@ function renderStack(){
           const fmt = v => (+v).toFixed(st >= 1 ? 0 : (st >= 0.1 ? 1 : 2));
           val.value = fmt(rng.value);
         }
+        if(selIdxs.has(pi)) renderStack();
       });
 
       row.appendChild(lab); row.appendChild(rng); row.appendChild(val);
