@@ -371,75 +371,17 @@ const OPS = [
   float r2 = max(dot(q, q), 1e-5);
   return q * (P.x * P.x) / r2;
 }` },
-  { name:'Complex', fn:'opComplex', deps:['sinhf','coshf','clog','csqrt','casin','catan'],
-    params:[['Func',0,18,1,9,['cos','cosh','cot','coth','csc','csch','exp','sec','sech','sin','sinh','tan','tanh','log','sqrt','asin','acos','atan','z^freqX']],['Amount',0.1,3,0.01,1],['Freq X',0.1,8,0.05,1],['Freq Y',0.1,8,0.05,1]],
-    glsl:`vec2 opComplex(vec2 q, vec4 P){
-  float f = P.x;
-  float A = P.y;
-  float x = q.x * P.z;
-  float y = q.y * P.w;
-  vec2 o;
-  if(f < 0.5){
-    o = vec2(cos(x)*coshf(y), -sin(x)*sinhf(y));
-  } else if(f < 1.5){
-    o = vec2(coshf(x)*cos(y), sinhf(x)*sin(y));
-  } else if(f < 2.5){
-    float d = coshf(y) - cos(x);
-    if(abs(d) < 1e-6) return q;
-    o = vec2(sin(x), -sinhf(y)) / d;
-  } else if(f < 3.5){
-    float d = coshf(x) - cos(y);
-    if(abs(d) < 1e-6) return q;
-    o = vec2(sinhf(x), sin(y)) / d;
-  } else if(f < 4.5){
-    float d = coshf(2.0*q.y) - cos(2.0*q.x);
-    if(abs(d) < 1e-6) return q;
-    o = (2.0/d) * vec2(sin(x)*coshf(y), -cos(x)*sinhf(y));
-  } else if(f < 5.5){
-    float d = coshf(2.0*q.x) - cos(2.0*q.y);
-    if(abs(d) < 1e-6) return q;
-    o = (2.0/d) * vec2(sinhf(x)*cos(y), -coshf(x)*sin(y));
-  } else if(f < 6.5){
-    float e = exp(x);
-    o = vec2(e*cos(y), e*sin(y));
-  } else if(f < 7.5){
-    float d = cos(2.0*q.x) + coshf(2.0*q.y);
-    if(abs(d) < 1e-6) return q;
-    o = (2.0/d) * vec2(cos(x)*coshf(y), sin(x)*sinhf(y));
-  } else if(f < 8.5){
-    float d = cos(2.0*q.y) + coshf(2.0*q.x);
-    if(abs(d) < 1e-6) return q;
-    o = (2.0/d) * vec2(coshf(x)*cos(y), -sinhf(x)*sin(y));
-  } else if(f < 9.5){
-    o = vec2(sin(x)*coshf(y), cos(x)*sinhf(y));
-  } else if(f < 10.5){
-    o = vec2(sinhf(x)*cos(y), coshf(x)*sin(y));
-  } else if(f < 11.5){
-    float d = cos(x) + coshf(y);
-    if(abs(d) < 1e-6) return q;
-    o = vec2(sin(x), sinhf(y)) / d;
-  } else if(f < 12.5){
-    float d = cos(y) + coshf(x);
-    if(abs(d) < 1e-6) return q;
-    o = vec2(sinhf(x), sin(y)) / d;
-  } else if(f < 13.5){
-    if(dot(vec2(x,y), vec2(x,y)) < 1e-12) return q;
-    o = clog(vec2(x, y));
-  } else if(f < 14.5){
-    o = csqrt(vec2(x, y));
-  } else if(f < 15.5){
-    o = casin(vec2(x, y));
-  } else if(f < 16.5){
-    vec2 s = casin(vec2(x, y));
-    o = vec2(1.57079632679 - s.x, -s.y);
-  } else if(f < 17.5){
-    o = catan(vec2(x, y));
-  } else {
-    float rr = max(length(q), 1e-6);
-    float aa = atan(q.y, q.x);
-    o = pow(rr, P.z) * vec2(cos(aa*P.z), sin(aa*P.z));
-  }
-  return A * o;
+  { name:'Complex', fn:'opComplexChain', deps:['cstage'],
+    params:[['Stage 1',0,27,1,7,['identity','1/z','z²','sqrt','exp','log','log_divide','sin','cos','tan','sinh','cosh','tanh','asin','acos','atan','asinh','acosh','atanh','sec','csc','cot','sech','csch','coth','asech','acosech','acoth']],['Stage 2',0,27,1,0,['identity','1/z','z²','sqrt','exp','log','log_divide','sin','cos','tan','sinh','cosh','tanh','asin','acos','atan','asinh','acosh','atanh','sec','csc','cot','sech','csch','coth','asech','acosech','acoth']],['Stage 3',0,27,1,0,['identity','1/z','z²','sqrt','exp','log','log_divide','sin','cos','tan','sinh','cosh','tanh','asin','acos','atan','asinh','acosh','atanh','sec','csc','cot','sech','csch','coth','asech','acosech','acoth']],['Stage 4',0,27,1,0,['identity','1/z','z²','sqrt','exp','log','log_divide','sin','cos','tan','sinh','cosh','tanh','asin','acos','atan','asinh','acosh','atanh','sec','csc','cot','sech','csch','coth','asech','acosech','acoth']],['Freq X',0.1,8,0.05,1],['Freq Y',0.1,8,0.05,1],['Amount',0.1,3,0.01,1],['Reflect',0,1,1,0,['off','mirror']]],
+    glsl:`vec2 opComplexChain(vec2 q, vec4 P, vec4 P2){
+  vec2 z = q * vec2(P2.x, P2.y);
+  z = cstage(z, P.x);
+  z = cstage(z, P.y);
+  z = cstage(z, P.z);
+  z = cstage(z, P.w);
+  float amt = (P2.z <= 0.0) ? 1.0 : P2.z;
+  if(P2.w > 0.5 && hash1(q*13.0) < 0.5) z = -z;
+  return amt * z;
 }` },
   { name:'KIFS', fn:'opKifs', deps:[],
     params:[['Iters',1,12,1,6],['Fold',0,1,0.005,0.25],['Angle\u00b0',-180,180,0.5,25],['Scale',0.5,1.8,0.005,1.05]],
@@ -967,6 +909,51 @@ const OPS = [
   }
 
   return vec2(cellCenterX + tX - xOffset, cellCenterY + tY + yOffset);
+}` },
+  { name:'Complex sum', fn:'opComplexSum', deps:['crecip','clog','cdivz','csqrt','cexp','casinh','cacosh','catanh','casin','catan','csin','ccos','csinh','ccosh','ctanh'],
+    params:[['Reciprocal',-3,3,0.01,1],['Log divide',-3,3,0.01,0],['Sqrt',-3,3,0.01,0],['Exp',-3,3,0.01,0],['Log',-3,3,0.01,0],['Asinh',-3,3,0.01,0],['Acosh',-3,3,0.01,0],['Atanh',-3,3,0.01,0],['Asech',-3,3,0.01,0],['Acosech',-3,3,0.01,0],['Acoth',-3,3,0.01,0],['Asin',-3,3,0.01,0],['Acos',-3,3,0.01,0],['Atan',-3,3,0.01,0],['Sin',-3,3,0.01,0],['Cos',-3,3,0.01,0],['Tan',-3,3,0.01,0],['Sinh',-3,3,0.01,0],['Cosh',-3,3,0.01,0],['Tanh',-3,3,0.01,0],['ZX mult',0,3,0.01,1],['ZY mult',0,3,0.01,1],['ZX add',-2,2,0.01,0],['ZY add',-2,2,0.01,0],['Amount',0.1,3,0.01,1],['Reflect',0,1,1,0,['off','mirror']]],
+    glsl:`vec2 opComplexSum(vec2 q, vec4 P, vec4 P2, vec4 P3, vec4 P4, vec4 P5, vec4 P6, vec4 P7){
+  const float M2 = 0.63661977236;                 // 2/pi
+  float w_recip=P.x, w_logdiv=P.y, w_sqrt=P.z, w_exp=P.w;
+  float w_log=P2.x, w_asinh=P2.y, w_acosh=P2.z, w_atanh=P2.w;
+  float w_asech=P3.x, w_acosech=P3.y, w_acoth=P3.z, w_asin=P3.w;
+  float w_acos=P4.x, w_atan=P4.y, w_sin=P4.z, w_cos=P4.w;
+  float w_tan=P5.x, w_sinh=P5.y, w_cosh=P5.z, w_tanh=P5.w;
+  float zxm=P6.x, zym=P6.y, zxa=P6.z, zya=P6.w;
+  float amount = (P7.x <= 0.0) ? 1.0 : P7.x;
+  float sgn = (P7.y > 0.5 && hash1(q*17.0) < 0.5) ? -1.0 : 1.0;
+
+  vec2 r = vec2(q.x*zxm + zxa, q.y*zym + zya);      // input affine (pre_recip)
+  vec2 acc = vec2(0.0);
+
+  // pre-conditioner tier (post_trig order) overwrites r
+  if(w_recip  != 0.0){ vec2 z = crecip(r); r = w_recip * amount * z; }
+  if(w_logdiv != 0.0){ vec2 z = clog(cdivz(r + vec2(1.0,0.0), r - vec2(1.0,0.0))); r = w_logdiv * amount*M2 * z; }
+  if(w_sqrt   != 0.0){ vec2 z = csqrt(r); r = w_sqrt * amount * sgn * z; }
+  if(w_exp    != 0.0){ vec2 z = cexp(r); r = w_exp * amount * z; }
+  if(w_log    != 0.0){ vec2 z = clog(r); r = w_log * amount * z; }
+
+  // sum tier accumulates
+  if(w_asinh   != 0.0) acc += w_asinh   * amount*M2 * casinh(r);
+  if(w_acosh   != 0.0) acc += w_acosh   * amount*M2 * sgn * cacosh(r);
+  if(w_atanh   != 0.0) acc += w_atanh   * amount*M2 * catanh(r);
+  if(w_asech   != 0.0) acc += w_asech   * amount*M2 * cacosh(crecip(r));
+  if(w_acosech != 0.0) acc += w_acosech * amount*M2 * sgn * casinh(crecip(r));
+  if(w_acoth   != 0.0) acc += w_acoth   * amount*M2 * catanh(crecip(r));
+  if(w_asin    != 0.0) acc += w_asin    * amount*M2 * casin(r);
+  if(w_acos    != 0.0) acc += w_acos    * amount*M2 * vec2(1.57079632679 - casin(r).x, -casin(r).y);
+  if(w_atan    != 0.0) acc += w_atan    * amount*M2 * catan(r);
+  if(w_sin     != 0.0) acc += w_sin     * amount * csin(r);
+  if(w_cos     != 0.0) acc += w_cos     * amount * ccos(r);
+  if(w_tan     != 0.0) acc += w_tan     * amount * cdivz(csin(r), ccos(r));
+  if(w_sinh    != 0.0) acc += w_sinh    * amount * csinh(r);
+  if(w_cosh    != 0.0) acc += w_cosh    * amount * ccosh(r);
+  if(w_tanh    != 0.0) acc += w_tanh    * amount * ctanh(r);
+
+  float sumw = abs(w_asinh)+abs(w_acosh)+abs(w_atanh)+abs(w_asech)+abs(w_acosech)+abs(w_acoth)
+             + abs(w_asin)+abs(w_acos)+abs(w_atan)+abs(w_sin)+abs(w_cos)+abs(w_tan)
+             + abs(w_sinh)+abs(w_cosh)+abs(w_tanh);
+  return (sumw == 0.0) ? r : acc;
 }` },
 ];
 export { OPS };
