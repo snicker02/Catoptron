@@ -1,53 +1,311 @@
-# Hall of Mirrors — lite (deployable)
+# Hall of Mirrors — User Guide
 
-Working, module-split build ready for GitHub Pages. Same UI, renderers, feedback,
-presets, recording and export as before; the fold shader is now **assembled at runtime**
-from only the operators in your stack (see `engine/`), which is what lets the operator
-library grow without hitting the WebGL1 compile ceiling.
+Hall of Mirrors turns a photo (or a built-in pattern) into kaleidoscopic, fractal, and
+conformal artwork. You build an effect by **stacking coordinate "folds"** and choosing a
+**renderer** that reflects/recurses the result, then dress it with color, framing, and motion.
+Everything runs live on the GPU in your browser — no install, nothing uploaded.
 
-This lite build ships **15 operators** (the ones validated end-to-end). Adding the rest is
-mechanical — one record each in `engine/ops.js` — and does not touch anything else.
+---
 
-## Files
+## 1. The idea in one picture
+
+```
+  SOURCE            FOLD STACK                 RENDERER            GLASS            MOTION
+  image     →   fold₁ → fold₂ → …    →   Panes/Droste/…    →   color/frame   →   animate
+ (photo)      (coordinate transforms,     (reflects & tiles      (tint, counter-    (drift, spin,
+              applied top to bottom)       the folded plane)      change, grain)     wobble)
+```
+
+Read it left to right. Each **fold** bends the coordinate grid; the folds **compose in order**,
+so the same folds in a different order give a different result. The **renderer** then takes that
+bent grid and mirrors/repeats it into the final structure. **Glass** handles color and framing.
+**Motion** animates any of it over time for video export.
+
+The single most useful habit: **add one fold, watch what it does, then add the next.** Stacks of
+2–4 folds already go a very long way.
+
+---
+
+## 2. Quick start
+
+1. **Source** (top of the left panel): click **Load image** to use your own photo, or pick a
+   built-in pattern (`orbs`, `plasma`, `grid probe`, `polar probe`, `checker probe`) to learn an
+   effect against a clean reference.
+2. **Renderer**: start on **Panes**.
+3. **Fold stack**: choose an operator in the *add* dropdown and click **+** (or "add"). Try
+   **Polar fold** first — instant kaleidoscope.
+4. Drag its sliders. Add a second fold (say **Swirl** or **Spiral**).
+5. Open **Presets** and load a few to see what full recipes look like.
+6. **Export PNG** when you like it, or open **Record / HQ Video** for animation.
+
+---
+
+## 3. The interface
+
+The left panel is grouped top to bottom:
+
+- **Source / Image** — load a photo or pick a probe pattern; set **Aspect** (free, source, 1:1,
+  4:5, 3:4, 2:3, 9:16, 4:3, 3:2, 16:9); **HQ Still** exports a super-sampled frame.
+- **Presets** — load, save, randomize, reseed, and copy/paste or import/export recipes as text.
+- **Fold stack** — the heart of the tool: add, order, and tune the folds (section 5).
+- **Renderer** — the six reflection engines (section 4) plus their shared controls
+  (Depth, Step scale, Twist, Shift X/Y, Zoom, mirrored).
+- **Glass** — color and framing (section 6): Frame, Tint, Counterchange, Chroma, Ripple,
+  Vignette, Grain.
+- **Motion** — animation (section 7): Drift, Spin, Rotate, Wobble.
+- **Record** — WebM capture and offline HQ video.
+
+---
+
+## 4. Renderers
+
+The renderer decides how the folded plane is reflected and repeated. Same stack, different
+renderer = very different image, so try switching.
+
+| Renderer | What it does | Good for |
+|---|---|---|
+| **Panes** | Straightforward mirrored tiling of the folded plane | Clean kaleidoscopes, learning a fold |
+| **Droste** | Logarithmic-spiral recursion (image inside itself, forever) | Infinite-zoom, spiral vortices |
+| **Room** | Opposed-mirror "hall of mirrors" corridor | Deep receding reflections |
+| **Tube** | Wraps the plane around a cylinder | Tunnels, wormholes |
+| **Strip** | Repeats along a single band | Friezes, ribbon patterns |
+| **Feedback** | Feeds the previous frame back in (trails) | Painterly buildup, motion smear |
+
+Shared renderer controls:
+
+- **Depth** — how many reflection/recursion steps (higher = more intricate, slower).
+- **Step scale** — zoom ratio between recursion levels (drives Droste/Room depth feel).
+- **Twist** — rotation added per level.
+- **Shift X / Y**, **Zoom** — pan and zoom the whole view.
+- **mirrored** — flip alternating tiles for seamless mirror symmetry.
+- **Feedback** (Feedback renderer only) — how much of the last frame persists (trail length).
+
+---
+
+## 5. The fold stack
+
+This is where you compose the effect.
+
+- **Add** a fold: pick it in the dropdown, click add. It appends to the bottom.
+- **Reorder**: the ↑ / ↓ buttons. **Order matters** — Swirl-then-Mirror ≠ Mirror-then-Swirl.
+- **Remove**: the × button.
+- **Tune**: each fold shows its parameters. Numeric params are sliders (with an editable number
+  box); **choice params are dropdowns** (mode, style, wave type, symmetry group, …).
+- **Mode-aware panels**: multi-mode folds (Lazy, Loonie, Wave bank, Complex, …) show **only the
+  parameters for the mode you've selected** — pick "Travis" on the Lazy fold and only Travis's
+  knobs appear.
+- **Origin** (⊕): every fold has an X/Y origin so you can move where it acts. Click the ⊕ and
+  **drag on the canvas** to place that fold's center — great for off-center swirls and lenses.
+
+A good mental model: the first fold acts on the raw image coordinates; each later fold acts on the
+result of the one above it.
+
+---
+
+## 6. Operator reference
+
+All 49 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
+reveal the rest once you pick a mode.
+
+### Basic transforms
+| Fold | What it does | Key params |
+|---|---|---|
+| **Rotate** | Spins coordinates | Angle° |
+| **Scale** | Zooms coordinates in/out | Factor |
+| **Shift** | Translates the plane | X, Y |
+| **Shear** | Slants the plane | X, Y |
+| **Mosaic** | Snaps to a blocky grid | Cells |
+
+### Kaleidoscope & symmetry
+| Fold | What it does | Key params |
+|---|---|---|
+| **Polar fold** | Classic wedge kaleidoscope — mirrors N angular slices | Segments, Offset° |
+| **Rosette Cn** | Rotational (Cn) symmetry **without** mirroring — pinwheels | Segments, Offset° |
+| **Triangle fold** | Folds through a triangle (triangular kaleidoscope) | Scale |
+| **Mirror line** | Reflects across a line; keep side A or B | Angle°, Side |
+| **Mirror tile** | Tiles X×Y with mirror or repeat | Tiles X, Tiles Y, Mode |
+| **Wallpaper** | All 17 wallpaper groups — seamless symmetric wallpaper | Group (p1…p6m), Cell, Angle° |
+| **Frieze** | The 7 frieze (strip) symmetry groups | Group, Angle°, Period |
+| **Hyperbolic** | Hyperbolic {p,q} tiling in the Poincaré disk | p, q, Scale |
+| **Polyhedral** | Spherical / polyhedral {p,q} symmetry | p, q, Scale |
+| **Aperiodic** | Quasicrystal / aperiodic tilings (Penrose, Ammann–Beenker) | Grids, Cell, Gamma, Mode, Levels, Inflation |
+
+### Swirls, spirals & waves
+| Fold | What it does | Key params |
+|---|---|---|
+| **Swirl** | Whirlpool — rotation that grows with radius | Amount |
+| **Spiral** | Spiral distortion | Amount |
+| **Log spiral** | Logarithmic spiral arms | Scale, Turn°, Arms, Mirror |
+| **Wave warp** | Sine / triangle / saw / square displacement | Amp, Freq, Wave |
+| **Wave bank** | 17-style mega wave warper (see below) | Style, + per-style knobs |
+| **Pleat** | Folded-paper pleats | Angle°, Width, Tilt° |
+| **Petal** | Flower-petal lobes | Lobes, Amp |
+
+### Lenses, rings & bubbles
+| Fold | What it does | Key params |
+|---|---|---|
+| **Spherical** | Spherical inversion (1/r²) — fisheye bubble | Radius |
+| **Lens** | Radial magnification | Curve |
+| **Ring fold** | Folds into concentric rings | Density |
+| **Fresnel** | Concentric Fresnel-lens rings | Rings, Gain |
+| **Bubbles** | Circle-packing bubbles | Scale, Floor, Iters |
+| **Circle mirror** | Reflect across a circle (ball = inside-out, window = keep inside) | Radius, Mode |
+| **Radial pow** | Raises radius to a power | Amount, Power |
+| **Loonie** | Circle-inversion bubbles (see below) | Mode, Amount, + |
+
+### Conformal & complex maps
+| Fold | What it does | Key params |
+|---|---|---|
+| **Complex** | 4-stage complex-function pipeline — the conformal Swiss army knife (see below) | Stage 1–4, Freq X/Y, Reflect |
+| **Complex sum** | 26-weight complex-function accumulator — blend many functions additively (see below) | function weights, input affine, Reflect |
+| **Mobius** | Simple Möbius transform | Offset X, Offset Y, Rotate° |
+| **Mobius abcd** | Full Möbius (az+b)/(cz+d), all 8 real/imag terms | Re/Im a,b,c,d |
+| **Bipolar** | Bipolar conformal map — lens/eye stretches | Amount, Shift |
+| **Elliptic** | Elliptic conformal map | Amount, Mode |
+| **Disc** | Disc-family conformal maps (disc, idisc, wdisc, fdisc, edisc, spiral, squircle, tan, sech) | Mode, Amount, Twist, Petal |
+
+### Fractal folds
+| Fold | What it does | Key params |
+|---|---|---|
+| **KIFS** | Kaleidoscopic IFS fractal fold | Iters, Fold, Angle°, Scale |
+| **Koch fold** | Koch-curve folding (snowflake edges) | Iters, Scale |
+| **DModulus** | Double-modulus fractal tiling | Size X/Y, Angle°, Iters |
+| **Shatter** | Breaks the plane into tilted cells (shattered glass) | Cells, Tilt |
+| **Kleinian** | Kleinian-group circle-inversion fractal | Circles, Radius, Iters, Scale, Bound, Spin°, Twist°, Frame |
+| **Fuchsian** | Fuchsian group (hyperbolic tilings) | trace ta/tb/tab, Iters |
+| **Apollonian** | Apollonian gasket circle packing | Iters, Radius, Scale |
+| **Juliascope** | Julia-set wedge mapping | Power, Dist, Wedge cover, Iters |
+| **Julian** | Julia mapping | Power, Dist, Wedge cover |
+
+### The big multi-mode banks
+
+- **Complex** — apply up to **four** complex functions in sequence (identity, 1/z, z², sqrt, exp,
+  log, the trig family, the hyperbolic family, and all their inverses), with per-axis frequency
+  and an optional mirror. Chaining e.g. `sqrt → acoth` reproduces classic JWildfire looks.
+- **Complex sum** — instead of chaining, **add** functions together with individual weights: a
+  pre-conditioner tier (reciprocal, log, sqrt, exp) plus a 15-function sum tier, with an input
+  affine (ZX/ZY mult & add). Turn weights up to taste.
+- **Wave bank** — one fold, **17 wave styles**: `waves22`, `dc_gnarly` (8 nested-trig modes),
+  `vibration2`, `waves23`, `waves2b` (Jacobi-elliptic / Bessel), `waves2`, `waves2_radial`,
+  `waves3`, `waves42`, `waves4`, `waves_julia`, `waves_spiral`, `waves_noise` (FBM),
+  `waves_mobius`, `waves_power`, `waves_fisheye`, `waves_swirl`. Pick **Style** and only that
+  style's parameters show. **Weight** blends the effect; **Seed** feeds the input back in.
+- **Lazy** — the classic lazy-susan family: **Susan** (circular swirl with a movable center via
+  x/y), **Travis** (square-metric swirl, spin_in/out), **Jess** (n-gon swirl with corner-flip),
+  plus a **Sensen** post-fold toggle. Amount sets the swirl radius; for Travis/Jess try
+  Amount ≈ 0.5–0.6 to stay in frame, higher for a bolder look.
+- **Loonie** — circle-inversion bubbles: **Loonie** (circle), **Loonie2** (n-gon / star / circle
+  blend — Sides, Star, Circle), **Loonie3** (parabolic). Two extras: **Radius** sizes the bubble
+  independently of Amount, and **Rotate** spins the Loonie2 polygon.
+- **BusyBrad** — the grid version of the lazy family: tiles the plane into cells (Grid size), each
+  running a **Susan / Jess / Combined** swirl, with Spin, Twist, Space, N, offsets, and a Sensen
+  fold. Grid size 0 makes it a single centered swirl.
+
+### Recolor
+- **Counterchange** — the one fold that changes **color, not geometry**. It splits the plane into
+  **stripes / checker / pinwheel / rings** and recolors alternating regions
+  (**negate**, **hue 180°**, **desaturate**, or **tint**). Use **Cell** for scale and **Angle°**
+  for orientation. (There's also a global Counterchange in the Glass panel — the fold gives you a
+  second, independent one you can place anywhere in the stack.)
+
+---
+
+## 7. Glass — color & framing
+
+- **Frame / Frame width** — draw a border vignette-frame around the piece.
+- **Tint** — pick a color and blend amount to wash the image.
+- **Counterchange** (global) — the same stripes/checker/pinwheel/rings recolor as the fold, applied
+  once at the end: **off / negate / hue 180° / desaturate / tint**, with a **Counterchange fold**
+  scale.
+- **Chroma** — chromatic-aberration color fringing.
+- **Ripple** — a final rippling distortion pass.
+- **Vignette** — darken the edges.
+- **Grain** — film grain.
+- **Hue / depth** — shifts hue with recursion depth for rainbow layering.
+
+---
+
+## 8. Motion — animation
+
+Turn these up to animate for video export:
+
+- **Drift** — slowly evolves fold parameters over time.
+- **Spin** — continuous rotation of the whole view.
+- **Rotate** — a fixed rotation offset (also animatable).
+- **Wobble** — drives the time input of the animated folds (Wave bank, Swirl-type waves, etc.).
+
+Animation loops are built to close seamlessly when exported as HQ Video.
+
+---
+
+## 9. Presets
+
+- **Load** a factory preset from the dropdown (93 included, from clean kaleidoscopes to the Wave,
+  Lazy, and Loonie families) to see complete recipes.
+- **Save** your own; **Randomize** for happy accidents; **Reseed** to reshuffle random elements.
+- **Copy / Paste** and **Import / Export** share recipes as plain text — hand a preset to someone
+  else and they get your exact stack.
+
+Note: a preset saved from an older build may not map cleanly if operator numbering changed since;
+re-save presets after big updates.
+
+---
+
+## 10. Export & recording
+
+- **Export PNG** — save the current frame at **1× / 2× / 4×** super-sampling.
+- **HQ Still** (in the Image group) — a high-resolution super-sampled still.
+- **Record (WebM)** — captures the live canvas in real time; set FPS, quality, and length.
+- **HQ Video** — renders **offline, frame by frame** via WebCodecs at export resolution, so loops
+  close exactly and Feedback trails are rebuilt cleanly. Slower than real time but crisp.
+- **Aspect** — lock the composition to any common ratio before exporting.
+
+---
+
+## 11. Recipes to try
+
+- **Kaleidoscope portrait**: Polar fold (6–12 segments) → Swirl (small) → Panes, add a Tint.
+- **Infinite vortex**: Spiral → Droste renderer, raise Step scale and Twist.
+- **Stained glass**: Wallpaper (p6m) → Counterchange (checker, tint) → Panes.
+- **Liquid chrome**: Wave bank (dc_gnarly) → Feedback renderer, add Chroma and a little Drift.
+- **Bubble field**: Loonie (Loonie2, sides 6, some Star) → Spherical → Room.
+- **Quiet spiral galaxy**: Log spiral → Wave bank (waves_spiral) → Droste, Vignette up.
+
+When something looks muddy, **remove the last fold** — over-stacking is the usual culprit. When
+it looks flat, switch the **renderer** before adding more folds.
+
+---
+
+## Appendix — running & deploying (for developers)
+
+Single-page app, no build step. The fold shader is **assembled at runtime** from only the
+operators in your stack, which is what lets the library grow without hitting the WebGL1 compile
+ceiling.
+
 ```
 index.html        markup + CSS, loads main.js as a module
 main.js           UI, render loop, presets, recording, PNG/HQ export
 engine/
   prelude.js      shared uniforms + sampling/shading GLSL
-  helpers.js      GLSL math helpers (complex arithmetic, hyperbolics, ...)
+  helpers.js      GLSL math helpers (complex arithmetic, hyperbolics, noise, …)
   ops.js          operator registry (UI params + GLSL together) — the file that grows
   assemble.js     per-stack shader assembly + the 6 renderer bodies
-  glcache.js      assembled string -> linked program, async parallel compile, per-program caching
+  glcache.js      assembled program cache with async parallel compile
 ```
 
-## Put it on GitHub Pages
-1. Commit these files preserving the layout (keep `engine/` as a folder next to `index.html`).
-2. Repo → Settings → Pages → deploy from your branch, root.
-3. Open the Pages URL. That's it — Pages serves `.js` with the right type, so the modules load.
+**GitHub Pages**: commit these files keeping `engine/` as a folder next to `index.html`; in
+Settings → Pages, deploy from your branch root. Pages serves `.js` with the right MIME type, so the
+modules load.
 
-## Test locally
-ES modules don't load from `file://`, so don't double-click `index.html`. Instead, from the
-repo folder:
-```
-python -m http.server 8000
-```
-then open http://localhost:8000 . (Any static server works.)
+**Local testing**: ES modules don't load from `file://`, so run a static server from the repo
+folder — `python -m http.server 8000` — and open `http://localhost:8000`.
 
-## What was validated
-Every operator and all 6 renderers were compiled **and rendered** (pixel readback) through
-headless ANGLE — the same `WebGL GLSL ES 1.0` path the browser uses — across 48 renderer×stack
-combinations, all producing valid output. One thing only a real browser can exercise:
-`KHR_parallel_shader_compile` (async recompile when you add/reorder a fold). Worth a quick check
-that reordering folds stays smooth.
+**Validation**: all 49 operators × 6 renderers (294 combinations) and all 93 preset recipes are
+compiled *and* rendered through headless ANGLE (the same `WebGL GLSL ES 1.0` path the browser
+uses). The one thing only a real browser exercises is `KHR_parallel_shader_compile` — the async
+recompile when you add or reorder a fold — so it's worth a quick check that reordering stays smooth.
 
-## Adding an operator (later)
-Append one record to `engine/ops.js`:
-```js
-{ name:'Swirl', fn:'opSwirl', deps:[],
-  params:[['Amount',-6,6,0.05,2]],
-  glsl:`vec2 opSwirl(vec2 q, vec4 P){ return rot(P.x * length(q)) * q; }` },
-```
-Rules: `fn` must equal the GLSL function name; `deps` lists helpers from `helpers.js`
-(closure pulled automatically); set one of `par` / `crack` / `p2` if the operator writes
-counterchange parity, writes the crack mask, or uses the 2nd param bank. New renderer →
-add a body to `RENDERERS` in `assemble.js`.
+**Adding an operator**: append one record to `engine/ops.js` (`name`, `fn` matching the GLSL
+function name, `deps` from `helpers.js`, `params`, and the `glsl`). Choice params render as
+dropdowns via a `names` array; a 7th param entry `[selectorIndex, …values]` hides that row unless
+the selector matches, which is how multi-mode panels show only the active mode's controls.
