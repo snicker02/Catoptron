@@ -186,5 +186,6 @@ const HELPERS = {
   if(bo){ float tmp = dn; dn = cn; cn = tmp; sn = sn/d; }
   return sn;
 }` },
+  fmodf:  { deps:[], src:`float fmodf(float a, float b){ float q=a/b; float t=(q<0.0)?-floor(-q):floor(q); return a - b*t; }` },
 };
 export {HELPERS};
