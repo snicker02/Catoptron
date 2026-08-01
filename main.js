@@ -533,23 +533,35 @@ function renderStack(){
       row.className = 'row';
       const lab = document.createElement('label');
       lab.textContent = label;
+      row.appendChild(lab);
 
-      const rng = document.createElement('input');
-      rng.type = 'range'; rng.min = mn; rng.max = mx; rng.step = st;
-      rng.value = slot.p[pi];
-
-      let val;
       if (names) {
-        val = document.createElement('span');
-        val.className = 'val';
-        val.textContent = names[Math.round(slot.p[pi])];
+        // discrete selector -> dropdown: fires change once, so re-filtering the
+        // panel (for showIf) is clean, with no mid-drag rebuild of the control
+        const sel = document.createElement('select');
+        sel.className = 'val';
+        sel.style.flex = '1';
+        names.forEach((nm, ni)=>{
+          const o = document.createElement('option');
+          o.value = ni; o.textContent = nm;
+          if (ni === Math.round(slot.p[pi])) o.selected = true;
+          sel.appendChild(o);
+        });
+        sel.addEventListener('change', ()=>{
+          slot.p[pi] = +sel.value;
+          if (selIdxs.has(pi)) renderStack();
+        });
+        row.appendChild(sel);
       } else {
-        val = document.createElement('input');
+        const rng = document.createElement('input');
+        rng.type = 'range'; rng.min = mn; rng.max = mx; rng.step = st;
+        rng.value = slot.p[pi];
+
+        const val = document.createElement('input');
         val.type = 'number'; val.className = 'val';
         val.min = mn; val.max = mx; val.step = st;
         const fmt = v => (+v).toFixed(st >= 1 ? 0 : (st >= 0.1 ? 1 : 2));
         val.value = fmt(slot.p[pi]);
-
         val.addEventListener('input', e => {
           let num = parseFloat(e.target.value);
           if (!isNaN(num)) {
@@ -559,20 +571,14 @@ function renderStack(){
             rng.value = num;
           }
         });
-      }
-
-      rng.addEventListener('input', ()=>{
-        slot.p[pi] = +rng.value;
-        if (names) {
-          val.textContent = names[Math.round(+rng.value)];
-        } else {
-          const fmt = v => (+v).toFixed(st >= 1 ? 0 : (st >= 0.1 ? 1 : 2));
+        rng.addEventListener('input', ()=>{
+          slot.p[pi] = +rng.value;
           val.value = fmt(rng.value);
-        }
-        if(selIdxs.has(pi)) renderStack();
-      });
-
-      row.appendChild(lab); row.appendChild(rng); row.appendChild(val);
+        });
+        // a non-named selector (rare) re-filters on release, never mid-drag
+        if (selIdxs.has(pi)) rng.addEventListener('change', ()=> renderStack());
+        row.appendChild(rng); row.appendChild(val);
+      }
       div.appendChild(row);
     });
 
