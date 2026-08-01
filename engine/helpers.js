@@ -76,5 +76,44 @@ const HELPERS = {
   }
   return v * (c * 2.0 / N);
 }` },
+  cexp:  { deps:[], src:`vec2 cexp(vec2 z){ float e = exp(z.x); return e*vec2(cos(z.y), sin(z.y)); }` },
+  crecip:{ deps:[], src:`vec2 crecip(vec2 z){ float d = max(dot(z,z), 1e-12); return vec2(z.x, -z.y)/d; }` },
+  csin:  { deps:['sinhf','coshf'], src:`vec2 csin(vec2 z){ return vec2(sin(z.x)*coshf(z.y), cos(z.x)*sinhf(z.y)); }` },
+  ccos:  { deps:['sinhf','coshf'], src:`vec2 ccos(vec2 z){ return vec2(cos(z.x)*coshf(z.y), -sin(z.x)*sinhf(z.y)); }` },
+  csinh: { deps:['sinhf','coshf'], src:`vec2 csinh(vec2 z){ return vec2(sinhf(z.x)*cos(z.y), coshf(z.x)*sin(z.y)); }` },
+  ccosh: { deps:['sinhf','coshf'], src:`vec2 ccosh(vec2 z){ return vec2(coshf(z.x)*cos(z.y), sinhf(z.x)*sin(z.y)); }` },
+  casinh:{ deps:['clog','csqrt','cmul'], src:`vec2 casinh(vec2 z){ vec2 s = csqrt(cmul(z,z) + vec2(1.0,0.0)); return clog(z + s); }` },
+  cacosh:{ deps:['clog','csqrt','cmul'], src:`vec2 cacosh(vec2 z){ vec2 s = cmul(csqrt(z - vec2(1.0,0.0)), csqrt(z + vec2(1.0,0.0))); return clog(z + s); }` },
+  catanh:{ deps:['clog'], src:`vec2 catanh(vec2 z){ return 0.5*(clog(vec2(1.0,0.0)+z) - clog(vec2(1.0,0.0)-z)); }` },
+  cstage:{ deps:['crecip','cmul','csqrt','cexp','clog','cdivz','csin','ccos','csinh','ccosh','ctanh','casin','catan','casinh','cacosh','catanh'], src:`vec2 cstage(vec2 z, float m){
+  if(m < 0.5)  return z;                                  // identity
+  if(m < 1.5)  return crecip(z);                          // 1/z
+  if(m < 2.5)  return cmul(z, z);                         // z^2
+  if(m < 3.5)  return csqrt(z);
+  if(m < 4.5)  return cexp(z);
+  if(m < 5.5)  return clog(z);
+  if(m < 6.5)  return clog(cdivz(z + vec2(1.0,0.0), z - vec2(1.0,0.0)));   // log_divide
+  if(m < 7.5)  return csin(z);
+  if(m < 8.5)  return ccos(z);
+  if(m < 9.5)  return cdivz(csin(z), ccos(z));            // tan
+  if(m < 10.5) return csinh(z);
+  if(m < 11.5) return ccosh(z);
+  if(m < 12.5) return ctanh(z);
+  if(m < 13.5) return casin(z);
+  if(m < 14.5) return vec2(1.57079632679 - casin(z).x, -casin(z).y);  // acos
+  if(m < 15.5) return catan(z);
+  if(m < 16.5) return casinh(z);
+  if(m < 17.5) return cacosh(z);
+  if(m < 18.5) return catanh(z);
+  if(m < 19.5) return crecip(ccos(z));                    // sec
+  if(m < 20.5) return crecip(csin(z));                    // csc
+  if(m < 21.5) return crecip(cdivz(csin(z), ccos(z)));    // cot
+  if(m < 22.5) return crecip(ccosh(z));                   // sech
+  if(m < 23.5) return crecip(csinh(z));                   // csch
+  if(m < 24.5) return crecip(ctanh(z));                   // coth
+  if(m < 25.5) return cacosh(crecip(z));                  // asech
+  if(m < 26.5) return casinh(crecip(z));                  // acosech
+  return catanh(crecip(z));                               // acoth
+}` },
 };
 export {HELPERS};
