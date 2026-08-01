@@ -1157,5 +1157,52 @@ const OPS = [
   }
   return o;
 }` },
+  { name:'Loonie', fn:'opLoonie', deps:[],
+    params:[["Mode",0,2,1,0,["Loonie","Loonie2","Loonie3"]],["Amount",0.1,3,0.01,1],["Radius",0.1,3,0.01,1],["Sides",1,50,1,4,null,[0,1]],["Star",-1,1,0.01,0.15,null,[0,1]],["Circle",-1,1,0.01,0.25,null,[0,1]],["Rotate",-180,180,1,0,null,[0,1]]],
+    glsl:`vec2 opLoonie(vec2 q, vec4 P, vec4 P2){
+  int mode = int(P.x + 0.5);
+  float amount = (P.y <= 0.0) ? 1.0 : P.y;
+  float radius = (P.z <= 0.0) ? 1.0 : P.z;
+  float sqrvvar = (amount*radius)*(amount*radius);      // bubble threshold (=amount^2 at radius 1)
+  vec2 o;
+  if(mode == 0){                                        // loonie (Apo pack)
+    float r2 = dot(q, q);
+    float qq = (r2 < sqrvvar && r2 > 1e-20) ? amount*sqrt(sqrvvar/r2 - 1.0) : amount;
+    o = qq * q;
+  } else if(mode == 1){                                 // loonie2 (dark-beam)
+    int sides = int(P.w + 0.5);
+    float star = P2.x, circleP = P2.y, rot = P2.z*DEG;
+    float aa = TAU/float(sides);
+    float sina = sin(aa), cosa = cos(aa);
+    float as = -1.57079632679*star;   float sins = sin(as), coss = cos(as);
+    float ac =  1.57079632679*circleP; float sinc = sin(ac), cosc = cos(ac);
+    float xrt = q.x*cos(rot) - q.y*sin(rot);            // Rotate expansion: metric phase only
+    float yrt = q.x*sin(rot) + q.y*cos(rot);
+    float r2 = xrt*coss + abs(yrt)*sins;
+    float circ = sqrt(xrt*xrt + yrt*yrt);
+    int i;
+    for(i = 0; i < 50; i++){
+      if(i >= sides - 1) break;
+      float swp = xrt*cosa - yrt*sina;
+      yrt = xrt*sina + yrt*cosa;
+      xrt = swp;
+      r2 = max(r2, xrt*coss + abs(yrt)*sins);
+    }
+    r2 = r2*cosc + circ*sinc;
+    if(i > 1) r2 = r2*r2;
+    else r2 = abs(r2)*r2;
+    float qq;
+    if(r2 > 0.0 && r2 < sqrvvar) qq = amount*sqrt(abs(sqrvvar/r2 - 1.0));
+    else if(r2 < 0.0)           qq = amount/sqrt(abs(sqrvvar/r2) - 1.0);
+    else                        qq = amount;
+    o = qq * q;                                         // output along ORIGINAL q
+  } else {                                              // loonie3 (dark-beam)
+    float r2 = 2.0*sqrvvar;
+    if(q.x > 1e-6){ float t = dot(q, q)/q.x; r2 = t*t; }
+    float qq = (r2 < sqrvvar) ? amount*sqrt(sqrvvar/r2 - 1.0) : amount;
+    o = qq * q;
+  }
+  return o;
+}` },
 ];
 export { OPS };
