@@ -1153,6 +1153,7 @@ function frame(now){
     spinA  += dt * state.spin * 0.5;
     wavePh += dt * state.wobble * 1.5;
   }
+  if(kfPlaying && !paused) kfTick(dt);
   const period = state.flip ? 2 : 1;
   phase = ((phase % period) + period) % period;
 
@@ -1374,6 +1375,7 @@ hqBtn.addEventListener('click', async ()=>{
   exporting = true; hqAbort = false;
   hqBtn.classList.add('on');
   const save = {phase, spinA, wavePh, cw:canvas.width, ch:canvas.height};
+  const kfBase = kfActive() ? kfSnapshot() : null;
   canvas.width = ew; canvas.height = eh;
   if(lenSel === 'loop1' || lenSel === 'loop2') phase = 0;
 
@@ -1397,6 +1399,7 @@ hqBtn.addEventListener('click', async ()=>{
     }
 
     for(let n = 0; n < frames && !hqAbort && !encErr; n++){
+      if(kfBase) kfApply(kfExportU(n, frames));
       renderScene(ew, eh);
       const vf = new VideoFrame(canvas, {
         timestamp: Math.round(n * 1e6 / fps),
@@ -1434,6 +1437,7 @@ hqBtn.addEventListener('click', async ()=>{
     canvas.width = save.cw; canvas.height = save.ch;
     phase = save.phase; spinA = save.spinA; wavePh = save.wavePh;
     exporting = false;
+    if(kfBase) kfRestore(kfBase);
     hqBtn.classList.remove('on');
     hqBtn.textContent = 'HQ Video';
   }
@@ -1553,4 +1557,114 @@ $('exportBtn').addEventListener('click', ()=>{
   const x   = document.getElementById('helpClose'); if(x)   x.addEventListener('click', close);
   ov.addEventListener('click', e=>{ if(e.target === ov) close(); });
   document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && ov.classList.contains('show')) close(); });
+})();
+
+
+// ===================== KEYFRAME ANIMATION =====================
+let keyframes = [];
+let kfPlaying = false, kfTime = 0, kfDuration = 6, kfSeamless = true, kfSel = -1;
+const KF_LERP  = ['depth','step','twist','shiftX','shiftY','zoom','frame','frameW','tintA','hue','chroma','ripple','vign','grain','drift','spin','wobble','rot','fbAmt','cx','cy'];
+const KF_COLOR = ['tint','ccTint'];
+const KF_SNAP  = ['rend','ccMode','aspect','src','seed','flip'];
+const _klerp = (a,b,f)=> a + (b-a)*f;
+function _khexRGB(x){ x=(x||'#000000').replace('#',''); if(x.length===3) x=x.split('').map(c=>c+c).join(''); return [parseInt(x.slice(0,2),16),parseInt(x.slice(2,4),16),parseInt(x.slice(4,6),16)]; }
+function _krgbHex(r,g,b){ const c=v=>('0'+Math.max(0,Math.min(255,Math.round(v))).toString(16)).slice(-2); return '#'+c(r)+c(g)+c(b); }
+function _khexLerp(a,b,f){ const A=_khexRGB(a),B=_khexRGB(b); return _krgbHex(_klerp(A[0],B[0],f),_klerp(A[1],B[1],f),_klerp(A[2],B[2],f)); }
+
+function kfSnapshot(){
+  const s = { stack: state.stack.map(fd=>({t:fd.t, p:fd.p.slice(), o:(fd.o||[0,0]).slice()})) };
+  KF_LERP.forEach(k=> s[k]=state[k]);
+  KF_COLOR.forEach(k=> s[k]=state[k]);
+  KF_SNAP.forEach(k=> s[k]=state[k]);
+  return s;
+}
+function kfActive(){ return keyframes.length >= 2; }
+
+function kfRestore(kf){
+  state.stack = kf.stack.map(fd=>({t:fd.t, p:fd.p.slice(), o:(fd.o||[0,0]).slice()}));
+  KF_LERP.forEach(k=> state[k]=kf[k]);
+  KF_COLOR.forEach(k=> state[k]=kf[k]);
+  KF_SNAP.forEach(k=> state[k]=kf[k]);
+  if(typeof GENS!=='undefined' && GENS[state.src]) applySource();
+  syncUI();
+}
+
+function kfApply(u){
+  const n = keyframes.length;
+  if(n === 0) return;
+  if(n === 1){ kfWriteLerp(keyframes[0], keyframes[0], 0); return; }
+  const segs = kfSeamless ? n : (n - 1);
+  let x = u * segs;
+  if(!kfSeamless) x = Math.max(0, Math.min(segs - 1e-6, x));
+  const i = Math.floor(x), f = x - i;
+  kfWriteLerp(keyframes[((i%n)+n)%n], keyframes[(((i+1)%n)+n)%n], f);
+}
+function kfWriteLerp(a, b, f){
+  KF_LERP.forEach(k=> state[k] = _klerp(a[k], b[k], f));
+  state.depth = Math.round(state.depth);
+  KF_COLOR.forEach(k=> state[k] = _khexLerp(a[k], b[k], f));
+  KF_SNAP.forEach(k=> state[k] = a[k]);
+  for(let i=0;i<state.stack.length;i++){
+    const fa=a.stack[i], fb=b.stack[i], sf=state.stack[i];
+    if(!fa || sf.t !== fa.t) continue;
+    const spec = OPS[fa.t] ? OPS[fa.t].params : [];
+    const canLerp = fb && fb.t===fa.t && fb.p.length===fa.p.length;
+    for(let pi=0; pi<fa.p.length; pi++){
+      const discrete = spec[pi] && Array.isArray(spec[pi][5]);
+      sf.p[pi] = (canLerp && !discrete) ? _klerp(fa.p[pi], fb.p[pi], f) : fa.p[pi];
+    }
+    if(!sf.o) sf.o=[0,0];
+    if(canLerp && fa.o && fb.o){ sf.o[0]=_klerp(fa.o[0],fb.o[0],f); sf.o[1]=_klerp(fa.o[1],fb.o[1],f); }
+    else if(fa.o){ sf.o[0]=fa.o[0]; sf.o[1]=fa.o[1]; }
+  }
+}
+function kfTick(dt){
+  if(!kfActive()){ kfPlaying=false; kfSyncPlayBtn(); return; }
+  kfTime += dt / Math.max(0.1, kfDuration);
+  if(kfSeamless){ kfTime = ((kfTime%1)+1)%1; }
+  else if(kfTime >= 1){ kfTime = 1; kfApply(1); kfStop(); kfScrubUI(); return; }
+  kfApply(kfTime);
+  kfScrubUI();
+}
+function kfStop(){ kfPlaying=false; kfSyncPlayBtn(); syncUI(); }
+function kfExportU(n, frames){ return kfSeamless ? (n / Math.max(1,frames)) : (n / Math.max(1, frames-1)); }
+
+function kfRenderList(){
+  const box = document.getElementById('kfList'); if(!box) return;
+  box.innerHTML = '';
+  if(keyframes.length === 0){ box.innerHTML = '<span class="kf-empty">No keyframes — press ◆ Key (top bar) to capture the current look</span>'; return; }
+  keyframes.forEach((kf, i)=>{
+    const chip = document.createElement('button');
+    chip.className = 'kf-chip' + (i===kfSel ? ' sel' : '');
+    chip.textContent = (i+1);
+    chip.title = 'Jump to keyframe ' + (i+1);
+    chip.addEventListener('click', ()=>{ kfSel=i; kfPlaying=false; kfSyncPlayBtn(); kfRestore(keyframes[i]); kfRenderList(); toast('keyframe '+(i+1)); });
+    box.appendChild(chip);
+  });
+}
+function kfSyncPlayBtn(){ const b=document.getElementById('kfPlay'); if(b){ b.innerHTML = kfPlaying ? '⏸ Pause' : '▶ Play'; b.classList.toggle('on', kfPlaying); } }
+function kfScrubUI(){ const s=document.getElementById('kfScrub'); if(s && document.activeElement!==s) s.value = Math.round(kfTime*1000); }
+
+function kfAdd(){ keyframes.push(kfSnapshot()); kfSel = keyframes.length-1; kfRenderList(); toast('keyframe '+keyframes.length+' set'); }
+function kfDup(){ if(kfSel<0){ if(keyframes.length) kfSel=keyframes.length-1; else return; } const c=JSON.parse(JSON.stringify(keyframes[kfSel])); keyframes.splice(kfSel+1,0,c); kfSel++; kfRenderList(); toast('duplicated'); }
+function kfDel(){ if(kfSel<0||!keyframes.length) return; keyframes.splice(kfSel,1); if(kfSel>=keyframes.length) kfSel=keyframes.length-1; kfRenderList(); toast('removed'); }
+
+(function kfWire(){
+  const on=(id,ev,fn)=>{ const el=document.getElementById(id); if(el) el.addEventListener(ev,fn); };
+  on('kfSetBtn','click', kfAdd);
+  on('kfAdd','click', kfAdd);
+  on('kfDup','click', kfDup);
+  on('kfDel','click', kfDel);
+  on('kfPlay','click', ()=>{
+    if(!kfActive()){ toast('set at least 2 keyframes'); return; }
+    kfPlaying = !kfPlaying;
+    if(kfPlaying && kfTime >= 1) kfTime = 0;
+    kfSyncPlayBtn();
+    if(!kfPlaying) syncUI();
+  });
+  on('kfSeam','click', ()=>{ kfSeamless=!kfSeamless; const b=document.getElementById('kfSeam'); if(b) b.classList.toggle('on', kfSeamless); });
+  on('kfDur','input', e=>{ kfDuration=+e.target.value; const v=document.getElementById('kfDurV'); if(v) v.textContent=(+e.target.value).toFixed(1)+'s'; });
+  on('kfScrub','input', e=>{ if(!kfActive()) return; kfPlaying=false; kfSyncPlayBtn(); kfTime=(+e.target.value)/1000; kfApply(kfTime); });
+  kfRenderList(); kfSyncPlayBtn();
+  const b=document.getElementById('kfSeam'); if(b) b.classList.toggle('on', kfSeamless);
 })();
