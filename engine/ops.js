@@ -955,5 +955,121 @@ const OPS = [
              + abs(w_sinh)+abs(w_cosh)+abs(w_tanh);
   return (sumw == 0.0) ? r : acc;
 }` },
+  { name:'Wave bank', fn:'opWaveBank', deps:['whash','gauss4','asinh_f','sqr_f','vib_mod','jacobi_sn','bessel_j1','cpow','fbm','cmul','cdivz'],
+    params:[["Style",0,16,1,1,["waves22","dc_gnarly","vibration2","waves23","waves2b","waves2","waves2_radial","waves3","waves42","waves4","waves_julia","waves_spiral","waves_noise","waves_mobius","waves_power","waves_fisheye","waves_swirl"]],["Weight",0,2,0.01,1],["Seed",0,2,0.01,1],["scalex",-0.5,0.5,0.005,0.05],["scaley",-0.5,0.5,0.005,0.05],["freqx",-30,30,0.5,7],["freqy",-30,30,0.5,13],["modex",-10,10,0.1,0,null,[0,0]],["modey",-10,10,0.1,0,null,[0,0]],["powerx",0.5,5,0.1,2,null,[0,0]],["powery",0.5,5,0.1,2,null,[0,0]],["gnarly mode",1,8,1,1,null,[0,1]],["freqx1",-20,20,0.1,3.5,null,[0,1]],["freqy1",-20,20,0.1,3.5,null,[0,1]],["freqx2",-20,20,0.1,2,null,[0,1]],["freqy2",-20,20,0.1,2,null,[0,1]],["freqx3",-20,20,0.1,5,null,[0,1]],["freqy3",-20,20,0.1,5,null,[0,1]],["distort",-2,2,0.05,0,null,[0,1]],["blur",-0.1,0.1,0.002,0,null,[0,1]],["vib dir",0,6.28,0.05,0,null,[0,2]],["vib angle",0,6.28,0.05,1.5708,null,[0,2]],["vib freq",0.1,10,0.1,1,null,[0,2]],["vib amp",0.01,1.5,0.01,0.25,null,[0,2]],["vib dir2",0,6.28,0.05,1.5708,null,[0,2]],["vib angle2",0,6.28,0.05,1.5708,null,[0,2]],["vib freq2",0.1,10,0.1,1,null,[0,2]],["vib amp2",0.01,1.5,0.01,0.25,null,[0,2]],["vib dm",0,1,0.05,0,null,[0,2]],["vib tm",0,1,0.05,0,null,[0,2]],["w2b pwx",-2,2,0.02,1,null,[0,4]],["w2b pwy",-2,2,0.02,1.5,null,[0,4]],["w2b scaleinfx",0,5,0.1,1,null,[0,4]],["w2b scaleinfy",0,5,0.1,1.5,null,[0,4]],["w2b unity",0.1,10,0.1,1,null,[0,4]],["w2b jacok",-1,1,0.05,0.25,null,[0,4]],["w2r null",0,10,0.1,2,null,[0,6]],["w2r distance",1,25,0.5,10,null,[0,6]],["w3 sxfreq",-10,10,0.2,0,null,[0,7]],["w3 syfreq",-10,10,0.2,2,null,[0,7]],["w4 yfact",0,10,0.1,0.1,null,[0,8,9]],["w4 continuous",0,1,1,0,["off","on"],[0,8,9]],["w42 freqx2",-10,10,0.2,1,null,[0,8]],["julia c.re",-2,2,0.01,-0.7,null,[0,10]],["julia c.im",-2,2,0.01,0.27,null,[0,10]],["julia power",0.5,6,0.05,2,null,[0,10]],["spiral twist",-8,8,0.05,1.5,null,[0,11]],["spiral freq",0.1,20,0.1,3,null,[0,11]],["noise octaves",1,8,0.5,4,null,[0,12]],["noise rough",0.1,1,0.02,0.5,null,[0,12]],["noise strength",0,4,0.05,1,null,[0,12]],["mob a.re",-2,2,0.02,1,null,[0,13]],["mob a.im",-2,2,0.02,0,null,[0,13]],["mob b.re",-2,2,0.02,0,null,[0,13]],["mob b.im",-2,2,0.02,0,null,[0,13]],["mob c.re",-2,2,0.02,0,null,[0,13]],["mob c.im",-2,2,0.02,0,null,[0,13]],["mob d.re",-2,2,0.02,1,null,[0,13]],["mob d.im",-2,2,0.02,0,null,[0,13]],["power n",0.5,12,0.05,3,null,[0,14]],["power twist",-6.28,6.28,0.05,0,null,[0,14]],["fish strength",-4,4,0.05,1.5,null,[0,15]],["fish radius",0.1,5,0.05,1.5,null,[0,15]],["swirl strength",-12,12,0.1,3,null,[0,16]],["swirl radius",0.1,5,0.05,1,null,[0,16]]],
+    glsl:`vec2 opWaveBank(vec2 q, vec4 P0, vec4 P1, vec4 P2, vec4 P3, vec4 P4, vec4 P5, vec4 P6, vec4 P7, vec4 P8, vec4 P9, vec4 P10, vec4 P11, vec4 P12, vec4 P13, vec4 P14, vec4 P15, vec4 P16){
+  int style=int(P0.x+0.5); float weight=P0.y, seed=P0.z, scalex=P0.w;
+  float scaley=P1.x, freqx=P1.y, freqy=P1.z, modex=P1.w;
+  float modey=P2.x, powerx=P2.y, powery=P2.z; int gmode=int(P2.w+0.5);
+  float fx1=P3.x, fy1=P3.y, fx2=P3.z, fy2=P3.w;
+  float fx3=P4.x, fy3=P4.y, blur=P4.w;
+  float vdir=P5.x, vang=P5.y, vfreq=P5.z, vamp=P5.w;
+  float vdir2=P6.x, vang2=P6.y, vfreq2=P6.z, vamp2=P6.w;
+  float vdm=P7.x, vtm=P7.y, pwx=P7.z, pwy=P7.w;
+  float sinfx=P8.x, sinfy=P8.y, unity=P8.z, jacok=P8.w;
+  float w2rnull=P9.x, w2rdist=P9.y, sxf=P9.z, syf=P9.w;
+  float yfact=P10.x; int wcont=int(P10.y+0.5); float w42fx2=P10.z, jcx=P10.w;
+  float jcy=P11.x, jpow=P11.y, stwist=P11.z, sfreq=P11.w;
+  float noct=P12.x, nrough=P12.y, nstr=P12.z, mobax=P12.w;
+  float mobay=P13.x, mobbx=P13.y, mobby=P13.z, mobcx=P13.w;
+  float mobcy=P14.x, mobdx=P14.y, mobdy=P14.z, pown=P14.w;
+  float powtw=P15.x, fishs=P15.y, fishr=P15.z, swirls=P15.w;
+  float swirlr=P16.x;
+  vec2 rz=q, zi=q; float T=uWavePh; vec2 z=rz;
+  if(style==0){
+    float ax=rz.y*freqx+rz.x*modex; float ay=rz.x*freqy+rz.y*modey;
+    float px=sign(ax)*pow(abs(ax)+1e-10, powerx); float py=sign(ay)*pow(abs(ay)+1e-10, powery);
+    vec2 wave=vec2(scalex*sin(px+T*0.05), scaley*cos(py-T*0.05));
+    z=rz+weight*wave+zi*seed;
+  } else if(style==1){
+    float x0=rz.x, y0=rz.y;
+    if(blur!=0.0){ float sd=T*0.02; vec2 suv=zi*800.0; float r=whash(suv+sd)*6.28318;
+      x0+=blur*gauss4(suv,sd)*cos(r); y0+=blur*gauss4(suv,sd)*sin(r); }
+    float x1=0.0,y1=0.0;
+    if(gmode==1){x1=cos(fx1*y0+sin(fx2*(y0+sin(fx3*y0))))*scalex; y1=cos(fy1*x0+sin(fy2*(x0+sin(fy3*x0))))*scaley;}
+    else if(gmode==2){x1=sin(fx1*y0+sin(fx2*(y0+cos(fx3*y0))))*scalex; y1=sin(fy1*x0+sin(fy2*(x0+cos(fy3*x0))))*scaley;}
+    else if(gmode==3){x1=cos(fx1*y0+sin(fx2*(x0+sin(fx3*y0))))*scalex; y1=cos(fy1*x0+sin(fy2*(y0+sin(fy3*x0))))*scaley;}
+    else if(gmode==4){x1=sin(fx1*y0+sin(sqrt(abs(fx2*(y0+cos(fx3*y0))))))*scalex; y1=sin(fy1*x0+sin(sqrt(abs(fy2*(x0+cos(fy3*x0))))))*scaley;}
+    else if(gmode==5){x1=cos(fx1*y0+asinh_f(fx2*(y0+sin(fx3*y0))))*scalex; y1=cos(fy1*x0+asinh_f(fy2*(x0+sin(fy3*x0))))*scaley;}
+    else if(gmode==6){x1=cos(fx1*y0+tan(fx2*(y0+sin(fx3*y0))))*scalex; y1=cos(fy1*x0+tan(fy2*(x0+sin(fy3*x0))))*scaley;}
+    else if(gmode==7){x1=sin(fx1*y0+sin(sqr_f(fx2*(y0+cos(fx3*y0)))))*scalex; y1=sin(fy1*x0+sin(sqr_f(fy2*(x0+cos(fy3*x0)))))*scaley;}
+    else {x1=sin(fx1*y0+sin(sqr_f(fx2*(x0+cos(fx3*y0)))))*scalex; y1=sin(fy1*x0+sin(sqr_f(fy2*(y0+cos(fy3*x0)))))*scaley;}
+    z=rz+weight*vec2(x0+x1,y0+y1)*0.5+zi*seed;
+  } else if(style==2){
+    float da=rz.x*cos(vdir)+rz.y*sin(vdir);
+    float dirL=vdir+vib_mod(vdm,0.1,da); float angL=vang+vib_mod(vtm,0.1,da);
+    float sf=vfreq*6.28318; da=rz.x*cos(dirL)+rz.y*sin(dirL);
+    float la=vamp*sin(da*sf); float vx=rz.x+la*cos(angL+dirL); float vy=rz.y+la*sin(angL+dirL);
+    float da2=rz.x*cos(vdir2)+rz.y*sin(vdir2);
+    float dirL2=vdir2+vib_mod(vdm,0.1,da2); float angL2=vang2+vib_mod(vtm,0.1,da2);
+    float sf2=vfreq2*6.28318; da2=rz.x*cos(dirL2)+rz.y*sin(dirL2);
+    float la2=vamp2*sin(da2*sf2); vx+=la2*cos(angL2+dirL2); vy+=la2*sin(angL2+dirL2);
+    z=rz+weight*vec2(vx,vy)*0.5+zi*seed;
+  } else if(style==3){
+    float mx=rz.y*freqx/6.28318; float fxx=mx-floor(mx); if(fxx>0.5)fxx=0.5-fxx;
+    float my=rz.x*freqy/6.28318; float fyy=my-floor(my); if(fyy>0.5)fyy=0.5-fyy;
+    z=rz+weight*vec2(rz.x+fxx*scalex, rz.y+fyy*scaley)+zi*seed;
+  } else if(style==4){
+    float CsX=unity/(unity+rz.x*rz.x+1e-6); CsX=CsX*(scalex-sinfx)+sinfx;
+    float CsY=unity/(unity+rz.y*rz.y+1e-6); CsY=CsY*(scaley-sinfy)+sinfy;
+    float wx2b, wy2b;
+    if(pwx>-1e-4 && pwx<1e-4) wx2b=jacobi_sn(rz.y*freqx, jacok);
+    else if(pwx<0.0) wx2b=bessel_j1(rz.y*freqx);
+    else wx2b=sin(sign(rz.y)*pow(abs(rz.y)+1e-10, pwx)*freqx);
+    if(pwy>-1e-4 && pwy<1e-4) wy2b=jacobi_sn(rz.x*freqy, jacok);
+    else if(pwy<0.0) wy2b=bessel_j1(rz.x*freqy);
+    else wy2b=sin(sign(rz.x)*pow(abs(rz.x)+1e-10, pwy)*freqy);
+    z=rz+weight*vec2(rz.x+CsX*wx2b, rz.y+CsY*wy2b)+zi*seed;
+  } else if(style==5){
+    z=rz+weight*vec2(rz.x+scalex*sin(rz.y*freqx), rz.y+scaley*sin(rz.x*freqy))+zi*seed;
+  } else if(style==6){
+    float dist=length(rz);
+    float factor=(dist<w2rdist)?(dist-w2rnull)/(w2rdist-w2rnull+1e-6):1.0;
+    if(dist<w2rnull) factor=0.0;
+    z=rz+weight*vec2(rz.x+factor*sin(rz.y*freqx)*scalex, rz.y+factor*sin(rz.x*freqy)*scaley)+zi*seed;
+  } else if(style==7){
+    float sxx=0.5*scalex*(1.0+sin(rz.y*sxf)); float syy=0.5*scaley*(1.0+sin(rz.x*syf));
+    z=rz+weight*vec2(rz.x+sin(rz.y*freqx)*sxx, rz.y+sin(rz.x*freqy)*syy)+zi*seed;
+  } else if(style==8){
+    float ax=floor(rz.y*w42fx2); ax=sin(ax*12.9898+ax*78.233+1.0+rz.y*0.001*yfact)*43758.5453; ax=ax-floor(ax);
+    if(wcont==1) ax=(ax>0.5)?1.0:0.0;
+    z=rz+weight*vec2(rz.x+sin(rz.y*freqx)*ax*ax*scalex, rz.y+sin(rz.x*freqy)*scaley)+zi*seed;
+  } else if(style==9){
+    float ax=floor(rz.y*freqx/6.28318); ax=sin(ax*12.9898+ax*78.233+1.0+rz.y*0.001*yfact)*43758.5453; ax=ax-floor(ax);
+    if(wcont==1) ax=(ax>0.5)?1.0:0.0;
+    z=rz+weight*vec2(rz.x+sin(rz.y*freqx)*ax*ax*scalex, rz.y+sin(rz.x*freqy)*scaley)+zi*seed;
+  } else if(style==10){
+    vec2 cj=vec2(jcx,jcy); vec2 zp=cpow(rz,jpow)+cj; vec2 disp=(zp-rz)*scalex;
+    z=rz+weight*disp+zi*seed;
+  } else if(style==11){
+    float r=length(rz)+1e-6; float th=atan(rz.y,rz.x);
+    float tw=stwist*(1.0/r)+sin(r*sfreq+T*0.1)*scalex; float nth=th+tw;
+    vec2 w=r*vec2(cos(nth),sin(nth)); z=rz+weight*(w-rz)+zi*seed;
+  } else if(style==12){
+    float oct=clamp(noct,1.0,8.0); float rough=clamp(nrough,0.1,1.0);
+    float nx=fbm(rz*freqx*0.3+vec2(1.7,9.2),oct,rough)-0.5; float ny=fbm(rz*freqy*0.3+vec2(8.3,2.8),oct,rough)-0.5;
+    vec2 nd=vec2(nx,ny)*nstr*scalex*4.0;
+    float nx2=fbm(rz*freqx*0.3+nd+vec2(T*0.01),oct,rough)-0.5; float ny2=fbm(rz*freqy*0.3+nd+vec2(0.0,T*0.01),oct,rough)-0.5;
+    z=rz+weight*vec2(nx2,ny2)*nstr*4.0+zi*seed;
+  } else if(style==13){
+    vec2 a=vec2(mobax,mobay), b=vec2(mobbx,mobby), c=vec2(mobcx,mobcy), d=vec2(mobdx,mobdy);
+    vec2 num=cmul(a,rz)+b; vec2 den=cmul(c,rz)+d; vec2 mob=cdivz(num,den);
+    vec2 disp=(mob-rz)*scalex; z=rz+weight*disp+zi*seed;
+  } else if(style==14){
+    float r=length(rz); float th=atan(rz.y,rz.x); float rn=pow(max(r,1e-6),pown);
+    float an=th*pown+powtw*sin(r*freqx); vec2 powered=rn*vec2(cos(an),sin(an));
+    vec2 disp=(powered-rz)*scalex; z=rz+weight*disp+zi*seed;
+  } else if(style==15){
+    float r=length(rz); float mr=max(fishr,0.001); float t=r/mr; float sc;
+    if(t<1.0) sc=(2.0/(1.0+t*t))*(1.0+fishs*(1.0-t)); else sc=1.0;
+    vec2 w=rz*sc*scalex; z=rz+weight*(w-rz)+zi*seed;
+  } else {
+    float r=length(rz); float mr=max(swirlr,0.001);
+    float ang=swirls*exp(-r/mr)+sin(r*freqx+T*0.1)*scalex*0.5;
+    float ca=cos(ang), sa=sin(ang); vec2 sw=vec2(rz.x*ca-rz.y*sa, rz.x*sa+rz.y*ca);
+    z=rz+weight*(sw-rz)+zi*seed;
+  }
+  return z;
+}` },
 ];
 export { OPS };
