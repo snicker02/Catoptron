@@ -341,6 +341,35 @@ input[type=file]{display:none}
     </div>
 
     <div class="group">
+      <h2>Glass</h2>
+      <div class="row"><label>Frame</label><input type="range" id="frame" min="0" max="1" step="0.01" value="0.45"><span class="val" id="frameV"></span></div>
+      <div class="row"><label>Frame width</label><input type="range" id="frameW" min="0.004" max="0.15" step="0.001" value="0.035"><span class="val" id="frameWV"></span></div>
+      <div class="row"><label>Tint</label><input type="color" id="tintC" value="#5d8f86"><input type="range" id="tintA" min="0" max="1" step="0.01" value="0.30"><span class="val" id="tintAV"></span></div>
+      <div class="row">
+        <label title="What the Counterchange fold does to odd cells">Counterchange</label>
+        <select id="ccMode" style="flex:1">
+          <option value="0" selected>off</option>
+          <option value="1">negate</option>
+          <option value="2">hue 180&deg;</option>
+          <option value="3">desaturate</option>
+          <option value="4">tint</option>
+        </select>
+        <input type="color" id="ccTint" value="#ff5d7a">
+      </div>
+      <div class="note">Two-colour symmetry: a mirror flips colour as well as position. The <b>Counterchange fold</b> recolours on its own via its Recolor knob — add it and it just works. This dropdown applies the same to reflecting folds (Polar, Mirror line, Wallpaper, Frieze, Pleat) and, when set, overrides a fold’s own Recolor.</div>
+      <div class="row"><label>Hue / depth</label><input type="range" id="hue" min="-60" max="60" step="0.5" value="0"><span class="val" id="hueV"></span></div>
+      <div class="row"><label>Chroma</label><input type="range" id="chroma" min="0" max="3" step="0.01" value="0"><span class="val" id="chromaV"></span></div>
+      <div class="row"><label>Ripple</label><input type="range" id="ripple" min="0" max="1" step="0.01" value="0"><span class="val" id="rippleV"></span></div>
+      <div class="row"><label>Vignette</label><input type="range" id="vign" min="0" max="1" step="0.01" value="0.35"><span class="val" id="vignV"></span></div>
+      <div class="row"><label>Grain</label><input type="range" id="grain" min="0" max="1" step="0.01" value="0.06"><span class="val" id="grainV"></span></div>
+    </div>
+  </div>
+  <div id="stage">
+    <canvas id="glc"></canvas>
+    <div id="toast"></div>
+  </div>
+  <div id="panelR">
+    <div class="group">
       <h2>Fold stack</h2>
       <div id="stackList"></div>
       <div class="btns">
@@ -349,12 +378,7 @@ input[type=file]{display:none}
       </div>
       <div class="note">Folds run top to bottom, then feed the renderer. Order matters — reordering the same folds makes a different mirror.</div>
     </div>
-  </div>
-  <div id="stage">
-    <canvas id="glc"></canvas>
-    <div id="toast"></div>
-  </div>
-  <div id="panelR">
+
     <div class="group">
       <h2>Renderer</h2>
       <div class="btns" style="margin-bottom:8px">
@@ -380,36 +404,12 @@ input[type=file]{display:none}
     </div>
 
     <div class="group">
-      <h2>Glass</h2>
-      <div class="row"><label>Frame</label><input type="range" id="frame" min="0" max="1" step="0.01" value="0.45"><span class="val" id="frameV"></span></div>
-      <div class="row"><label>Frame width</label><input type="range" id="frameW" min="0.004" max="0.15" step="0.001" value="0.035"><span class="val" id="frameWV"></span></div>
-      <div class="row"><label>Tint</label><input type="color" id="tintC" value="#5d8f86"><input type="range" id="tintA" min="0" max="1" step="0.01" value="0.30"><span class="val" id="tintAV"></span></div>
-      <div class="row">
-        <label title="What the Counterchange fold does to odd cells">Counterchange</label>
-        <select id="ccMode" style="flex:1">
-          <option value="0" selected>off</option>
-          <option value="1">negate</option>
-          <option value="2">hue 180&deg;</option>
-          <option value="3">desaturate</option>
-          <option value="4">tint</option>
-        </select>
-        <input type="color" id="ccTint" value="#ff5d7a">
-      </div>
-      <div class="note">Two-colour symmetry: a mirror flips colour as well as position. The <b>Counterchange fold</b> recolours on its own via its Recolor knob — add it and it just works. This dropdown applies the same to reflecting folds (Polar, Mirror line, Wallpaper, Frieze, Pleat) and, when set, overrides a fold’s own Recolor.</div>
-      <div class="row"><label>Hue / depth</label><input type="range" id="hue" min="-60" max="60" step="0.5" value="0"><span class="val" id="hueV"></span></div>
-      <div class="row"><label>Chroma</label><input type="range" id="chroma" min="0" max="3" step="0.01" value="0"><span class="val" id="chromaV"></span></div>
-      <div class="row"><label>Ripple</label><input type="range" id="ripple" min="0" max="1" step="0.01" value="0"><span class="val" id="rippleV"></span></div>
-      <div class="row"><label>Vignette</label><input type="range" id="vign" min="0" max="1" step="0.01" value="0.35"><span class="val" id="vignV"></span></div>
-      <div class="row"><label>Grain</label><input type="range" id="grain" min="0" max="1" step="0.01" value="0.06"><span class="val" id="grainV"></span></div>
-    </div>
-
-    <div class="group">
       <h2>Motion</h2>
       <div class="row"><label>Drift</label><input type="range" id="drift" min="-1" max="1" step="0.01" value="0.15"><span class="val" id="driftV"></span></div>
       <div class="row"><label>Spin</label><input type="range" id="spin" min="-1" max="1" step="0.01" value="0"><span class="val" id="spinV"></span></div>
       <div class="row"><label>Rotate</label><input type="range" id="rot" min="-180" max="180" step="1" value="0"><span class="val" id="rotV"></span></div>
       <div class="row"><label>Wobble</label><input type="range" id="wobble" min="0" max="2" step="0.01" value="0.6"><span class="val" id="wobbleV"></span></div>
-      <div class="note">Drift falls through the reflections, spin rotates everything, wobble animates sine-warp folds &amp; ripple.</div>
+      <div class="note">Drift falls through the reflections, spin rotates everything, wobble undulates the whole pattern — every fold now, plus sine-warp folds &amp; ripple.</div>
     </div>
 
     <div class="group">
@@ -607,7 +607,7 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
 
       <h2>Motion &mdash; animation</h2>
       <ul>
-        <li><b>Drift</b> slowly evolves fold parameters. <b>Spin</b> rotates the whole view. <b>Rotate</b> is a fixed (animatable) rotation. <b>Wobble</b> drives the time input of animated folds (Wave bank, etc.).</li>
+        <li><b>Drift</b> slowly evolves fold parameters. <b>Spin</b> rotates the whole view. <b>Rotate</b> is a fixed (animatable) rotation. <b>Wobble</b> gently undulates the whole pattern over time — it animates every fold, plus the Wave folds and Ripple.</li>
         <li>Loops are built to close seamlessly when exported as HQ Video.</li>
       </ul>
 
