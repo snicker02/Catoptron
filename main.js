@@ -512,7 +512,7 @@ sliders.forEach(([id, vid, fmt])=>{
 $('tintC').addEventListener('input', e=> state.tint = e.target.value);
 $('ccMode').addEventListener('change', e=>{
   state.ccMode = +e.target.value;
-  if(state.ccMode > 0 && !state.stack.some(s => OPS[s.t].par || OPS[s.t].ccop)){
+  if(state.ccMode > 0 && !state.stack.filter(s=>!s.mute).some(s => OPS[s.t].par || OPS[s.t].ccop)){
     toast('needs a reflecting fold (Polar, Mirror, Wallpaper…) or the Counterchange fold in the stack');
   }
 });
@@ -543,7 +543,7 @@ OPS_ALPHA.forEach(([name, i])=>{
 $('addOp').addEventListener('click', ()=>{
   if(state.stack.length >= MAX_OPS){ toast(`stack is full (${MAX_OPS} folds max)`); return; }
   state.stack.push(defaultOp(+opSel.value));
-  renderStack();
+  pushHistory(); renderStack();
 });
 
 function renderStack(){
@@ -553,9 +553,16 @@ function renderStack(){
     const opDef = OPS[slot.t];
     const div = document.createElement('div');
     div.className = 'op';
+    if(slot.mute) div.classList.add('muted');
 
     const head = document.createElement('div');
     head.className = 'ophead';
+    const muteBtn = document.createElement('button');
+    muteBtn.className = 'mute' + (slot.mute ? ' off' : '');
+    muteBtn.textContent = slot.mute ? '\u25cb' : '\u25cf';
+    muteBtn.title = slot.mute ? 'Muted (bypassed) \u2014 click to enable' : 'Enabled \u2014 click to mute';
+    muteBtn.addEventListener('click', ()=>{ slot.mute = !slot.mute; pushHistory(); renderStack(); });
+    head.appendChild(muteBtn);
     const sel = document.createElement('select');
     OPS_ALPHA.forEach(([name, i])=>{
       const o = document.createElement('option');
@@ -565,7 +572,7 @@ function renderStack(){
     });
     sel.addEventListener('change', ()=>{
       state.stack[idx] = defaultOp(+sel.value);
-      renderStack();
+      pushHistory(); renderStack();
     });
     head.appendChild(sel);
 
@@ -576,9 +583,9 @@ function renderStack(){
       b.addEventListener('click', fn);
       head.appendChild(b);
     };
-    mk('\u2191', ()=>{ const s=state.stack; [s[idx-1],s[idx]]=[s[idx],s[idx-1]]; renderStack(); }, idx===0);
-    mk('\u2193', ()=>{ const s=state.stack; [s[idx+1],s[idx]]=[s[idx],s[idx+1]]; renderStack(); }, idx===state.stack.length-1);
-    mk('\u00d7', ()=>{ state.stack.splice(idx,1); renderStack(); });
+    mk('\u2191', ()=>{ const s=state.stack; [s[idx-1],s[idx]]=[s[idx],s[idx-1]]; pushHistory(); renderStack(); }, idx===0);
+    mk('\u2193', ()=>{ const s=state.stack; [s[idx+1],s[idx]]=[s[idx],s[idx+1]]; pushHistory(); renderStack(); }, idx===state.stack.length-1);
+    mk('\u00d7', ()=>{ state.stack.splice(idx,1); pushHistory(); renderStack(); });
     div.appendChild(head);
 
     const selIdxs = new Set(opDef.params.map(p=>p[6]).filter(Boolean).map(x=>x[0]));
@@ -784,6 +791,7 @@ function loadPresetObject(p){
   Object.assign(state, JSON.parse(JSON.stringify(p.state)));
   if(GENS[state.src]) applySource();
   syncUI();
+  pushHistory();
   return true;
 }
 
@@ -912,7 +920,7 @@ $('rand').addEventListener('click', ()=>{
   state.cx = r(0.3,0.7); state.cy = r(0.3,0.7);
   state.seed = Math.random()*100;
   if(GENS[state.src] && GENS[state.src].seeded) applySource();
-  syncUI(); toast('randomized');
+  syncUI(); pushHistory(); toast('randomized');
 });
 
 /* vanishing point + fold-origin picking */
@@ -1068,8 +1076,9 @@ function setUniforms(entry, w, h){
   gl.uniform1i(L.uTex, 0);
   gl.uniform2f(L.uCanvas, w, h);
   gl.uniform2f(L.uImg, imgW, imgH);
-  for(let i = 0; i < state.stack.length; i++){
-    const slot = state.stack[i];
+  const _act = state.stack.filter(s => !s.mute);
+  for(let i = 0; i < _act.length; i++){
+    const slot = _act[i];
     const p = slot.p || [];
     const banks = Math.max(1, Math.ceil(OPS[slot.t].params.length / 4));
     for(let b = 0; b < banks; b++){
@@ -1127,7 +1136,7 @@ function presentFeedback(w, h, srcTexIdx){
 
 function renderScene(w, h){
   /* pick (or reuse) the assembled program for this stack + renderer */
-  const req = cache.request(state.stack.map(s => s.t), state.rend);
+  const req = cache.request(state.stack.filter(s => !s.mute).map(s => s.t), state.rend);
   if(req.ready) curEntry = req.entry;
   if(req.error && !shaderErrShown){ shaderErrShown = true; toast('shader error \u2014 see console'); console.error(req.error); }
   if(!curEntry) return;              // first program still linking; nothing to draw yet
@@ -1182,6 +1191,13 @@ function togglePause(){
 }
 $('pauseBtn').addEventListener('click', togglePause);
 window.addEventListener('keydown', e=>{
+  if((e.ctrlKey || e.metaKey) && !e.altKey){
+    const k = e.key.toLowerCase();
+    const ae = document.activeElement, tag = ae && ae.tagName, ty = ae && ae.type;
+    const typing = tag === 'TEXTAREA' || (tag === 'INPUT' && (ty === 'text' || ty === 'number' || ty === 'search'));
+    if(!typing && k === 'z' && !e.shiftKey){ e.preventDefault(); undo(); return; }
+    if(!typing && (k === 'y' || (k === 'z' && e.shiftKey))){ e.preventDefault(); redo(); return; }
+  }
   if(e.code === 'Space'){
     const t = document.activeElement && document.activeElement.tagName;
     if(t === 'INPUT' || t === 'SELECT' || t === 'TEXTAREA' || t === 'BUTTON') return;
@@ -1719,3 +1735,41 @@ function kfDel(){ if(kfSel<0||!keyframes.length) return; keyframes.splice(kfSel,
 let _srcPending = false;
 function scheduleSource(){ if(_srcPending) return; _srcPending = true; requestAnimationFrame(()=>{ _srcPending = false; if(GENS[state.src]) applySource(); }); }
 ['srcScale','srcHue','srcVar'].forEach(id=>{ const el=$(id); if(el) el.addEventListener('input', scheduleSource); });
+
+
+// ===================== UNDO / REDO + COLLAPSIBLE SECTIONS =====================
+let _undo = [], _redo = [], _histTimer = null, _histLast = '';
+function _histSnap(){ return JSON.stringify(state); }
+function pushHistory(){
+  if(kfPlaying) return;                       // don't record keyframe playback frames
+  const j = _histSnap();
+  if(j === _histLast) return;                 // nothing changed
+  _undo.push(j); if(_undo.length > 80) _undo.shift();
+  _redo.length = 0; _histLast = j;
+}
+function scheduleHistory(){ if(_histTimer) clearTimeout(_histTimer); _histTimer = setTimeout(()=>{ _histTimer = null; pushHistory(); }, 450); }
+function _histApply(j){
+  const snap = JSON.parse(j);
+  Object.keys(state).forEach(k=>{ if(!(k in snap)) delete state[k]; });
+  Object.assign(state, snap);
+  if(GENS[state.src]) applySource();
+  syncUI();
+  _histLast = _histSnap();
+}
+function undo(){
+  if(_histTimer){ clearTimeout(_histTimer); _histTimer = null; pushHistory(); }
+  if(_undo.length < 2){ toast('nothing to undo'); return; }
+  _redo.push(_undo.pop());
+  _histApply(_undo[_undo.length - 1]); toast('undo');
+}
+function redo(){
+  if(!_redo.length){ toast('nothing to redo'); return; }
+  const j = _redo.pop(); _undo.push(j); _histApply(j); toast('redo');
+}
+(function _wireUndoCollapse(){
+  ['panelL','panelR'].forEach(id=>{ const el = document.getElementById(id); if(el){ el.addEventListener('input', scheduleHistory); el.addEventListener('change', scheduleHistory); } });
+  const u = document.getElementById('undoBtn'); if(u) u.addEventListener('click', undo);
+  const r = document.getElementById('redoBtn'); if(r) r.addEventListener('click', redo);
+  document.querySelectorAll('.group > h2').forEach(h2=> h2.addEventListener('click', ()=> h2.parentElement.classList.toggle('collapsed')));
+  pushHistory();   // seed initial state
+})();
