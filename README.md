@@ -29,7 +29,7 @@ The single most useful habit: **add one fold, watch what it does, then add the n
 ## 2. Quick start
 
 1. **Source** (top of the left panel): click **Load image** to use your own photo, or pick a
-   built-in pattern (`orbs`, `plasma`, `grid probe`, `polar probe`, `checker probe`) to learn an
+   built-in pattern (`orbs`, `plasma`, `rings`, `stripes`, `waves`, `voronoi`, `truchet`, `halftone`, or a `grid`/`polar`/`checker` probe) — each shaped by three knobs (**Scale** density, **Hue** color, **Variation**) to learn an
    effect against a clean reference.
 2. **Renderer**: start on **Panes**.
 3. **Fold stack**: choose an operator in the *add* dropdown and click **+** (or "add"). Try
