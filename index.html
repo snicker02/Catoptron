@@ -178,9 +178,9 @@ input[type=file]{display:none}
   border:1px solid #26304a;border-radius:6px;background:#151b28;
   padding:7px 8px 8px;margin-bottom:8px;
 }
-.ophead{display:flex;gap:4px;margin-bottom:6px}
-.ophead select{flex:1;padding:5px 8px}
-.ophead button{flex:0 0 26px;padding:4px 0;font-family:var(--mono);font-size:11px}
+.ophead{display:flex;gap:3px;margin-bottom:6px}
+.ophead select{flex:1;min-width:0;padding:5px 8px}
+.ophead button{flex:0 0 24px;padding:4px 0;font-family:var(--mono);font-size:11px}
 .op .row label{flex:0 0 64px;font-size:11px}
 .op .row .val{flex:0 0 46px;font-size:10.5px}
 #stackList:empty::after{
@@ -240,7 +240,7 @@ input[type=file]{display:none}
 .kf-tools{display:flex;gap:6px;margin-bottom:6px}
 .kf-tools button{flex:1}
 /* ── fold mute + collapsible sections ── */
-.ophead .mute{padding:2px 7px;font-size:11px;line-height:1;color:var(--ice1);cursor:pointer}
+.ophead .mute{flex:0 0 20px;padding:2px 0;font-size:12px;line-height:1;color:var(--ice1);cursor:pointer}
 .ophead .mute.off{color:var(--dim)}
 .op.muted{opacity:0.5}
 .op.muted .ophead > select{text-decoration:line-through}
