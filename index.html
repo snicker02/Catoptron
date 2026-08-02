@@ -239,6 +239,15 @@ input[type=file]{display:none}
 .kf-chip.sel{border-color:var(--ice1);color:var(--ice2);box-shadow:inset 0 0 8px rgba(138,184,255,.25)}
 .kf-tools{display:flex;gap:6px;margin-bottom:6px}
 .kf-tools button{flex:1}
+/* ── fold mute + collapsible sections ── */
+.ophead .mute{padding:2px 7px;font-size:11px;line-height:1;color:var(--ice1);cursor:pointer}
+.ophead .mute.off{color:var(--dim)}
+.op.muted{opacity:0.5}
+.op.muted .ophead > select{text-decoration:line-through}
+.group > h2{cursor:pointer;user-select:none}
+.group > h2::after{content:'\25BE';float:right;color:var(--dim);font-size:10px;transition:transform .15s;transform-origin:center}
+.group.collapsed > h2::after{transform:rotate(-90deg)}
+.group.collapsed > *:not(h2){display:none}
 </style>
 </head>
 <body>
@@ -249,6 +258,8 @@ input[type=file]{display:none}
   <button id="pauseBtn" title="Pause / resume animation (Space)">&#10074;&#10074;</button>
   <button id="helpBtn" title="User guide">?</button>
   <button id="kfSetBtn" title="Set keyframe — capture current look">&#9670; Key</button>
+  <button id="undoBtn" title="Undo (Ctrl+Z)">&#8630;</button>
+  <button id="redoBtn" title="Redo (Ctrl+Shift+Z)">&#8631;</button>
   <span class="hint">drop / paste an image &nbsp;·&nbsp; drag canvas = vanishing point &nbsp;·&nbsp; dbl-click = recenter</span>
 </header>
 <main>
