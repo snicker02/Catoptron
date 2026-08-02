@@ -137,7 +137,7 @@ function foldCall(t, i){
   if(op.ccop)       args += ', par, ccOp';
   else if(op.par)   args += ', par';
   else if(op.crack) args += ', crack';
-  return `  q -= uO${i};\n  q = ${op.fn}(${args});\n  q += uO${i};`;
+  return `  q -= uO${i};\n  q = rot(-uR${i}) * q;\n  q = ${op.fn}(${args});\n  q = rot(uR${i}) * q;\n  q += uO${i};`;
 }
 
 function assemble(stack, rend = 0){
@@ -148,7 +148,7 @@ function assemble(stack, rend = 0){
     const banks = Math.max(1, Math.ceil(OPS[t].params.length / 4));
     let d = '';
     for(let b = 0; b < banks; b++) d += `uniform vec4 uP${i}_${b};\n`;
-    return d + `uniform vec2 uO${i};`;
+    return d + `uniform vec2 uO${i};\nuniform float uR${i};`;
   }).join('\n');
   return `${PRELUDE}
 ${decls}
