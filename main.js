@@ -295,7 +295,7 @@ const state = {
   shiftX: 0, shiftY: 0, zoom: 1,
   frame: 0.45, frameW: 0.035, tint: '#5d8f86', tintA: 0.30,
   hue: 0, chroma: 0, ripple: 0, vign: 0.35, grain: 0.06,
-  drift: 0.15, spin: 0, wobble: 0.6, rot: 0,
+  drift: 0.15, spin: 0, wobble: 0, rot: 0,
   cx: 0.5, cy: 0.5, seed: 7.13, aspect: 'free', fbAmt: 0.9, src: 'orbs',
   ccMode: 0, ccTint: '#ff5d7a',
   srcScale: 1, srcHue: 0, srcVar: 0.5
