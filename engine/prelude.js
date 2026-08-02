@@ -25,6 +25,7 @@ uniform float uGrain;
 uniform float uPhase;
 uniform float uSpinA;
 uniform float uWavePh;
+uniform float uWobble;
 uniform float uSeed;
 uniform sampler2D uPrev;
 uniform float uFbAmt;
