@@ -269,7 +269,18 @@ input[type=file]{display:none}
           <option value="grid">grid probe</option>
           <option value="polar">polar probe</option>
           <option value="checker">checker probe</option>
+          <option value="rings">rings</option>
+          <option value="stripes">stripes</option>
+          <option value="waves">waves</option>
+          <option value="voronoi">voronoi</option>
+          <option value="truchet">truchet</option>
+          <option value="halftone">halftone</option>
         </select>
+      </div>
+      <div id="srcParams">
+        <div class="row"><label>Scale</label><input type="range" id="srcScale" min="0.25" max="4" step="0.05" value="1"><span class="val" id="srcScaleV"></span></div>
+        <div class="row"><label>Hue</label><input type="range" id="srcHue" min="0" max="360" step="1" value="0"><span class="val" id="srcHueV"></span></div>
+        <div class="row"><label>Variation</label><input type="range" id="srcVar" min="0" max="1" step="0.01" value="0.5"><span class="val" id="srcVarV"></span></div>
       </div>
       <div class="row" style="margin-top:8px">
         <label style="flex:0 0 60px">Aspect</label>
@@ -453,7 +464,7 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
 
       <h2>Quick start</h2>
       <ul>
-        <li><b>Source</b>: <b>Load image</b> for your own photo, or pick a built-in pattern (orbs, plasma, grid/polar/checker probe) to learn an effect against a clean reference.</li>
+        <li><b>Source</b>: <b>Load image</b> for your own photo, or pick a built-in pattern (orbs, plasma, rings, stripes, waves, voronoi, truchet, halftone, or a grid/polar/checker probe) and shape it with the <b>Scale / Hue / Variation</b> knobs to learn an effect against a clean reference.</li>
         <li><b>Renderer</b>: start on <b>Panes</b>.</li>
         <li><b>Fold stack</b>: pick an operator in the add dropdown and click <b>+</b>. Try <b>Polar fold</b> first &mdash; instant kaleidoscope.</li>
         <li>Drag its sliders; add a second fold (Swirl or Spiral).</li>
