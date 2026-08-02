@@ -161,6 +161,8 @@ void main(){
   uv = (uv - c) / uZoom + c;
   vec2 q = (uv - c) * vec2(ca, 1.0);
   q = rot(uSpinA) * q;
+  // global wobble: broad undulation feeding every fold; amplitude tied to Wobble so 0 == static
+  q += uWobble * 0.025 * vec2(sin(q.y*4.0 + uWavePh), sin(q.x*4.0 - uWavePh*1.27));
   float crack = 1.0;
   float par = 0.0;
   float ccOp = 0.0;
