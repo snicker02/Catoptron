@@ -1100,6 +1100,7 @@ function setUniforms(entry, w, h){
   gl.uniform1f(L.uPhase, phase);
   gl.uniform1f(L.uSpinA, spinA + (state.rot || 0) * Math.PI / 180);
   gl.uniform1f(L.uWavePh, wavePh);
+  gl.uniform1f(L.uWobble, state.wobble);
   gl.uniform1f(L.uSeed, state.seed);
   gl.uniform1i(L.uPrev, 1);
   gl.uniform1f(L.uFbAmt, state.fbAmt);
