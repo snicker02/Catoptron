@@ -286,7 +286,7 @@ function applySource(){
 
 /* ================= state ================= */
 function defaultOp(t){
-  return { t, p: OPS[t].params.map(pr => pr[4]), o: [0, 0] };
+  return { t, p: OPS[t].params.map(pr => pr[4]), o: [0, 0], rot: 0 };
 }
 const state = {
   rend: 0,
@@ -646,6 +646,22 @@ function renderStack(){
       div.appendChild(row);
     });
 
+    slot.rot = slot.rot || 0;
+    const arow = document.createElement('div');
+    arow.className = 'row';
+    const alab = document.createElement('label');
+    alab.textContent = 'Angle';
+    arow.appendChild(alab);
+    const arng = document.createElement('input');
+    arng.type = 'range'; arng.min = -180; arng.max = 180; arng.step = 1; arng.value = slot.rot;
+    const aval = document.createElement('input');
+    aval.type = 'number'; aval.className = 'val'; aval.min = -180; aval.max = 180; aval.step = 1;
+    aval.value = Math.round(slot.rot);
+    arng.addEventListener('input', ()=>{ slot.rot = +arng.value; aval.value = Math.round(slot.rot); });
+    aval.addEventListener('input', ()=>{ let v = parseFloat(aval.value); if(!isNaN(v)){ v = Math.max(-180, Math.min(180, v)); slot.rot = v; arng.value = v; } });
+    arow.appendChild(arng); arow.appendChild(aval);
+    div.appendChild(arow);
+
     slot.o = slot.o || [0, 0];
     const orow = document.createElement('div');
     orow.className = 'row';
@@ -899,6 +915,7 @@ $('rand').addEventListener('click', ()=>{
       return +v.toFixed(3);
     });
     op.o = coin(0.6) ? [0,0] : [+r(-0.4,0.4).toFixed(3), +r(-0.4,0.4).toFixed(3)];
+    op.rot = coin(0.6) ? 0 : +r(-180,180).toFixed(1);
     state.stack.push(op);
   }
   state.rend  = Math.floor(r(0,6));
@@ -1088,6 +1105,8 @@ function setUniforms(entry, w, h){
     const o = slot.o || [0, 0];
     const ol = L[`uO${i}`];
     if(ol) gl.uniform2f(ol, o[0], o[1]);
+    const rl = L[`uR${i}`];
+    if(rl) gl.uniform1f(rl, (slot.rot || 0) * Math.PI / 180);
   }
   gl.uniform1f(L.uDepth, state.depth);
   gl.uniform1f(L.uStep, state.step);
@@ -1633,7 +1652,7 @@ function _krgbHex(r,g,b){ const c=v=>('0'+Math.max(0,Math.min(255,Math.round(v))
 function _khexLerp(a,b,f){ const A=_khexRGB(a),B=_khexRGB(b); return _krgbHex(_klerp(A[0],B[0],f),_klerp(A[1],B[1],f),_klerp(A[2],B[2],f)); }
 
 function kfSnapshot(){
-  const s = { stack: state.stack.map(fd=>({t:fd.t, p:fd.p.slice(), o:(fd.o||[0,0]).slice()})) };
+  const s = { stack: state.stack.map(fd=>({t:fd.t, p:fd.p.slice(), o:(fd.o||[0,0]).slice(), rot:(fd.rot||0)})) };
   KF_LERP.forEach(k=> s[k]=state[k]);
   KF_COLOR.forEach(k=> s[k]=state[k]);
   KF_SNAP.forEach(k=> s[k]=state[k]);
@@ -1642,7 +1661,7 @@ function kfSnapshot(){
 function kfActive(){ return keyframes.length >= 2; }
 
 function kfRestore(kf){
-  state.stack = kf.stack.map(fd=>({t:fd.t, p:fd.p.slice(), o:(fd.o||[0,0]).slice()}));
+  state.stack = kf.stack.map(fd=>({t:fd.t, p:fd.p.slice(), o:(fd.o||[0,0]).slice(), rot:(fd.rot||0)}));
   KF_LERP.forEach(k=> state[k]=kf[k]);
   KF_COLOR.forEach(k=> state[k]=kf[k]);
   KF_SNAP.forEach(k=> state[k]=kf[k]);
@@ -1677,6 +1696,7 @@ function kfWriteLerp(a, b, f){
     if(!sf.o) sf.o=[0,0];
     if(canLerp && fa.o && fb.o){ sf.o[0]=_klerp(fa.o[0],fb.o[0],f); sf.o[1]=_klerp(fa.o[1],fb.o[1],f); }
     else if(fa.o){ sf.o[0]=fa.o[0]; sf.o[1]=fa.o[1]; }
+    sf.rot = canLerp ? _klerp(fa.rot||0, fb.rot||0, f) : (fa.rot||0);
   }
 }
 function kfTick(dt){
