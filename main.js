@@ -96,144 +96,183 @@ function srand(seed){
   };
 }
 
-function genGrid(x, s){
-  x.fillStyle = '#f4f1ea'; x.fillRect(0, 0, s, s);
-  const q = [['#dce8f8',0,0], ['#f8ecdc',s/2,0], ['#dff3df',0,s/2], ['#f5dfee',s/2,s/2]];
-  x.globalAlpha = 0.55;
-  q.forEach(([c,px,py])=>{ x.fillStyle = c; x.fillRect(px, py, s/2, s/2); });
-  x.globalAlpha = 1;
-  const line = (x1,y1,x2,y2)=>{ x.beginPath(); x.moveTo(x1,y1); x.lineTo(x2,y2); x.stroke(); };
-  x.strokeStyle = 'rgba(60,80,110,0.22)'; x.lineWidth = 1;
-  for(let i = 0; i <= 32; i++){ const p = i*s/32; line(p,0,p,s); line(0,p,s,p); }
-  x.strokeStyle = 'rgba(40,58,88,0.45)'; x.lineWidth = 2;
-  for(let i = 0; i <= 8; i++){ const p = i*s/8; line(p,0,p,s); line(0,p,s,p); }
-  x.lineWidth = 5;
-  x.strokeStyle = '#c0392b'; line(0, s/2, s, s/2);      // x-axis
-  x.strokeStyle = '#2b5fc0'; line(s/2, 0, s/2, s);      // y-axis
-  x.strokeStyle = '#0e7d6d'; x.lineWidth = 4;
-  x.beginPath(); x.arc(s/2, s/2, s*0.25, 0, 7); x.stroke();
-  x.setLineDash([10, 8]);
-  x.beginPath(); x.arc(s/2, s/2, s*0.375, 0, 7); x.stroke();
-  x.setLineDash([]);
-  x.fillStyle = '#1b2333';
-  x.beginPath(); x.arc(s/2, s/2, 8, 0, 7); x.fill();
+function _hslRGB(h, s, l){
+  h = (((h % 360) + 360) % 360) / 360; s /= 100; l /= 100;
+  const q = l < 0.5 ? l*(1+s) : l+s-l*s, p = 2*l - q;
+  const hk = t => { t = (t%1+1)%1; if(t<1/6) return p+(q-p)*6*t; if(t<1/2) return q; if(t<2/3) return p+(q-p)*(2/3-t)*6; return p; };
+  return [Math.round(hk(h+1/3)*255), Math.round(hk(h)*255), Math.round(hk(h-1/3)*255)];
 }
-
-function genPolar(x, s){
-  const cx = s/2, cy = s/2, R = s*0.75;
-  for(let a = 0; a < 360; a++){
-    x.fillStyle = `hsl(${a},70%,55%)`;
-    x.beginPath(); x.moveTo(cx, cy);
-    x.arc(cx, cy, R, (a-90)*Math.PI/180, (a-88.85)*Math.PI/180);
-    x.fill();
+function genGrid(x, s, R, P){
+  const sc=P?P.scale:1, hu=P?P.hue:0, vv=P?P.v:0.5;
+  x.fillStyle = '#f4f1ea'; x.fillRect(0,0,s,s);
+  const quad = [[210,0,0],[40,s/2,0],[150,0,s/2],[320,s/2,s/2]];
+  x.globalAlpha = 0.55;
+  quad.forEach(([h,px,py])=>{ x.fillStyle = `hsl(${(((h+hu)%360)+360)%360},55%,82%)`; x.fillRect(px,py,s/2,s/2); });
+  x.globalAlpha = 1;
+  const line=(x1,y1,x2,y2)=>{ x.beginPath(); x.moveTo(x1,y1); x.lineTo(x2,y2); x.stroke(); };
+  const fine=Math.max(4,Math.round(32*sc)), heavy=Math.max(2,Math.round(8*sc));
+  x.strokeStyle=`rgba(60,80,110,${(0.10+0.30*vv).toFixed(3)})`; x.lineWidth=1;
+  for(let i=0;i<=fine;i++){ const p=i*s/fine; line(p,0,p,s); line(0,p,s,p); }
+  x.strokeStyle=`rgba(40,58,88,${(0.20+0.45*vv).toFixed(3)})`; x.lineWidth=2;
+  for(let i=0;i<=heavy;i++){ const p=i*s/heavy; line(p,0,p,s); line(0,p,s,p); }
+  x.lineWidth=5; x.strokeStyle='#c0392b'; line(0,s/2,s,s/2);
+  x.strokeStyle='#2b5fc0'; line(s/2,0,s/2,s);
+  x.strokeStyle='#0e7d6d'; x.lineWidth=4; x.beginPath(); x.arc(s/2,s/2,s*0.25,0,7); x.stroke();
+  x.setLineDash([10,8]); x.beginPath(); x.arc(s/2,s/2,s*0.375,0,7); x.stroke(); x.setLineDash([]);
+  x.fillStyle='#1b2333'; x.beginPath(); x.arc(s/2,s/2,8,0,7); x.fill();
+}
+function genPolar(x, s, R, P){
+  const sc=P?P.scale:1, hu=P?P.hue:0, vv=P?P.v:0.5;
+  const cx=s/2, cy=s/2, Rr=s*0.75, sat=Math.round(35+50*vv);
+  for(let a=0;a<360;a++){
+    x.fillStyle=`hsl(${(((a+hu)%360)+360)%360},${sat}%,55%)`;
+    x.beginPath(); x.moveTo(cx,cy); x.arc(cx,cy,Rr,(a-90)*Math.PI/180,(a-88.85)*Math.PI/180); x.fill();
   }
-  x.strokeStyle = 'rgba(10,12,22,0.6)';
-  for(let i = 1; i <= 12; i++){
-    x.lineWidth = (i % 4 === 0) ? 4 : 1.5;
-    x.beginPath(); x.arc(cx, cy, i*s/16, 0, 7); x.stroke();
+  const rings=Math.max(3,Math.round(12*sc));
+  x.strokeStyle='rgba(10,12,22,0.6)';
+  for(let i=1;i<=rings;i++){ x.lineWidth=(i%4===0)?4:1.5; x.beginPath(); x.arc(cx,cy,i*(Rr/rings),0,7); x.stroke(); }
+  const spokeStep=Math.max(5,Math.round(15/sc));
+  for(let a=0;a<360;a+=spokeStep){
+    const heavy=a%90===0;
+    x.strokeStyle=heavy?'rgba(255,255,255,0.9)':'rgba(10,12,22,0.5)'; x.lineWidth=heavy?4:1.5;
+    x.beginPath(); x.moveTo(cx,cy); x.lineTo(cx+Rr*Math.cos((a-90)*Math.PI/180), cy+Rr*Math.sin((a-90)*Math.PI/180)); x.stroke();
   }
-  for(let a = 0; a < 360; a += 15){
-    const heavy = a % 90 === 0;
-    x.strokeStyle = heavy ? 'rgba(255,255,255,0.9)' : 'rgba(10,12,22,0.5)';
-    x.lineWidth = heavy ? 4 : 1.5;
-    x.beginPath(); x.moveTo(cx, cy);
-    x.lineTo(cx + R*Math.cos((a-90)*Math.PI/180), cy + R*Math.sin((a-90)*Math.PI/180));
+  x.fillStyle='#fff'; x.beginPath(); x.arc(cx,cy,10,0,7); x.fill();
+}
+function genChecker(x, s, R, P){
+  const sc=P?P.scale:1, hu=P?P.hue:0, vv=P?P.v:0.5;
+  const hues=[210,40,150,320], n=Math.max(2,Math.round(8*sc));
+  const dl=Math.round(18+22*(1-vv)), ll=Math.round(58+24*vv);
+  for(let j=0;j<n;j++) for(let i=0;i<n;i++){
+    const qi=(i<n/2?0:1)+(j<n/2?0:2), dark=(i+j)%2===0;
+    x.fillStyle=`hsl(${(((hues[qi]+hu)%360)+360)%360},55%,${dark?dl:ll}%)`;
+    x.fillRect(i*s/n,j*s/n,s/n,s/n);
+  }
+  x.strokeStyle='rgba(255,255,255,0.85)'; x.lineWidth=3;
+  x.beginPath(); x.moveTo(s/2,0); x.lineTo(s/2,s); x.moveTo(0,s/2); x.lineTo(s,s/2); x.stroke();
+  const arrow=(cx,cy,ang)=>{ x.save(); x.translate(cx,cy); x.rotate(ang);
+    x.strokeStyle='#fff'; x.fillStyle='#fff'; x.lineWidth=8; x.lineCap='round';
+    x.beginPath(); x.moveTo(-s*0.07,0); x.lineTo(s*0.06,0); x.stroke();
+    x.beginPath(); x.moveTo(s*0.06,-s*0.035); x.lineTo(s*0.11,0); x.lineTo(s*0.06,s*0.035); x.closePath(); x.fill(); x.restore(); };
+  arrow(s*0.25,s*0.25,-3*Math.PI/4); arrow(s*0.75,s*0.25,-Math.PI/4);
+  arrow(s*0.25,s*0.75,3*Math.PI/4); arrow(s*0.75,s*0.75,Math.PI/4);
+}
+function genPlasma(x, s, R, P){
+  const sc=P?P.scale:1, hu=P?P.hue:0, vv=P?P.v:0.5;
+  const oct=4, base=Math.max(2,Math.round(4*sc)), lat=[];
+  for(let o=0;o<oct;o++){ const n=(1<<o)*base+1; const g=new Float32Array(n*n); for(let i=0;i<n*n;i++) g[i]=R(); lat.push({n,g}); }
+  const sm=t=>t*t*(3-2*t);
+  const val=(o,u,v)=>{ const {n,g}=lat[o]; const X=u*(n-1),Y=v*(n-1); const xi=Math.min(n-2,X|0),yi=Math.min(n-2,Y|0);
+    const fx=sm(X-xi),fy=sm(Y-yi); const a=g[yi*n+xi],b=g[yi*n+xi+1],c=g[(yi+1)*n+xi],e=g[(yi+1)*n+xi+1];
+    return a+(b-a)*fx+(c-a)*fy+(a-b-c+e)*fx*fy; };
+  const ph=R()+hu/360, con=0.7+1.3*vv;
+  const img=x.createImageData(s,s), d=img.data, pal=(t,c,dd)=>0.5+0.5*Math.cos(6.28318*(c*t+dd));
+  let p=0;
+  for(let y=0;y<s;y++){ const v=y/s;
+    for(let xx=0;xx<s;xx++){ const u=xx/s; let t=0,amp=0.5,tot=0;
+      for(let o=0;o<oct;o++){ t+=val(o,u,v)*amp; tot+=amp; amp*=0.55; } t/=tot; t=0.5+(t-0.5)*con;
+      d[p++]=255*pal(t,1.0,ph); d[p++]=255*pal(t,0.9,ph+0.18); d[p++]=255*pal(t,0.8,ph+0.38); d[p++]=255; } }
+  x.putImageData(img,0,0);
+}
+function genOrbs(x, s, R, P){
+  const sc=P?P.scale:1, hu=P?P.hue:0, vv=P?P.v:0.5;
+  const g=x.createLinearGradient(0,0,s,s), h0=((R()*360+hu)%360+360)%360;
+  g.addColorStop(0,`hsl(${h0},45%,16%)`); g.addColorStop(0.5,`hsl(${(h0+90)%360},40%,28%)`); g.addColorStop(1,`hsl(${(h0+200)%360},55%,45%)`);
+  x.fillStyle=g; x.fillRect(0,0,s,s);
+  const n=Math.max(2,Math.round(8*sc)), light=Math.round(55+25*vv);
+  for(let i=0;i<n;i++){ const px=R()*s,py=R()*s,r=s*(0.08+R()*0.22)/Math.sqrt(sc), hue=(h0+R()*220)%360;
+    const rg=x.createRadialGradient(px,py,r*0.1,px,py,r);
+    rg.addColorStop(0,`hsla(${hue},85%,${light}%,0.85)`); rg.addColorStop(1,'hsla(0,0%,0%,0)');
+    x.fillStyle=rg; x.beginPath(); x.arc(px,py,r,0,7); x.fill(); }
+  x.strokeStyle='rgba(255,255,255,0.5)'; x.lineWidth=5;
+  x.beginPath(); x.arc(s*(0.3+R()*0.4),s*(0.3+R()*0.4),s*(0.1+R()*0.12),R()*3,3+R()*3); x.stroke();
+}
+function genRings(x, s, R, P){
+  const sc=P?P.scale:1, hu=P?P.hue:0, vv=P?P.v:0.5;
+  const rings=Math.max(3,Math.round(10*sc)), cx=s/2, cy=s/2, maxR=Math.hypot(cx,cy);
+  const img=x.createImageData(s,s), d=img.data; let p=0;
+  for(let y=0;y<s;y++){ const dy=y-cy;
+    for(let xx=0;xx<s;xx++){ const dx=xx-cx; const t=Math.sqrt(dx*dx+dy*dy)/maxR*rings; const f=t-Math.floor(t);
+      const soft=0.5+0.5*Math.cos(f*6.28318), hard=f<0.5?1:0, band=soft*(1-vv)+hard*vv;
+      const hue=hu+Math.floor(t)*24; const rgb=_hslRGB(hue,62,22+52*band);
+      d[p++]=rgb[0]; d[p++]=rgb[1]; d[p++]=rgb[2]; d[p++]=255; } }
+  x.putImageData(img,0,0);
+}
+function genStripes(x, s, R, P){
+  const sc=P?P.scale:1, hu=P?P.hue:0, vv=P?P.v:0.5;
+  const count=Math.max(2,Math.round(12*sc)), ang=vv*Math.PI, ca=Math.cos(ang), sa=Math.sin(ang);
+  const img=x.createImageData(s,s), d=img.data; let p=0;
+  for(let y=0;y<s;y++) for(let xx=0;xx<s;xx++){
+    const u=(xx*ca+y*sa)/s, idx=u*count, cell=Math.floor(idx), f=idx-cell;
+    const hue=hu+cell*(360/count), shade=42+24*Math.sin(f*6.28318);
+    const rgb=_hslRGB(hue,60,shade); d[p++]=rgb[0]; d[p++]=rgb[1]; d[p++]=rgb[2]; d[p++]=255;
+  }
+  x.putImageData(img,0,0);
+}
+function genWaves(x, s, R, P){
+  const sc=P?P.scale:1, hu=P?P.hue:0, vv=P?P.v:0.5;
+  const f=6.28318*(1+4*sc)/s, mix=vv;
+  const img=x.createImageData(s,s), d=img.data; let p=0;
+  for(let y=0;y<s;y++) for(let xx=0;xx<s;xx++){
+    const w=Math.sin(xx*f)+Math.sin(y*f)+mix*Math.sin((xx+y)*f*0.7)+(1-mix)*Math.sin(Math.hypot(xx-s/2,y-s/2)*f*1.3);
+    const t=(w+3)/6, hue=hu+t*140, rgb=_hslRGB(hue,58,34+32*t);
+    d[p++]=rgb[0]; d[p++]=rgb[1]; d[p++]=rgb[2]; d[p++]=255;
+  }
+  x.putImageData(img,0,0);
+}
+function genVoronoi(x, s, R, P){
+  const sc=P?P.scale:1, hu=P?P.hue:0, vv=P?P.v:0.5;
+  const G=Math.max(2,Math.round(6*sc)), cell=s/G;
+  const fx=new Float32Array(G*G), fy=new Float32Array(G*G), fh=new Float32Array(G*G);
+  for(let j=0;j<G;j++) for(let i=0;i<G;i++){ const k=j*G+i; fx[k]=(i+R())*cell; fy[k]=(j+R())*cell; fh[k]=hu+R()*300; }
+  const img=x.createImageData(s,s), d=img.data; let p=0;
+  for(let y=0;y<s;y++){ const cj=Math.min(G-1,y/cell|0);
+    for(let xx=0;xx<s;xx++){ const ci=Math.min(G-1,xx/cell|0);
+      let d1=1e12,d2=1e12,best=0;
+      for(let jj=-1;jj<=1;jj++) for(let ii=-1;ii<=1;ii++){ const gi=ci+ii,gj=cj+jj; if(gi<0||gj<0||gi>=G||gj>=G) continue;
+        const k=gj*G+gi, ddx=xx-fx[k], ddy=y-fy[k], dd=ddx*ddx+ddy*ddy;
+        if(dd<d1){ d2=d1; d1=dd; best=k; } else if(dd<d2){ d2=dd; } }
+      const e=Math.min(1,(Math.sqrt(d2)-Math.sqrt(d1))/(cell*0.5));
+      const baseL=28+40*(((best*2654435761)>>>0)%1000/1000), L=baseL*(1-vv*(1-e));
+      const rgb=_hslRGB(fh[best],55,Math.max(6,Math.min(82,L)));
+      d[p++]=rgb[0]; d[p++]=rgb[1]; d[p++]=rgb[2]; d[p++]=255; } }
+  x.putImageData(img,0,0);
+}
+function genTruchet(x, s, R, P){
+  const sc=P?P.scale:1, hu=P?P.hue:0, vv=P?P.v:0.5;
+  const G=Math.max(2,Math.round(8*sc)), cell=s/G, lw=cell*(0.12+0.30*vv);
+  x.fillStyle=`hsl(${(((hu+20)%360)+360)%360},40%,16%)`; x.fillRect(0,0,s,s);
+  x.strokeStyle=`hsl(${((hu%360)+360)%360},70%,62%)`; x.lineWidth=lw; x.lineCap='round';
+  for(let j=0;j<G;j++) for(let i=0;i<G;i++){ const ox=i*cell, oy=j*cell, r=cell/2;
+    x.beginPath();
+    if(R()<0.5){ x.arc(ox,oy,r,0,Math.PI/2); x.moveTo(ox+cell,oy+cell); x.arc(ox+cell,oy+cell,r,Math.PI,Math.PI*1.5); }
+    else { x.arc(ox+cell,oy,r,Math.PI/2,Math.PI); x.moveTo(ox,oy+cell); x.arc(ox,oy+cell,r,Math.PI*1.5,Math.PI*2); }
     x.stroke();
   }
-  x.fillStyle = '#fff';
-  x.beginPath(); x.arc(cx, cy, 10, 0, 7); x.fill();
 }
-
-function genChecker(x, s){
-  const hues = [210, 40, 150, 320];
-  const n = 8;
-  for(let j = 0; j < n; j++) for(let i = 0; i < n; i++){
-    const qi = (i < n/2 ? 0 : 1) + (j < n/2 ? 0 : 2);
-    const dark = (i + j) % 2 === 0;
-    x.fillStyle = `hsl(${hues[qi]},55%,${dark ? 30 : 72}%)`;
-    x.fillRect(i*s/n, j*s/n, s/n, s/n);
+function genHalftone(x, s, R, P){
+  const sc=P?P.scale:1, hu=P?P.hue:0, vv=P?P.v:0.5;
+  const G=Math.max(3,Math.round(18*sc)), cell=s/G, rmax=cell*0.5*(0.4+0.9*vv);
+  x.fillStyle=`hsl(${(((hu+180)%360)+360)%360},30%,14%)`; x.fillRect(0,0,s,s);
+  for(let j=0;j<G;j++) for(let i=0;i<G;i++){ const cx=(i+0.5)*cell, cy=(j+0.5)*cell;
+    const t=(Math.sin((i/G)*6.28318)+Math.cos((j/G)*6.28318)+2)/4, r=rmax*(0.35+0.65*t);
+    const hue=hu+(i+j)*(180/G); x.fillStyle=`hsl(${((hue%360)+360)%360},70%,${Math.round(45+20*t)}%)`;
+    x.beginPath(); x.arc(cx,cy,r,0,7); x.fill();
   }
-  x.strokeStyle = 'rgba(255,255,255,0.85)'; x.lineWidth = 3;
-  x.beginPath(); x.moveTo(s/2, 0); x.lineTo(s/2, s); x.moveTo(0, s/2); x.lineTo(s, s/2); x.stroke();
-  /* orientation arrows: one per quadrant, pointing to its outer corner (flips become visible) */
-  const arrow = (cx, cy, ang)=>{
-    x.save(); x.translate(cx, cy); x.rotate(ang);
-    x.strokeStyle = '#fff'; x.fillStyle = '#fff'; x.lineWidth = 8; x.lineCap = 'round';
-    x.beginPath(); x.moveTo(-s*0.07, 0); x.lineTo(s*0.06, 0); x.stroke();
-    x.beginPath(); x.moveTo(s*0.06, -s*0.035); x.lineTo(s*0.11, 0); x.lineTo(s*0.06, s*0.035); x.closePath(); x.fill();
-    x.restore();
-  };
-  arrow(s*0.25, s*0.25, -3*Math.PI/4);
-  arrow(s*0.75, s*0.25, -Math.PI/4);
-  arrow(s*0.25, s*0.75,  3*Math.PI/4);
-  arrow(s*0.75, s*0.75,  Math.PI/4);
-}
-
-function genPlasma(x, s, R){
-  const oct = 4, lat = [];
-  for(let o = 0; o < oct; o++){
-    const n = (1 << o)*4 + 1;
-    const g = new Float32Array(n*n);
-    for(let i = 0; i < n*n; i++) g[i] = R();
-    lat.push({n, g});
-  }
-  const sm = t => t*t*(3 - 2*t);
-  const val = (o, u, v)=>{
-    const {n, g} = lat[o];
-    const X = u*(n-1), Y = v*(n-1);
-    const xi = Math.min(n-2, X|0), yi = Math.min(n-2, Y|0);
-    const fx = sm(X - xi), fy = sm(Y - yi);
-    const a = g[yi*n+xi], b = g[yi*n+xi+1], c = g[(yi+1)*n+xi], e = g[(yi+1)*n+xi+1];
-    return a + (b-a)*fx + (c-a)*fy + (a-b-c+e)*fx*fy;
-  };
-  const ph = R();
-  const img = x.createImageData(s, s), d = img.data;
-  const pal = (t, c, dd)=> 0.5 + 0.5*Math.cos(6.28318*(c*t + dd));
-  let p = 0;
-  for(let y = 0; y < s; y++){
-    const v = y/s;
-    for(let xx = 0; xx < s; xx++){
-      const u = xx/s;
-      let t = 0, amp = 0.5, tot = 0;
-      for(let o = 0; o < oct; o++){ t += val(o, u, v)*amp; tot += amp; amp *= 0.55; }
-      t /= tot;
-      d[p++] = 255*pal(t, 1.0, ph);
-      d[p++] = 255*pal(t, 0.9, ph + 0.18);
-      d[p++] = 255*pal(t, 0.8, ph + 0.38);
-      d[p++] = 255;
-    }
-  }
-  x.putImageData(img, 0, 0);
-}
-
-function genOrbs(x, s, R){
-  const g = x.createLinearGradient(0, 0, s, s);
-  const h0 = R()*360;
-  g.addColorStop(0, `hsl(${h0},45%,16%)`);
-  g.addColorStop(0.5, `hsl(${(h0+90)%360},40%,28%)`);
-  g.addColorStop(1, `hsl(${(h0+200)%360},55%,45%)`);
-  x.fillStyle = g; x.fillRect(0, 0, s, s);
-  for(let i = 0; i < 8; i++){
-    const px = R()*s, py = R()*s, r = s*(0.08 + R()*0.22);
-    const hue = (h0 + R()*220) % 360;
-    const rg = x.createRadialGradient(px, py, r*0.1, px, py, r);
-    rg.addColorStop(0, `hsla(${hue},85%,68%,0.85)`);
-    rg.addColorStop(1, 'hsla(0,0%,0%,0)');
-    x.fillStyle = rg;
-    x.beginPath(); x.arc(px, py, r, 0, 7); x.fill();
-  }
-  x.strokeStyle = 'rgba(255,255,255,0.5)'; x.lineWidth = 5;
-  x.beginPath();
-  x.arc(s*(0.3 + R()*0.4), s*(0.3 + R()*0.4), s*(0.1 + R()*0.12), R()*3, 3 + R()*3);
-  x.stroke();
 }
 
 const GENS = {
-  grid:    {seeded: false, fn: genGrid},
-  polar:   {seeded: false, fn: genPolar},
-  checker: {seeded: false, fn: genChecker},
-  plasma:  {seeded: true,  fn: genPlasma},
-  orbs:    {seeded: true,  fn: genOrbs},
+  grid:     {seeded: false, fn: genGrid},
+  polar:    {seeded: false, fn: genPolar},
+  checker:  {seeded: false, fn: genChecker},
+  plasma:   {seeded: true,  fn: genPlasma},
+  orbs:     {seeded: true,  fn: genOrbs},
+  rings:    {seeded: false, fn: genRings},
+  stripes:  {seeded: false, fn: genStripes},
+  waves:    {seeded: false, fn: genWaves},
+  voronoi:  {seeded: true,  fn: genVoronoi},
+  truchet:  {seeded: true,  fn: genTruchet},
+  halftone: {seeded: false, fn: genHalftone},
 };
 
 function applySource(){
@@ -241,7 +280,7 @@ function applySource(){
   const s = 1024, cv = document.createElement('canvas');
   cv.width = cv.height = s;
   const ctx = cv.getContext('2d');
-  GENS[state.src].fn(ctx, s, srand(state.seed));
+  GENS[state.src].fn(ctx, s, srand(state.seed), {scale: state.srcScale, hue: state.srcHue, v: state.srcVar});
   setImage(cv, s, s);
 }
 
@@ -258,7 +297,8 @@ const state = {
   hue: 0, chroma: 0, ripple: 0, vign: 0.35, grain: 0.06,
   drift: 0.15, spin: 0, wobble: 0.6, rot: 0,
   cx: 0.5, cy: 0.5, seed: 7.13, aspect: 'free', fbAmt: 0.9, src: 'orbs',
-  ccMode: 0, ccTint: '#ff5d7a'
+  ccMode: 0, ccTint: '#ff5d7a',
+  srcScale: 1, srcHue: 0, srcVar: 0.5
 };
 const defaults = JSON.parse(JSON.stringify(state));
 
@@ -391,6 +431,9 @@ const sliders = [
   ['spin','spinV',    v=>v.toFixed(2)],
   ['rot','rotV',      v=>v.toFixed(0)],
   ['wobble','wobbleV',v=>v.toFixed(2)],
+  ['srcScale','srcScaleV',v=>v.toFixed(2)],
+  ['srcHue','srcHueV',v=>v.toFixed(0)],
+  ['srcVar','srcVarV',v=>v.toFixed(2)],
 ];
 
 // Convert standard text wrappers into custom editable text input blocks smoothly
@@ -436,6 +479,7 @@ function syncUI(){
   $('tintC').value = state.tint;
   $('aspectSel').value = state.aspect || 'free';
   $('srcSel').value = state.src || 'user';
+  { const sp=$('srcParams'); if(sp) sp.style.display = (state.src && state.src!=='user' && GENS[state.src]) ? '' : 'none'; }
   $('ccMode').value = state.ccMode || 0;
   $('ccTint').value = state.ccTint || '#ff5d7a';
   document.querySelectorAll('button.mode').forEach(b=>
@@ -1668,3 +1712,9 @@ function kfDel(){ if(kfSel<0||!keyframes.length) return; keyframes.splice(kfSel,
   kfRenderList(); kfSyncPlayBtn();
   const b=document.getElementById('kfSeam'); if(b) b.classList.toggle('on', kfSeamless);
 })();
+
+
+// regenerate the source when its knobs change (rAF-throttled so heavy generators stay responsive)
+let _srcPending = false;
+function scheduleSource(){ if(_srcPending) return; _srcPending = true; requestAnimationFrame(()=>{ _srcPending = false; if(GENS[state.src]) applySource(); }); }
+['srcScale','srcHue','srcVar'].forEach(id=>{ const el=$(id); if(el) el.addEventListener('input', scheduleSource); });
