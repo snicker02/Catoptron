@@ -1277,8 +1277,12 @@ recBtn.addEventListener('click', ()=>{
   } else if(lenSel !== 'manual'){
     dur = +lenSel;
   }
-  const mimes = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+  const _fmt = $('recFmt') ? $('recFmt').value : 'webm';
+  const _mp4 = ['video/mp4;codecs=avc1.640028','video/mp4;codecs=avc1.42E01F','video/mp4'];
+  const _webm = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+  const mimes = _fmt === 'mp4' ? _mp4.concat(_webm) : _webm;
   const mime = mimes.find(m2=> MediaRecorder.isTypeSupported(m2)) || '';
+  if(_fmt === 'mp4' && !/mp4/.test(mime)) toast('MP4 not supported for live record here - saving WebM');
   const stream = canvas.captureStream(fps);
   recChunks = [];
   try{
@@ -1295,7 +1299,7 @@ recBtn.addEventListener('click', ()=>{
     const blob = new Blob(recChunks, {type: mime || 'video/webm'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `hall-of-mirrors-${Date.now()}.webm`;
+    a.download = `hall-of-mirrors-${Date.now()}.` + (/mp4/.test(mime)?'mp4':'webm');
     a.click();
     setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
     recorder = null;
@@ -1394,6 +1398,70 @@ function WebMMuxer(width, height, codecId){
 const hqBtn = $('hqBtn');
 let hqAbort = false;
 
+function MP4Muxer(width, height, fps){
+  const chunks = [], samples = [];
+  let avcC = null;
+  const u16 = n => [(n>>>8)&255, n&255];
+  const u32 = n => [(n>>>24)&255,(n>>>16)&255,(n>>>8)&255,n&255];
+  const s4  = s => [s.charCodeAt(0),s.charCodeAt(1),s.charCodeAt(2),s.charCodeAt(3)];
+  const cstr= s => { const a=[]; for(let i=0;i<s.length;i++) a.push(s.charCodeAt(i)); a.push(0); return a; };
+  const cat = arrs => { let o=[]; for(const a of arrs) o = o.concat(a); return o; };
+  const box = (t, ...p) => { const b = cat(p); return cat([u32(b.length+8), s4(t), b]); };
+  const fbox= (t, v, f, ...p) => box(t, cat([[v],[(f>>>16)&255,(f>>>8)&255,f&255]]), ...p);
+  const MATRIX = cat([u32(0x00010000),u32(0),u32(0), u32(0),u32(0x00010000),u32(0), u32(0),u32(0),u32(0x40000000)]);
+  return {
+    add(chunk, meta){
+      if(!avcC && meta && meta.decoderConfig && meta.decoderConfig.description)
+        avcC = new Uint8Array(meta.decoderConfig.description);
+      const b = new Uint8Array(chunk.byteLength); chunk.copyTo(b);
+      chunks.push(b); samples.push({ size: b.byteLength, key: chunk.type === 'key' });
+    },
+    finish(){
+      const N = samples.length;
+      if(!avcC) avcC = new Uint8Array([1,66,0,31,255,225,0,0,1,0,0]);
+      const ftyp = box('ftyp', s4('isom'), u32(512), s4('isom'), s4('iso2'), s4('avc1'), s4('mp41'));
+      let mb = 0; for(const s of samples) mb += s.size;
+      const mdatH = cat([u32(mb + 8), s4('mdat')]);
+      const off = ftyp.length + mdatH.length;
+      const stts = fbox('stts',0,0, u32(1), u32(N), u32(1));
+      const keys = []; samples.forEach((s,i)=>{ if(s.key) keys.push(i+1); });
+      const stss = fbox('stss',0,0, u32(keys.length), cat(keys.map(u32)));
+      const stsc = fbox('stsc',0,0, u32(1), u32(1), u32(N), u32(1));
+      const stsz = fbox('stsz',0,0, u32(0), u32(N), cat(samples.map(s=>u32(s.size))));
+      const stco = fbox('stco',0,0, u32(1), u32(off));
+      const avcCb = box('avcC', [...avcC]);
+      const avc1 = box('avc1', [0,0,0,0,0,0], u16(1), u16(0), u16(0), cat([u32(0),u32(0),u32(0)]),
+        u16(width), u16(height), u32(0x00480000), u32(0x00480000), u32(0),
+        u16(1), new Array(32).fill(0), u16(0x0018), u16(0xFFFF), avcCb);
+      const stsd = fbox('stsd',0,0, u32(1), avc1);
+      const stbl = box('stbl', stsd, stts, stss, stsc, stsz, stco);
+      const minf = box('minf', fbox('vmhd',0,1, u16(0), u16(0),u16(0),u16(0)),
+        box('dinf', fbox('dref',0,0, u32(1), fbox('url ',0,1))), stbl);
+      const mdia = box('mdia',
+        fbox('mdhd',0,0, u32(0),u32(0), u32(fps), u32(N), u16(0x55C4), u16(0)),
+        fbox('hdlr',0,0, u32(0), s4('vide'), cat([u32(0),u32(0),u32(0)]), cstr('VideoHandler')), minf);
+      const trak = box('trak',
+        fbox('tkhd',0,7, u32(0),u32(0), u32(1), u32(0), u32(N), u32(0),u32(0), u16(0),u16(0), u16(0),u16(0),
+          MATRIX, u32(width*65536), u32(height*65536)), mdia);
+      const moov = box('moov',
+        fbox('mvhd',0,0, u32(0),u32(0), u32(fps), u32(N), u32(0x00010000), u16(0x0100), u16(0),
+          cat([u32(0),u32(0)]), MATRIX, cat([u32(0),u32(0),u32(0),u32(0),u32(0),u32(0)]), u32(2)), trak);
+      return new Blob([Uint8Array.from(ftyp), Uint8Array.from(mdatH), ...chunks, Uint8Array.from(moov)], {type:'video/mp4'});
+    }
+  };
+}
+
+async function pickH264(w, h, bitrate, fps){
+  const tries = ['avc1.640034','avc1.640033','avc1.640028','avc1.4D4028','avc1.42E028','avc1.42E01F'];
+  for(const codec of tries){
+    try{
+      const s = await VideoEncoder.isConfigSupported({codec, width:w, height:h, bitrate, framerate:fps, avc:{format:'avc'}});
+      if(s.supported) return codec;
+    }catch(_){}
+  }
+  return null;
+}
+
 async function pickCodec(w, h, bitrate, fps){
   const tries = [['vp09.00.10.08','V_VP9'], ['vp8','V_VP8']];
   for(const [codec, idc] of tries){
@@ -1440,17 +1508,26 @@ hqBtn.addEventListener('click', async ()=>{
   ew = Math.floor(ew * shrink / 2) * 2;
   eh = Math.floor(eh * shrink / 2) * 2;
 
-  const picked = await pickCodec(ew, eh, mbps*1e6, fps);
-  if(!picked){ toast('no supported video codec (VP9/VP8)'); return; }
-  const [codec, codecId] = picked;
-
-  const mux = new WebMMuxer(ew, eh, codecId);
+  const fmt = $('recFmt') ? $('recFmt').value : 'webm';
+  let mux, codec, codecId, ext, cfg;
+  if(fmt === 'mp4'){
+    codec = await pickH264(ew, eh, mbps*1e6, fps);
+    if(!codec){ toast('H.264 (MP4) not supported here - use WebM'); return; }
+    mux = new MP4Muxer(ew, eh, fps); codecId = codec; ext = 'mp4';
+    cfg = {codec, width:ew, height:eh, bitrate:mbps*1e6, framerate:fps, avc:{format:'avc'}};
+  } else {
+    const picked = await pickCodec(ew, eh, mbps*1e6, fps);
+    if(!picked){ toast('no supported video codec (VP9/VP8)'); return; }
+    codec = picked[0]; codecId = picked[1];
+    mux = new WebMMuxer(ew, eh, codecId); ext = 'webm';
+    cfg = {codec, width:ew, height:eh, bitrate:mbps*1e6, framerate:fps};
+  }
   let encErr = null;
   const encoder = new VideoEncoder({
-    output: chunk => mux.add(chunk),
+    output: (chunk, meta) => mux.add(chunk, meta),
     error:  e => { encErr = e; }
   });
-  encoder.configure({codec, width:ew, height:eh, bitrate:mbps*1e6, framerate:fps});
+  encoder.configure(cfg);
 
   exporting = true; hqAbort = false;
   hqBtn.classList.add('on');
@@ -1502,10 +1579,10 @@ hqBtn.addEventListener('click', async ()=>{
       const blob = mux.finish();
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `hall-of-mirrors-hq-${Date.now()}.webm`;
+      a.download = `hall-of-mirrors-hq-${Date.now()}.${ext}`;
       a.click();
       setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
-      toast(`HQ export: ${ew}\u00d7${eh}, ${frames} frames, ${codecId.replace('V_','')}`);
+      toast(`HQ export: ${ew}\u00d7${eh}, ${frames} frames, ${ext.toUpperCase()}`);
     } else {
       try{ encoder.close(); }catch(_){}
       toast(encErr ? 'encoder error \u2014 try a lower resolution' : 'HQ export cancelled');
@@ -1792,4 +1869,11 @@ function redo(){
   const r = document.getElementById('redoBtn'); if(r) r.addEventListener('click', redo);
   document.querySelectorAll('.group > h2').forEach(h2=> h2.addEventListener('click', ()=> h2.parentElement.classList.toggle('collapsed')));
   pushHistory();   // seed initial state
+})();
+
+
+// record-format button label
+(function(){ const f = document.getElementById('recFmt'), b = document.getElementById('recBtn');
+  if(!f || !b) return; const upd = ()=>{ b.textContent = 'Record ' + (f.value === 'mp4' ? 'MP4' : 'WebM'); };
+  f.addEventListener('change', upd); upd();
 })();
