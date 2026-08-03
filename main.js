@@ -1422,41 +1422,48 @@ function MP4Muxer(width, height, fps){
       const ftyp = box('ftyp', s4('isom'), u32(512), s4('isom'), s4('iso2'), s4('avc1'), s4('mp41'));
       let mb = 0; for(const s of samples) mb += s.size;
       const mdatH = cat([u32(mb + 8), s4('mdat')]);
-      const off = ftyp.length + mdatH.length;
-      const stts = fbox('stts',0,0, u32(1), u32(N), u32(1));
       const keys = []; samples.forEach((s,i)=>{ if(s.key) keys.push(i+1); });
-      const stss = fbox('stss',0,0, u32(keys.length), cat(keys.map(u32)));
-      const stsc = fbox('stsc',0,0, u32(1), u32(1), u32(N), u32(1));
-      const stsz = fbox('stsz',0,0, u32(0), u32(N), cat(samples.map(s=>u32(s.size))));
-      const stco = fbox('stco',0,0, u32(1), u32(off));
-      const avcCb = box('avcC', [...avcC]);
-      const avc1 = box('avc1', [0,0,0,0,0,0], u16(1), u16(0), u16(0), cat([u32(0),u32(0),u32(0)]),
-        u16(width), u16(height), u32(0x00480000), u32(0x00480000), u32(0),
-        u16(1), new Array(32).fill(0), u16(0x0018), u16(0xFFFF), avcCb);
-      const stsd = fbox('stsd',0,0, u32(1), avc1);
-      const stbl = box('stbl', stsd, stts, stss, stsc, stsz, stco);
-      const minf = box('minf', fbox('vmhd',0,1, u16(0), u16(0),u16(0),u16(0)),
-        box('dinf', fbox('dref',0,0, u32(1), fbox('url ',0,1))), stbl);
-      const mdia = box('mdia',
-        fbox('mdhd',0,0, u32(0),u32(0), u32(fps), u32(N), u16(0x55C4), u16(0)),
-        fbox('hdlr',0,0, u32(0), s4('vide'), cat([u32(0),u32(0),u32(0)]), cstr('VideoHandler')), minf);
-      const trak = box('trak',
-        fbox('tkhd',0,7, u32(0),u32(0), u32(1), u32(0), u32(N), u32(0),u32(0), u16(0),u16(0), u16(0),u16(0),
-          MATRIX, u32(width*65536), u32(height*65536)), mdia);
-      const moov = box('moov',
-        fbox('mvhd',0,0, u32(0),u32(0), u32(fps), u32(N), u32(0x00010000), u16(0x0100), u16(0),
-          cat([u32(0),u32(0)]), MATRIX, cat([u32(0),u32(0),u32(0),u32(0),u32(0),u32(0)]), u32(2)), trak);
-      return new Blob([Uint8Array.from(ftyp), Uint8Array.from(mdatH), ...chunks, Uint8Array.from(moov)], {type:'video/mp4'});
+      const buildMoov = (dataOffset)=>{
+        const stts = fbox('stts',0,0, u32(1), u32(N), u32(1));
+        const stss = fbox('stss',0,0, u32(keys.length), cat(keys.map(u32)));
+        const stsc = fbox('stsc',0,0, u32(1), u32(1), u32(N), u32(1));
+        const stsz = fbox('stsz',0,0, u32(0), u32(N), cat(samples.map(s=>u32(s.size))));
+        const stco = fbox('stco',0,0, u32(1), u32(dataOffset));
+        const avc1 = box('avc1', [0,0,0,0,0,0], u16(1), u16(0), u16(0), cat([u32(0),u32(0),u32(0)]),
+          u16(width), u16(height), u32(0x00480000), u32(0x00480000), u32(0),
+          u16(1), new Array(32).fill(0), u16(0x0018), u16(0xFFFF), box('avcC', [...avcC]));
+        const stbl = box('stbl', fbox('stsd',0,0, u32(1), avc1), stts, stss, stsc, stsz, stco);
+        const minf = box('minf', fbox('vmhd',0,1, u16(0), u16(0),u16(0),u16(0)),
+          box('dinf', fbox('dref',0,0, u32(1), fbox('url ',0,1))), stbl);
+        const mdia = box('mdia',
+          fbox('mdhd',0,0, u32(0),u32(0), u32(fps), u32(N), u16(0x55C4), u16(0)),
+          fbox('hdlr',0,0, u32(0), s4('vide'), cat([u32(0),u32(0),u32(0)]), cstr('VideoHandler')), minf);
+        const trak = box('trak',
+          fbox('tkhd',0,7, u32(0),u32(0), u32(1), u32(0), u32(N), u32(0),u32(0), u16(0),u16(0), u16(0),u16(0),
+            MATRIX, u32(width*65536), u32(height*65536)), mdia);
+        return box('moov',
+          fbox('mvhd',0,0, u32(0),u32(0), u32(fps), u32(N), u32(0x00010000), u16(0x0100), u16(0),
+            cat([u32(0),u32(0)]), MATRIX, cat([u32(0),u32(0),u32(0),u32(0),u32(0),u32(0)]), u32(2)), trak);
+      };
+      const moov0 = buildMoov(0);
+      const dataOffset = ftyp.length + moov0.length + mdatH.length;   // faststart: ftyp, moov, mdat
+      const moov = buildMoov(dataOffset);
+      return new Blob([Uint8Array.from(ftyp), Uint8Array.from(moov), Uint8Array.from(mdatH), ...chunks], {type:'video/mp4'});
     }
   };
 }
 
 async function pickH264(w, h, bitrate, fps){
-  const tries = ['avc1.640034','avc1.640033','avc1.640028','avc1.4D4028','avc1.42E028','avc1.42E01F'];
-  for(const codec of tries){
+  // constrained-baseline first (no B-frames, no ctts needed), then main, then high; several levels so one fits the resolution
+  const codecs = [
+    'avc1.42E028','avc1.42E029','avc1.42E02A','avc1.42E032','avc1.42E033','avc1.42E034',
+    'avc1.4D4028','avc1.4D402A','avc1.4D4032','avc1.4D4034',
+    'avc1.640028','avc1.64002A','avc1.640032','avc1.640034'
+  ];
+  for(const codec of codecs){
     try{
-      const s = await VideoEncoder.isConfigSupported({codec, width:w, height:h, bitrate, framerate:fps, avc:{format:'avc'}});
-      if(s.supported) return codec;
+      const s = await VideoEncoder.isConfigSupported({codec, width:w, height:h, bitrate, framerate:fps});
+      if(s && s.supported) return codec;
     }catch(_){}
   }
   return null;
