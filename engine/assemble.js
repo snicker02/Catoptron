@@ -118,6 +118,53 @@ const RENDERERS = {
     if(abs(uHueK) > 0.0001) fb = hueShift(fb, uHueK * 0.35);
     vec3 src = shade(p, 0.0, 999.0);
     col = mix(src, fb, uFbAmt);`,
+  6: `
+    vec2 d = (uv - c) * vec2(ca, 1.0);
+    float tile = mix(0.15, 1.2, (uStep - 0.42) / 0.52);
+    vec2 g = d / tile + uShift;
+    vec2 cell = floor(g);
+    vec2 fp = g - cell;
+    if(uFlip > 0.5){
+      if(mod(mod(cell.x,2.0)+2.0,2.0) >= 1.0) fp.x = 1.0 - fp.x;
+      if(mod(mod(cell.y,2.0)+2.0,2.0) >= 1.0) fp.y = 1.0 - fp.y;
+    }
+    fp = rot(uTwist * (cell.x - cell.y) * 0.25) * (fp - 0.5) + 0.5;
+    float e = min(min(fp.x, 1.0-fp.x), min(fp.y, 1.0-fp.y));
+    float dk = clamp((abs(cell.x)+abs(cell.y)) * 0.5, 0.0, 48.0);
+    col = shade(fp, dk, e);`,
+  7: `
+    vec2 d = (uv - c) * vec2(ca, 1.0);
+    float r = length(d);
+    float a = atan(d.y, d.x) + uTwist * 0.5;
+    float N = clamp(floor(uDepth), 3.0, 40.0);
+    float wedge = TAU / N;
+    a = mod(a, wedge);
+    a = abs(a - wedge * 0.5);
+    vec2 dir = vec2(cos(a), sin(a));
+    float rr = r / mix(0.4, 1.6, (uStep - 0.42) / 0.52);
+    rr = 1.0 - abs(mod(rr + ph, 2.0) - 1.0);
+    vec2 p = dir * rr + 0.5 + uShift;
+    float e = min(rr, 1.0 - rr);
+    float dk = clamp(r * 2.0, 0.0, 48.0);
+    col = shade(p, dk, e);`,
+  8: `
+    vec2 d = (uv - c) * vec2(ca, 1.0);
+    float rad = mix(0.5, 1.35, (uStep - 0.42) / 0.52);
+    vec2 s2 = d / rad;
+    float rr = dot(s2, s2);
+    if(rr <= 1.0){
+      float z = sqrt(max(0.0, 1.0 - rr));
+      vec2 sxy = rot(uTwist * 0.5) * s2;
+      float lon = atan(sxy.x, z) / TAU + 0.5 + ph * 0.05;
+      float lat = asin(clamp(sxy.y, -1.0, 1.0)) / 3.14159265 + 0.5;
+      vec2 p = vec2(lon, lat) + uShift;
+      if(uFlip > 0.5) p.x = 1.0 - p.x;
+      float e = clamp((1.0 - rr) * 6.0, 0.0, 999.0);
+      col = shade(p, 0.0, e);
+      col *= 0.5 + 0.5 * z;
+    } else {
+      col = shade(uv, 24.0, 999.0) * 0.10;
+    }`,
 };
 
 // transitive closure of helper deps, emitted in dependency order
