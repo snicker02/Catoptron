@@ -308,7 +308,10 @@ const rendNotes = [
   'Perspective raycast down an infinite mirrored box. Step = pane length, twist = spiral roll.',
   'Infinite mirrored pipe: cylindrical raycast down the bore. Step = pane length, twist = spiral roll.',
   'Parallel facing mirrors seen side-on: bands recede both directions. Step = band width, twist = skew.',
-  'Optical feedback: every frame re-enters through the folds. Pull draws inward, Feedback sets persistence, glass applies per generation. Causal \u2014 loop recordings won\u2019t seam.'
+  'Optical feedback: every frame re-enters through the folds. Pull draws inward, Feedback sets persistence, glass applies per generation. Causal \u2014 loop recordings won\u2019t seam.',
+  'Wallpaper tiling: the plane repeats in a rectangular grid. Tile size sets the cell, twist spins each cell, mirrored flips alternate cells.',
+  'Kaleidoscope: reflected into N radial wedges with mirrored rings. Segments = wedge count, zoom scales, spin rotates.',
+  'Sphere: the image wraps onto a rotating ball. Ball size scales it, spin turns the globe, shift scrolls the surface.'
 ];
 
 /* ================= presets (lite set uses operator indices 0\u201314) ================= */
@@ -487,15 +490,22 @@ function syncUI(){
     b.classList.toggle('on', +b.dataset.rend === state.rend));
   $('flip').classList.toggle('on', !!state.flip);
   $('flip').textContent = state.flip ? 'mirrored' : 'plain';
-  $('depthRow').style.display = state.rend===0 ? '' : 'none';
+  $('depthRow').style.display = (state.rend===0 || state.rend===7) ? '' : 'none';
+  { const dl=$('depthLbl'); if(dl) dl.textContent = state.rend===7 ? 'Segments' : 'Depth'; }
   $('fbRow').style.display    = state.rend===5 ? '' : 'none';
   $('stepLbl').textContent  = (state.rend===2||state.rend===3) ? 'Pane length'
                             : (state.rend===4 ? 'Band width'
-                            : (state.rend===5 ? 'Pull' : 'Step scale'));
+                            : (state.rend===5 ? 'Pull'
+                            : (state.rend===6 ? 'Tile size'
+                            : (state.rend===7 ? 'Zoom'
+                            : (state.rend===8 ? 'Ball size' : 'Step scale')))));
   $('twistLbl').textContent = state.rend===1 ? 'Spiral'
                             : ((state.rend===2||state.rend===3) ? 'Roll'
                             : (state.rend===4 ? 'Skew'
-                            : (state.rend===5 ? 'Rotate' : 'Twist')));
+                            : (state.rend===5 ? 'Rotate'
+                            : (state.rend===6 ? 'Cell spin'
+                            : (state.rend===7 ? 'Spin'
+                            : (state.rend===8 ? 'Ball spin' : 'Twist'))))));
   $('rendNote').textContent = rendNotes[state.rend];
   renderStack();
 }
