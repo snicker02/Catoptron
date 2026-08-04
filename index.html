@@ -283,6 +283,7 @@ input[type=file]{display:none}
 .group > h2::after{content:'\25BE';float:right;color:var(--dim);font-size:10px;transition:transform .15s;transform-origin:center}
 .group.collapsed > h2::after{transform:rotate(-90deg)}
 .group.collapsed > *:not(h2){display:none}
+#glc{touch-action:none}
 </style>
 </head>
 <body>
@@ -295,6 +296,7 @@ input[type=file]{display:none}
   <button id="kfSetBtn" title="Set keyframe — capture current look">&#9670; Key</button>
   <button id="undoBtn" title="Undo (Ctrl+Z)">&#8630;</button>
   <button id="redoBtn" title="Redo (Ctrl+Shift+Z)">&#8631;</button>
+  <button id="fsBtn" title="Fullscreen">&#9974;</button>
   <span class="hint">drop / paste an image &nbsp;·&nbsp; drag canvas = vanishing point &nbsp;·&nbsp; dbl-click = recenter</span>
 </header>
 <main>
@@ -337,7 +339,7 @@ input[type=file]{display:none}
           <option value="halftone">halftone</option>
         </select>
       </div>
-      <div id="camRow" class="btns" style="display:none;margin-top:8px"><button id="camFlip" style="flex:1">Flip camera (front / back)</button></div>
+      <div id="camRow" class="btns" style="display:none;margin-top:8px"><button id="camFlip" style="flex:1">Flip camera</button><button id="freezeBtn" style="flex:1">Freeze frame</button></div>
       <div id="srcParams">
         <div class="row"><label>Scale</label><input type="range" id="srcScale" min="0.25" max="4" step="0.05" value="1"><span class="val" id="srcScaleV"></span></div>
         <div class="row"><label>Hue</label><input type="range" id="srcHue" min="0" max="360" step="1" value="0"><span class="val" id="srcHueV"></span></div>
