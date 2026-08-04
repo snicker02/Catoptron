@@ -1884,3 +1884,28 @@ function redo(){
   if(!f || !b) return; const upd = ()=>{ b.textContent = 'Record ' + (f.value === 'mp4' ? 'MP4' : 'WebM'); };
   f.addEventListener('change', upd); upd();
 })();
+
+
+// ---- mobile layout: pin canvas above controls, collapse sections ----
+(function __mobileLayout(){
+  const mq = window.matchMedia('(max-width:760px)');
+  const main = document.querySelector('main');
+  const stage = document.getElementById('stage');
+  const pL = document.getElementById('panelL');
+  const pR = document.getElementById('panelR');
+  if(!main || !stage || !pL || !pR) return;
+  function order(){
+    if(mq.matches){
+      if(main.firstElementChild !== stage) main.insertBefore(stage, pL);   // canvas first
+    } else {
+      if(stage.previousElementSibling !== pL || stage.nextElementSibling !== pR) main.insertBefore(stage, pR); // panelL, stage, panelR
+    }
+    if(typeof fitCanvas === 'function') fitCanvas();
+  }
+  order();
+  if(mq.addEventListener) mq.addEventListener('change', order); else if(mq.addListener) mq.addListener(order);
+  if(mq.matches) document.querySelectorAll('.group').forEach(g=> g.classList.add('collapsed'));
+  let __rt; const __refit = ()=>{ clearTimeout(__rt); __rt = setTimeout(()=>{ if(typeof fitCanvas === 'function') fitCanvas(); }, 200); };
+  window.addEventListener('resize', __refit);
+  window.addEventListener('orientationchange', __refit);
+})();
