@@ -104,7 +104,7 @@ result of the one above it.
 
 ## 6. Operator reference
 
-All 49 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
+All 53 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
 reveal the rest once you pick a mode.
 
 ### Basic transforms
@@ -124,6 +124,9 @@ reveal the rest once you pick a mode.
 | **Triangle fold** | Folds through a triangle (triangular kaleidoscope) | Scale |
 | **Mirror line** | Reflects across a line; keep side A or B | Angle°, Side |
 | **Mirror tile** | Tiles X×Y with mirror or repeat | Tiles X, Tiles Y, Mode |
+| **Abs fold** | Box fold — reflects anything past ±fold back inward | Fold |
+| **Brick** | Brick-wall tiling, offset alternating rows | Scale X, Scale Y |
+| **Bravais** | Softly pulls points toward a lattice | Scale, Pull |
 | **Wallpaper** | All 17 wallpaper groups — seamless symmetric wallpaper | Group (p1…p6m), Cell, Angle° |
 | **Frieze** | The 7 frieze (strip) symmetry groups | Group, Angle°, Period |
 | **Hyperbolic** | Hyperbolic {p,q} tiling in the Poincaré disk | p, q, Scale |
@@ -171,6 +174,7 @@ reveal the rest once you pick a mode.
 | **Koch fold** | Koch-curve folding (snowflake edges) | Iters, Scale |
 | **DModulus** | Double-modulus fractal tiling | Size X/Y, Angle°, Iters |
 | **Shatter** | Breaks the plane into tilted cells (shattered glass) | Cells, Tilt |
+| **Bedhead** | Chaotic-attractor warp — organic, glitchy | a, b |
 | **Kleinian** | Kleinian-group circle-inversion fractal | Circles, Radius, Iters, Scale, Bound, Spin°, Twist°, Frame |
 | **Fuchsian** | Fuchsian group (hyperbolic tilings) | trace ta/tb/tab, Iters |
 | **Apollonian** | Apollonian gasket circle packing | Iters, Radius, Scale |
@@ -300,7 +304,7 @@ modules load.
 **Local testing**: ES modules don't load from `file://`, so run a static server from the repo
 folder — `python -m http.server 8000` — and open `http://localhost:8000`.
 
-**Validation**: all 49 operators × 6 renderers (294 combinations) and all 93 preset recipes are
+**Validation**: all 53 operators × 9 renderers (477 combinations) and all 93 preset recipes are
 compiled *and* rendered through headless ANGLE (the same `WebGL GLSL ES 1.0` path the browser
 uses). The one thing only a real browser exercises is `KHR_parallel_shader_compile` — the async
 recompile when you add or reorder a fold — so it's worth a quick check that reordering stays smooth.
