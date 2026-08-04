@@ -480,6 +480,7 @@ function syncUI(){
   $('aspectSel').value = state.aspect || 'free';
   $('srcSel').value = state.src || 'user';
   { const sp=$('srcParams'); if(sp) sp.style.display = (state.src && state.src!=='user' && GENS[state.src]) ? '' : 'none'; }
+  { const cr=$('camRow'), cv=$('camVideo'); if(cr) cr.style.display = (cv && cv.srcObject) ? '' : 'none'; }
   $('ccMode').value = state.ccMode || 0;
   $('ccTint').value = state.ccTint || '#ff5d7a';
   document.querySelectorAll('button.mode').forEach(b=>
@@ -518,13 +519,19 @@ $('ccMode').addEventListener('change', e=>{
 });
 $('ccTint').addEventListener('input', e=> state.ccTint = e.target.value);
 $('srcSel').addEventListener('change', e=>{
+  const _prev = state.src;
   state.src = e.target.value;
-  if(state.src === 'user'){
+  if(_prev === 'camera' && state.src !== 'camera') stopCamera();
+  if(state.src === 'camera'){
+    if(_prev !== 'camera') _preCameraSrc = _prev;
+    startCamera();
+  } else if(state.src === 'user'){
     toast('load or paste an image');
   } else {
     applySource();
     toast(state.src + (GENS[state.src].seeded ? ' \u00b7 reseed rerolls it' : ''));
   }
+  const sp = $('srcParams'); if(sp) sp.style.display = GENS[state.src] ? '' : 'none';
 });
 document.querySelectorAll('button.mode').forEach(b=>{
   b.addEventListener('click', ()=>{ state.rend = +b.dataset.rend; syncUI(); });
@@ -980,6 +987,7 @@ canvas.addEventListener('dblclick',    ()=>{ state.cx = 0.5; state.cy = 0.5; toa
 /* file loading */
 function loadFile(file){
   if(!file || !file.type.startsWith('image/')) return;
+  stopCamera();
   const url = URL.createObjectURL(file);
   const im = new Image();
   im.onload = ()=>{
@@ -1243,6 +1251,9 @@ function frame(now){
   const h = Math.round(canvas.clientHeight * dpr);
   if(canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; }
 
+  if(camActive && camVideo && camVideo.readyState >= 2 && camVideo.videoWidth){
+    setImage(camVideo, camVideo.videoWidth, camVideo.videoHeight);
+  }
   renderScene(w, h);
   requestAnimationFrame(frame);
 }
@@ -1913,3 +1924,40 @@ function redo(){
   window.addEventListener('resize', __refit);
   window.addEventListener('orientationchange', __refit);
 })();
+
+
+// ===================== LIVE CAMERA INPUT =====================
+let camStream = null, camActive = false, camFacing = 'environment', _preCameraSrc = 'orbs';
+const camVideo = document.getElementById('camVideo');
+async function startCamera(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ toast('camera not supported here'); revertSrc(); return; }
+  try{
+    if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream = null; }
+    camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: camFacing }, audio: false });
+    if(camVideo){ camVideo.srcObject = camStream; camVideo.muted = true; camVideo.setAttribute('playsinline',''); await camVideo.play().catch(()=>{}); }
+    camActive = true;
+    const cr = document.getElementById('camRow'); if(cr) cr.style.display = '';
+    const sp = document.getElementById('srcParams'); if(sp) sp.style.display = 'none';
+    toast('camera live \u00b7 ' + (camFacing === 'user' ? 'front' : 'back'));
+  }catch(err){
+    const why = (err && err.name === 'NotAllowedError') ? 'permission denied'
+              : (err && err.name === 'NotFoundError') ? 'no camera found'
+              : (err && err.message) || 'error';
+    toast('camera unavailable: ' + why);
+    camActive = false; revertSrc();
+  }
+}
+function stopCamera(){
+  if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream = null; }
+  if(camVideo) camVideo.srcObject = null;
+  camActive = false;
+  const cr = document.getElementById('camRow'); if(cr) cr.style.display = 'none';
+}
+function revertSrc(){
+  state.src = (_preCameraSrc && _preCameraSrc !== 'camera') ? _preCameraSrc : 'orbs';
+  const sel = document.getElementById('srcSel'); if(sel) sel.value = state.src;
+  const sp = document.getElementById('srcParams'); if(sp) sp.style.display = (GENS[state.src]) ? '' : 'none';
+  if(GENS[state.src]) applySource();
+}
+async function flipCamera(){ if(!camActive) return; camFacing = (camFacing === 'environment') ? 'user' : 'environment'; await startCamera(); }
+(function(){ const b = document.getElementById('camFlip'); if(b) b.addEventListener('click', flipCamera); })();
