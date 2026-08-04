@@ -1204,5 +1204,41 @@ const OPS = [
   }
   return o;
 }` },
+  { name:'Abs fold', fn:'opAbsFold', deps:[],
+    params:[["Fold",0.1,3,0.01,1],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opAbsFold(vec2 q, vec4 P){
+  float fold = P.x, amount = (P.y<=0.0)?1.0:P.y;
+  float nx = q.x, ny = q.y;
+  if(nx > fold) nx = 2.0*fold - nx; else if(nx < -fold) nx = -2.0*fold - nx;
+  if(ny > fold) ny = 2.0*fold - ny; else if(ny < -fold) ny = -2.0*fold - ny;
+  return amount * vec2(nx, ny);
+}` },
+  { name:'Brick', fn:'opBrick', deps:[],
+    params:[["Scale X",0.1,3,0.01,1],["Scale Y",0.1,3,0.01,0.5],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opBrick(vec2 q, vec4 P){
+  float sx = max(abs(P.x), 1e-4), sy = max(abs(P.y), 1e-4), amount = (P.z<=0.0)?1.0:P.z;
+  float row = floor(q.y / sy);
+  float offset = (mod(row, 2.0) > 0.5) ? sx*0.5 : 0.0;
+  float nx = q.x - (floor((q.x + offset)/sx)*sx + sx*0.5 - offset);
+  float ny = q.y - (floor(q.y/sy)*sy + sy*0.5);
+  return amount * vec2(nx, ny);
+}` },
+  { name:'Bravais', fn:'opBravais', deps:[],
+    params:[["Scale",0.5,8,0.1,3],["Pull",0,1,0.01,0.5],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opBravais(vec2 q, vec4 P){
+  float scale = max(abs(P.x), 1e-4), pull = P.y, amount = (P.z<=0.0)?1.0:P.z;
+  float cx = floor(q.x*scale + 0.5)/scale;
+  float cy = floor(q.y*scale + 0.5)/scale;
+  return amount * vec2(q.x + pull*(cx - q.x), q.y + pull*(cy - q.y));
+}` },
+  { name:'Bedhead', fn:'opBedhead', deps:[],
+    params:[["a",-2,2,0.01,-0.81],["b",-2,2,0.01,-0.92],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opBedhead(vec2 q, vec4 P){
+  float a = P.x, b = P.y, amount = (P.z<=0.0)?1.0:P.z;
+  float bs = (abs(b) < 0.001) ? sign(b + 0.00001)*0.001 : b;
+  float nx = sin(q.x*q.y/bs)*q.y + cos(a*q.x - q.y);
+  float ny = q.x + sin(q.y)/bs;
+  return amount * vec2(nx, ny);
+}` },
 ];
 export { OPS };
