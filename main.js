@@ -1893,18 +1893,22 @@ function redo(){
   const stage = document.getElementById('stage');
   const pL = document.getElementById('panelL');
   const pR = document.getElementById('panelR');
+  const timeline = document.getElementById('timeline');
   if(!main || !stage || !pL || !pR) return;
   function order(){
     if(mq.matches){
       if(main.firstElementChild !== stage) main.insertBefore(stage, pL);   // canvas first
+      if(timeline && timeline.parentElement !== main) main.appendChild(timeline); // Animation flows as a section
     } else {
       if(stage.previousElementSibling !== pL || stage.nextElementSibling !== pR) main.insertBefore(stage, pR); // panelL, stage, panelR
+      if(timeline && timeline.parentElement === main){ main.parentElement.insertBefore(timeline, main.nextElementSibling); timeline.classList.remove('tl-collapsed'); } // back to bottom bar
     }
     if(typeof fitCanvas === 'function') fitCanvas();
   }
   order();
   if(mq.addEventListener) mq.addEventListener('change', order); else if(mq.addListener) mq.addListener(order);
-  if(mq.matches) document.querySelectorAll('.group').forEach(g=> g.classList.add('collapsed'));
+  if(timeline){ const tlH2 = timeline.querySelector('h2'); if(tlH2) tlH2.addEventListener('click', ()=> timeline.classList.toggle('tl-collapsed')); }
+  if(mq.matches){ document.querySelectorAll('.group').forEach(g=> g.classList.add('collapsed')); if(timeline) timeline.classList.add('tl-collapsed'); }
   let __rt; const __refit = ()=>{ clearTimeout(__rt); __rt = setTimeout(()=>{ if(typeof fitCanvas === 'function') fitCanvas(); }, 200); };
   window.addEventListener('resize', __refit);
   window.addEventListener('orientationchange', __refit);
