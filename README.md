@@ -232,7 +232,7 @@ Turn these up to animate for video export:
 - **Drift** — slowly evolves fold parameters over time.
 - **Spin** — continuous rotation of the whole view.
 - **Rotate** — a fixed rotation offset (also animatable).
-- **Wobble** — drives the time input of the animated folds (Wave bank, Swirl-type waves, etc.).
+- **Wobble** — gently undulates the whole pattern over time; it animates *every* fold (a global warp), plus the Wave folds and Ripple more strongly. Wobble 0 is fully static.
 
 Animation loops are built to close seamlessly when exported as HQ Video.
 
