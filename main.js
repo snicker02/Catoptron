@@ -949,6 +949,7 @@ $('rand').addEventListener('click', ()=>{
 
 /* vanishing point + fold-origin picking */
 let dragging = false, pickOp = -1;
+const _ptrs = new Map(); let _gesture = null, _singleStartC = null;
 function setCenter(e){
   const r = canvas.getBoundingClientRect();
   state.cx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
@@ -966,22 +967,56 @@ function setOpOrigin(e){
     Math.min(1, Math.max(-1, (uy - state.cy)))
   ];
 }
+function _gStart(){
+  const p = [..._ptrs.values()];
+  const dx = p[1].x - p[0].x, dy = p[1].y - p[0].y;
+  _gesture = { dist0: Math.hypot(dx,dy) || 1, ang0: Math.atan2(dy,dx),
+    mid0:{ x:(p[0].x+p[1].x)/2, y:(p[0].y+p[1].y)/2 },
+    z0: state.zoom, rot0: state.rot || 0, sx0: state.shiftX, sy0: state.shiftY };
+}
+function _gMove(){
+  if(!_gesture) return;
+  const p = [..._ptrs.values()];
+  const dx = p[1].x - p[0].x, dy = p[1].y - p[0].y;
+  const dist = Math.hypot(dx,dy) || 1, ang = Math.atan2(dy,dx);
+  const mid = { x:(p[0].x+p[1].x)/2, y:(p[0].y+p[1].y)/2 };
+  const r = canvas.getBoundingClientRect();
+  state.zoom = Math.min(6, Math.max(0.2, _gesture.z0 * (dist / _gesture.dist0)));   // pinch
+  state.rot  = _gesture.rot0 + (ang - _gesture.ang0) * 180 / Math.PI;                // twist
+  const pf = 1.8 / state.zoom;                                                       // two-finger pan
+  state.shiftX = _gesture.sx0 + ((mid.x - _gesture.mid0.x) / r.width)  * pf;
+  state.shiftY = _gesture.sy0 - ((mid.y - _gesture.mid0.y) / r.height) * pf;
+}
 canvas.addEventListener('pointerdown', e=>{
-  dragging = true; canvas.setPointerCapture(e.pointerId);
-  if(pickOp >= 0) setOpOrigin(e); else setCenter(e);
-});
-canvas.addEventListener('pointermove', e=>{
-  if(!dragging) return;
-  if(pickOp >= 0) setOpOrigin(e); else setCenter(e);
-});
-canvas.addEventListener('pointerup', ()=>{
-  dragging = false;
-  if(pickOp >= 0){
-    pickOp = -1;
-    renderStack();
-    toast('fold origin set');
+  canvas.setPointerCapture(e.pointerId);
+  _ptrs.set(e.pointerId, { x:e.clientX, y:e.clientY });
+  if(_ptrs.size === 1){
+    _gesture = null; dragging = true;
+    if(pickOp < 0) _singleStartC = [state.cx, state.cy];
+    if(pickOp >= 0) setOpOrigin(e); else setCenter(e);         // tap-to-place focal point / fold origin
+  } else if(_ptrs.size === 2){
+    dragging = false;
+    if(pickOp < 0 && _singleStartC){ state.cx = _singleStartC[0]; state.cy = _singleStartC[1]; }  // undo the first-finger move
+    _gStart();
   }
 });
+canvas.addEventListener('pointermove', e=>{
+  if(!_ptrs.has(e.pointerId)) return;
+  _ptrs.set(e.pointerId, { x:e.clientX, y:e.clientY });
+  if(_ptrs.size >= 2) _gMove();
+  else if(dragging){ if(pickOp >= 0) setOpOrigin(e); else setCenter(e); }
+});
+function _ptrEnd(e){
+  _ptrs.delete(e.pointerId);
+  if(_ptrs.size < 2) _gesture = null;
+  if(_ptrs.size === 0){
+    dragging = false; _singleStartC = null;
+    if(pickOp >= 0){ pickOp = -1; renderStack(); toast('fold origin set'); }
+    if(typeof pushHistory === 'function') pushHistory();       // canvas gestures are undoable
+  }
+}
+canvas.addEventListener('pointerup', _ptrEnd);
+canvas.addEventListener('pointercancel', _ptrEnd);
 canvas.addEventListener('dblclick',    ()=>{ state.cx = 0.5; state.cy = 0.5; toast('recentered'); });
 
 /* file loading */
@@ -1940,10 +1975,10 @@ async function startCamera(){
     const sp = document.getElementById('srcParams'); if(sp) sp.style.display = 'none';
     toast('camera live \u00b7 ' + (camFacing === 'user' ? 'front' : 'back'));
   }catch(err){
-    const why = (err && err.name === 'NotAllowedError') ? 'permission denied'
+    const why = (err && err.name === 'NotAllowedError') ? 'blocked/denied — close floating app bubbles, allow camera, then retry'
               : (err && err.name === 'NotFoundError') ? 'no camera found'
               : (err && err.message) || 'error';
-    toast('camera unavailable: ' + why);
+    toast('camera: ' + why);
     camActive = false; revertSrc();
   }
 }
@@ -1961,3 +1996,45 @@ function revertSrc(){
 }
 async function flipCamera(){ if(!camActive) return; camFacing = (camFacing === 'environment') ? 'user' : 'environment'; await startCamera(); }
 (function(){ const b = document.getElementById('camFlip'); if(b) b.addEventListener('click', flipCamera); })();
+
+
+// ===================== FULLSCREEN + WAKE LOCK =====================
+let _wakeLock = null;
+async function _acquireWake(){ try{ if('wakeLock' in navigator) _wakeLock = await navigator.wakeLock.request('screen'); }catch(_){}}
+function _releaseWake(){ if(_wakeLock){ _wakeLock.release().catch(()=>{}); _wakeLock = null; } }
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'visible' && document.fullscreenElement) _acquireWake(); });
+function toggleFullscreen(){
+  const el = document.documentElement;
+  if(!document.fullscreenElement && !document.webkitFullscreenElement){
+    if(el.requestFullscreen) el.requestFullscreen().catch(()=>toast('fullscreen unavailable'));
+    else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    else toast('fullscreen not supported here');
+  } else {
+    if(document.exitFullscreen) document.exitFullscreen();
+    else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
+  }
+}
+function _onFsChange(){
+  const fs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  if(fs) _acquireWake(); else _releaseWake();
+  const b = document.getElementById('fsBtn'); if(b) b.classList.toggle('on', fs);
+  if(typeof fitCanvas === 'function') setTimeout(fitCanvas, 120);
+}
+document.addEventListener('fullscreenchange', _onFsChange);
+document.addEventListener('webkitfullscreenchange', _onFsChange);
+(function(){ const b = document.getElementById('fsBtn'); if(b) b.addEventListener('click', toggleFullscreen); })();
+
+// ===================== CAMERA FREEZE-FRAME =====================
+function freezeCamera(){
+  if(!camActive || !camVideo || !camVideo.videoWidth){ toast('camera not live'); return; }
+  const cv = document.createElement('canvas');
+  cv.width = camVideo.videoWidth; cv.height = camVideo.videoHeight;
+  cv.getContext('2d').drawImage(camVideo, 0, 0);
+  setImage(cv, cv.width, cv.height);
+  stopCamera();
+  state.src = 'user';
+  const sel = document.getElementById('srcSel'); if(sel) sel.value = 'user';
+  toast('frozen \u00b7 now a still image');
+  if(typeof pushHistory === 'function') pushHistory();
+}
+(function(){ const b = document.getElementById('freezeBtn'); if(b) b.addEventListener('click', freezeCamera); })();
