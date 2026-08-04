@@ -438,8 +438,11 @@ input[type=file]{display:none}
         <button class="mode" data-rend="3">Tube</button>
         <button class="mode" data-rend="4">Strip</button>
         <button class="mode" data-rend="5">Feedback</button>
+        <button class="mode" data-rend="6">Grid</button>
+        <button class="mode" data-rend="7">Kaleido</button>
+        <button class="mode" data-rend="8">Sphere</button>
       </div>
-      <div class="row" id="depthRow"><label>Depth</label><input type="range" id="depth" min="1" max="60" step="1" value="14"><span class="val" id="depthV"></span></div>
+      <div class="row" id="depthRow"><label id="depthLbl">Depth</label><input type="range" id="depth" min="1" max="60" step="1" value="14"><span class="val" id="depthV"></span></div>
       <div class="row" id="fbRow" style="display:none"><label>Feedback</label><input type="range" id="fbAmt" min="0" max="0.98" step="0.005" value="0.9"><span class="val" id="fbAmtV"></span></div>
       <div class="row"><label id="stepLbl">Step scale</label><input type="range" id="step" min="0.42" max="0.94" step="0.005" value="0.72"><span class="val" id="stepV"></span></div>
       <div class="row"><label id="twistLbl">Twist</label><input type="range" id="twist" min="-90" max="90" step="0.5" value="8"><span class="val" id="twistV"></span></div>
@@ -549,6 +552,9 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Tube</td><td>Wraps the plane around a cylinder</td><td>Tunnels, wormholes</td></tr>
         <tr><td>Strip</td><td>Repeats along one band</td><td>Friezes, ribbons</td></tr>
         <tr><td>Feedback</td><td>Feeds the previous frame back in</td><td>Trails, painterly buildup</td></tr>
+        <tr><td>Grid</td><td>Repeats the image in a wallpaper grid</td><td>Tiled patterns, textiles</td></tr>
+        <tr><td>Kaleido</td><td>Reflects into N radial mirror wedges</td><td>Classic kaleidoscope</td></tr>
+        <tr><td>Sphere</td><td>Wraps the image onto a rotating ball</td><td>Planets, crystal balls</td></tr>
       </table>
       <p>Shared controls: <b>Depth</b> (reflection/recursion steps), <b>Step scale</b> (zoom per level), <b>Twist</b> (rotation per level), <b>Shift X/Y</b> &amp; <b>Zoom</b> (pan/zoom), <b>mirrored</b> (flip alternating tiles), and <b>Feedback</b> amount (trail length, Feedback renderer only).</p>
 
