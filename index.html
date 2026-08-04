@@ -204,6 +204,36 @@ input[type=file]{display:none}
   #timeline{flex-wrap:wrap}
   #timeline #kfList{max-width:100%}
 }
+/* ── mobile mode (phones) ─────────────────────────────────────────── */
+@media (max-width:760px){
+  html,body{height:100vh;height:100dvh}
+  body{overflow:hidden}
+  /* slim header: one row, tiny title, icon-only key button */
+  header{padding:6px 10px;gap:6px;flex-wrap:wrap}
+  header h1{font-size:15px;line-height:1.05;white-space:nowrap}
+  header .sub, header .hint{display:none}
+  header button{padding:6px 9px;font-size:12px}
+  header #kfSetBtn{font-size:0;padding:6px 10px}
+  header #kfSetBtn::before{content:'\25C6';font-size:13px}
+  /* canvas pinned to top; panels scroll beneath it */
+  main{flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  #stage{position:sticky;top:0;z-index:6;flex:0 0 46vh;background:var(--bg);box-shadow:0 8px 18px rgba(0,0,0,.55)}
+  #panelL,#panelR{flex:0 0 auto;border:none;border-top:1px solid var(--edge);padding:8px 12px 22px}
+  /* touch targets */
+  .row{min-height:36px}
+  .row label{font-size:13px}
+  input[type=range]{height:30px}
+  .val{font-size:13px}
+  select,.btns button,.kf-tools button,#recBtn,.filebtn{min-height:38px;font-size:13px}
+  .group>h2{padding:11px 0;font-size:13px}
+  .ophead select{min-height:38px}
+  .ophead button,.ophead .mute{min-height:36px}
+  /* slim persistent timeline */
+  #timeline{flex-wrap:wrap;padding:5px 9px;gap:6px}
+  #timeline .tl-label{display:none}
+  #timeline .tl-scrub{flex:1 1 100%;min-width:0}
+  #timeline #kfList{max-width:100%}
+}
 @media (prefers-reduced-motion:reduce){ #toast{transition:none} }
 
 /* ── user guide overlay ─────────────────────────────────────────── */
