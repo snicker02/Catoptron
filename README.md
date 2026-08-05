@@ -104,7 +104,7 @@ result of the one above it.
 
 ## 6. Operator reference
 
-All 59 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
+All 65 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
 reveal the rest once you pick a mode.
 
 ### Basic transforms
@@ -128,6 +128,8 @@ reveal the rest once you pick a mode.
 | **Brick** | Brick-wall tiling, offset alternating rows | Scale X, Scale Y |
 | **Bravais** | Softly pulls points toward a lattice | Scale, Pull |
 | **Chainmail** | Interlocking-ring tiling | Scale, Ring ratio |
+| **Hexagonal** | Hex-cell tiling (cube-coordinate) | Scale |
+| **Honeycomb** | Soft pull toward a hex lattice | Scale, Pull |
 | **Wallpaper** | All 17 wallpaper groups — seamless symmetric wallpaper | Group (p1…p6m), Cell, Angle° |
 | **Frieze** | The 7 frieze (strip) symmetry groups | Group, Angle°, Period |
 | **Hyperbolic** | Hyperbolic {p,q} tiling in the Poincaré disk | p, q, Scale |
@@ -145,6 +147,7 @@ reveal the rest once you pick a mode.
 | **Curl noise** | Divergence-free swirl (incompressible flow) | Freq, Strength |
 | **Chladni** | Standing-wave (vibrating-plate) nodal warp | m, n, Amplitude |
 | **Fault** | Geological fault — hard shift across a line | Angle, Displacement |
+| **Jet stream** | Horizontal gaussian shear jet | Speed, Width, Center |
 | **Wave bank** | 17-style mega wave warper (see below) | Style, + per-style knobs |
 | **Pleat** | Folded-paper pleats | Angle°, Width, Tilt° |
 | **Petal** | Flower-petal lobes | Lobes, Amp |
@@ -156,6 +159,8 @@ reveal the rest once you pick a mode.
 | **Lens** | Radial magnification | Curve |
 | **Ring fold** | Folds into concentric rings | Density |
 | **Fresnel** | Concentric Fresnel-lens rings | Rings, Gain |
+| **Gear teeth** | Radial gear-tooth ripple | Teeth, Depth |
+| **Hammer** | Hammer-Aitoff map projection | Scale |
 | **Bubbles** | Circle-packing bubbles | Scale, Floor, Iters |
 | **Circle mirror** | Reflect across a circle (ball = inside-out, window = keep inside) | Radius, Mode |
 | **Radial pow** | Raises radius to a power | Amount, Power |
@@ -181,6 +186,7 @@ reveal the rest once you pick a mode.
 | **DModulus** | Double-modulus fractal tiling | Size X/Y, Angle°, Iters |
 | **Shatter** | Breaks the plane into tilted cells (shattered glass) | Cells, Tilt |
 | **Bedhead** | Chaotic-attractor warp — organic, glitchy | a, b |
+| **Ikeda** | Ikeda attractor — swirl-collapse chaos | u |
 | **Kleinian** | Kleinian-group circle-inversion fractal | Circles, Radius, Iters, Scale, Bound, Spin°, Twist°, Frame |
 | **Fuchsian** | Fuchsian group (hyperbolic tilings) | trace ta/tb/tab, Iters |
 | **Apollonian** | Apollonian gasket circle packing | Iters, Radius, Scale |
@@ -310,7 +316,7 @@ modules load.
 **Local testing**: ES modules don't load from `file://`, so run a static server from the repo
 folder — `python -m http.server 8000` — and open `http://localhost:8000`.
 
-**Validation**: all 59 operators × 9 renderers (531 combinations) and all 93 preset recipes are
+**Validation**: all 65 operators × 9 renderers (585 combinations) and all 93 preset recipes are
 compiled *and* rendered through headless ANGLE (the same `WebGL GLSL ES 1.0` path the browser
 uses). The one thing only a real browser exercises is `KHR_parallel_shader_compile` — the async
 recompile when you add or reorder a fold — so it's worth a quick check that reordering stays smooth.
