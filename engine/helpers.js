@@ -2,7 +2,8 @@
 // The assembler pulls the transitive closure of only what the used operators need.
 const HELPERS = {
   sinhf:    { deps:[], src:`float sinhf(float x){ float e = exp(x); return 0.5*(e - 1.0/e); }` },
-  coshf:    { deps:[], src:`float coshf(float x){ float e = exp(x); return 0.5*(e + 1.0/e); }` },
+  coshf:    { deps:[], src:`float coshf(float x){ float e = exp(clamp(x,-12.0,12.0)); return 0.5*(e + 1.0/e); }` },
+  tanhf:    { deps:[], src:`float tanhf(float x){ float e = exp(-2.0*abs(x)); float t = (1.0-e)/(1.0+e); return x < 0.0 ? -t : t; }` },
   sqrt_safe:{ deps:[], src:`float sqrt_safe(float x){ return (x < 1e-7) ? 0.0 : sqrt(x); }` },
   sqrt1pm1: { deps:[], src:`float sqrt1pm1(float x){
   if(x > -0.0625 && x < 0.0625){
