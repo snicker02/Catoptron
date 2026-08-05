@@ -141,7 +141,7 @@ reveal the rest once you pick a mode.
 | **Spiral** | Spiral distortion | Amount |
 | **Log spiral** | Logarithmic spiral arms | Scale, Turn°, Arms, Mirror |
 | **Wave warp** | Sine / triangle / saw / square displacement | Amp, Freq, Wave |
-| **Cam** | Lens distortion — barrel (k1>0) / pincushion (k1<0) | k1, k2 |
+| **Lens bank** | Optical lens bank — 12 modes (see below) | Mode + per-mode |
 | **Curl noise** | Divergence-free swirl (incompressible flow) | Freq, Strength |
 | **Chladni** | Standing-wave (vibrating-plate) nodal warp | m, n, Amplitude |
 | **Fault** | Geological fault — hard shift across a line | Angle, Displacement |
