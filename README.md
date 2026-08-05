@@ -104,7 +104,7 @@ result of the one above it.
 
 ## 6. Operator reference
 
-All 78 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
+All 87 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
 reveal the rest once you pick a mode.
 
 ### Basic transforms
@@ -135,6 +135,8 @@ reveal the rest once you pick a mode.
 | **Hyperbolic** | Hyperbolic {p,q} tiling in the Poincaré disk | p, q, Scale |
 | **Polyhedral** | Spherical / polyhedral {p,q} symmetry | p, q, Scale |
 | **Aperiodic** | Quasicrystal / aperiodic tilings (Penrose, Ammann–Beenker) | Grids, Cell, Gamma, Mode, Levels, Inflation |
+| **Quasicrystal** | 5-fold quasicrystal interference shimmer | Freq, Amp |
+| **Penrose fold** | Golden-ratio Penrose lattice fold | Scale |
 
 ### Swirls, spirals & waves
 | Fold | What it does | Key params |
@@ -149,6 +151,8 @@ reveal the rest once you pick a mode.
 | **Fault** | Geological fault — hard shift across a line | Angle, Displacement |
 | **Jet stream** | Horizontal gaussian shear jet | Speed, Width, Center |
 | **Karman vortex** | Von Karman vortex street — alternating eddies | Freq, Strength, Sep |
+| **PDJ** | Four-sine PDJ warp (with phase offsets) | a, b, c, d, e, f |
+| **Popcorn2** | Parametrized popcorn sin(tan()) jitter | X, Y, C |
 | **Maelstrom** | Swirl-warped exponential spiral | Swirl, Freq, Scale |
 | **Oscilloscope** | Mirror the image inside a cosine band | Separation, Frequency, Amplitude, Damping |
 | **Mitosis** | Cell-division pinch/split (tanh neck) | Separation, Width, Phase |
@@ -167,6 +171,10 @@ reveal the rest once you pick a mode.
 | **Gear teeth** | Radial gear-tooth ripple | Teeth, Depth |
 | **Hammer** | Hammer-Aitoff map projection | Scale |
 | **Mercator** | Mercator map projection | Scale |
+| **Perspective** | Apophysis perspective tilt (foreshortening) | Angle, Dist |
+| **Projective** | Full 9-coefficient projective / homography | A–C, A1–C1, A2–C2 |
+| **Quadrupole** | 4-pole cos(2θ)/r² field warp | Strength, Smooth |
+| **Rainbow arc** | Bends radius bands into an arc | Radius, Width, Arc |
 | **Klein** | Circle inversion inside a radius, with twist | Inner radius, Twist |
 | **Membrane** | Drumhead ring bulge (gaussian ripple) | Radius, Height, Stiff |
 | **Moebius strip** | Half-twist ring wrap | Radius |
@@ -200,6 +208,7 @@ reveal the rest once you pick a mode.
 | **Shatter** | Breaks the plane into tilted cells (shattered glass) | Cells, Tilt |
 | **Bedhead** | Chaotic-attractor warp — organic, glitchy | a, b |
 | **Ikeda** | Ikeda attractor — swirl-collapse chaos | u |
+| **Pickover** | Pickover attractor — chaotic sine map | a, b, c, d |
 | **Kleinian** | Kleinian-group circle-inversion fractal | Circles, Radius, Iters, Scale, Bound, Spin°, Twist°, Frame |
 | **Fuchsian** | Fuchsian group (hyperbolic tilings) | trace ta/tb/tab, Iters |
 | **Apollonian** | Apollonian gasket circle packing | Iters, Radius, Scale |
@@ -329,7 +338,7 @@ modules load.
 **Local testing**: ES modules don't load from `file://`, so run a static server from the repo
 folder — `python -m http.server 8000` — and open `http://localhost:8000`.
 
-**Validation**: all 78 operators × 9 renderers (702 combinations) and all 93 preset recipes are
+**Validation**: all 87 operators × 9 renderers (783 combinations) and all 93 preset recipes are
 compiled *and* rendered through headless ANGLE (the same `WebGL GLSL ES 1.0` path the browser
 uses). The one thing only a real browser exercises is `KHR_parallel_shader_compile` — the async
 recompile when you add or reorder a fold — so it's worth a quick check that reordering stays smooth.
