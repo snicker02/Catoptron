@@ -1418,5 +1418,160 @@ const OPS = [
   float cy = s * 0.86602540 * rr;
   return amount * vec2(cx + (q.x - cx)*pull, cy + (q.y - cy)*pull);
 }` },
+  { name:'Klein', fn:'opKlein', deps:[],
+    params:[["Inner radius",0.05,2,0.01,0.5],["Twist",-3,3,0.01,0.3],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opKlein(vec2 q, vec4 P){
+  float ri = max(abs(P.x), 0.01), tw = P.y, amount = (P.z<=0.0)?1.0:P.z;
+  float r = length(q), th = atan(q.y, q.x);
+  float nr, nt;
+  if(r < ri){ nr = r; nt = th + tw*r; }
+  else { nr = ri*ri/max(r,1e-6); nt = -th + tw*r; }
+  return amount * nr * vec2(cos(nt), sin(nt));
+}` },
+  { name:'Karman vortex', fn:'opKarmanVortex', deps:[],
+    params:[["Freq",0.2,8,0.1,2],["Strength",-1,1,0.01,0.3],["Sep",0,2,0.01,0.5],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opKarmanVortex(vec2 q, vec4 P){
+  float freq = max(abs(P.x), 0.01), str = P.y, sep = P.z, amount = (P.w<=0.0)?1.0:P.w;
+  float xi = floor(q.x*freq + 0.5);
+  float parity = mod(xi, 2.0);
+  float vcx = xi/freq;
+  float vcy = sep*0.5*(2.0*parity - 1.0);
+  float dx = q.x - vcx, dy = q.y - vcy;
+  float r2 = dx*dx + dy*dy + 1e-4;
+  float spin = str*(2.0*parity - 1.0)/r2;
+  return amount * (q + spin*vec2(-dy, dx));
+}` },
+  { name:'Maelstrom', fn:'opMaelstrom', deps:[],
+    params:[["Swirl",-5,5,0.05,1],["Freq",-5,5,0.05,2],["Scale",-2,2,0.02,1],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opMaelstrom(vec2 q, vec4 P){
+  float swirl = P.x, freq = P.y, scale = P.z, amount = (P.w<=0.0)?1.0:P.w;
+  float r = length(q);
+  float angle = swirl * sin(freq * r);
+  float sc = sin(angle), cc = cos(angle);
+  vec2 w = vec2(q.x*cc - q.y*sc, q.x*sc + q.y*cc);
+  float ex = exp(clamp(w.x*scale, -10.0, 4.0));
+  return amount * ex * vec2(cos(w.y*scale), sin(w.y*scale));
+}` },
+  { name:'Mercator', fn:'opMercator', deps:[],
+    params:[["Scale",0.2,3,0.05,1],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opMercator(vec2 q, vec4 P){
+  float scale = max(abs(P.x), 0.01), amount = (P.y<=0.0)?1.0:P.y;
+  float lat = clamp(q.y*scale, -1.5, 1.5);
+  float my = log(max(tan(0.78539816 + lat*0.5), 1e-6));
+  return amount * vec2(q.x, my/scale);
+}` },
+  { name:'Murl', fn:'opMurl', deps:[],
+    params:[["Type",0,1,1,0,["Murl","Murl2"]],["c",-1,1,0.01,0.1],["Power",1,6,1,3],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opMurl(vec2 q, vec4 P){
+  int mode = int(floor(P.x + 0.5));
+  float c = P.y, power = P.z, amount = (P.w<=0.0)?1.0:P.w;
+  float p2 = power*0.5;
+  float a = atan(q.y, q.x)*power;
+  float r2 = dot(q, q);
+  if(mode == 0){
+    float cc = c;
+    if(abs(power-1.0) > 0.001) cc /= (power - 1.0);
+    float vp = amount*(cc+1.0);
+    float sina = sin(a), cosa = cos(a);
+    float r = cc * pow(r2, p2);
+    float re = r*cosa + 1.0, im = r*sina;
+    float rl = vp/(re*re + im*im + 1e-9);
+    return vec2(rl*(q.x*re + q.y*im), rl*(q.y*re - q.x*im));
+  } else {
+    float invp = (abs(power) > 0.001) ? 1.0/power : 1e6;
+    float vp = (abs(c+1.0) < 1e-6) ? 0.0 : amount*pow(abs(c+1.0), 2.0*invp);
+    float sina = sin(a), cosa = cos(a);
+    float r = c*pow(r2, p2);
+    float re = r*cosa + 1.0, im = r*sina;
+    r = pow(re*re + im*im + 1e-9, invp);
+    float a2 = atan(im, re)*2.0*invp;
+    re = r*cos(a2); im = r*sin(a2);
+    float rl = vp/(r*r + 1e-9);
+    return vec2(rl*(q.x*re + q.y*im), rl*(q.y*re - q.x*im));
+  }
+}` },
+  { name:'Oscilloscope', fn:'opOscilloscope', deps:[],
+    params:[["Separation",0,3,0.01,1],["Frequency",0.1,8,0.1,3],["Amplitude",0,3,0.01,1],["Damping",0,2,0.01,0],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opOscilloscope(vec2 q, vec4 P, vec4 P2){
+  float sep = P.x, freq = P.y, amp = P.z, damp = P.w, amount = (P2.x<=0.0)?1.0:P2.x;
+  float tpf = 6.28318531*freq;
+  float t = (abs(damp) <= 1e-6) ? amp*cos(tpf*q.x)+sep : amp*exp(-abs(q.x)*damp)*cos(tpf*q.x)+sep;
+  float sy = (abs(q.y) <= t) ? -1.0 : 1.0;
+  return amount * vec2(q.x, sy*q.y);
+}` },
+  { name:'Mitosis', fn:'opMitosis', deps:["tanhf"],
+    params:[["Separation",0,3,0.01,1],["Width",0.05,2,0.01,0.5],["Phase",0,3.14,0.01,0],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opMitosis(vec2 q, vec4 P){
+  float sep = P.x, w = max(abs(P.y), 0.01), phase = P.z, amount = (P.w<=0.0)?1.0:P.w;
+  float ca = cos(phase), sa = sin(phase);
+  float u = q.x*ca + q.y*sa;
+  float v = -q.x*sa + q.y*ca;
+  float pull = tanhf(u/w);
+  float nu = pull*sep*0.5;
+  float neck = 1.0 - 0.5*exp(-(u*u)/(w*w));
+  float nv = v*neck;
+  return amount * vec2(nu*ca - nv*sa, nu*sa + nv*ca);
+}` },
+  { name:'Membrane', fn:'opMembrane', deps:[],
+    params:[["Radius",0.05,2,0.01,0.5],["Height",-1,1,0.01,0.3],["Stiff",0.05,3,0.01,0.5],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opMembrane(vec2 q, vec4 P){
+  float radius = max(abs(P.x), 0.01), height = P.y, stiff = max(abs(P.z), 0.01), amount = (P.w<=0.0)?1.0:P.w;
+  float r = length(q);
+  float ring = r - radius;
+  float env = exp(-ring*ring/(radius*radius*stiff));
+  float nr = r + height*env;
+  return amount * q * (nr/max(r, 0.01));
+}` },
+  { name:'Mushroom', fn:'opMushroom', deps:["tanhf"],
+    params:[["Cap radius",0.05,2,0.01,0.5],["Cap width",0.1,4,0.05,2],["Stalk width",0.05,2,0.01,0.3],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opMushroom(vec2 q, vec4 P){
+  float cr = max(abs(P.x), 0.01), cw = max(abs(P.y), 0.01), sw = clamp(P.z, 0.05, 2.0), amount = (P.w<=0.0)?1.0:P.w;
+  float above = 0.5 + 0.5*tanhf(q.y/(cr*0.3));
+  float d = q.y - cr*0.5;
+  float capenv = exp(-d*d/(cr*cr*0.5 + 1e-6));
+  float scale = mix(sw, cw, above) + capenv*0.4;
+  return amount * vec2(q.x*scale, q.y);
+}` },
+  { name:'Moebius strip', fn:'opMoebiusStrip', deps:[],
+    params:[["Radius",0.05,2,0.01,0.5],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opMoebiusStrip(vec2 q, vec4 P){
+  float rad = max(abs(P.x), 0.01), amount = (P.y<=0.0)?1.0:P.y;
+  float r = length(q), th = atan(q.y, q.x);
+  float h = r - rad;
+  float nh = h*cos(th*0.5);
+  float nr = rad + nh;
+  return amount * nr * vec2(cos(th), sin(th));
+}` },
+  { name:'Ouroboros', fn:'opOuroboros', deps:[],
+    params:[["Radius",0.05,2,0.01,0.5],["Twist",-3,3,0.01,0.5],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opOuroboros(vec2 q, vec4 P){
+  float radius = max(abs(P.x), 0.01), twist = P.y, amount = (P.z<=0.0)?1.0:P.z;
+  float r = length(q), th = atan(q.y, q.x);
+  float wr = radius*fract(r/radius);
+  float nt = th + twist*r;
+  return amount * wr * vec2(cos(nt), sin(nt));
+}` },
+  { name:'Mcarpet', fn:'opMcarpet', deps:[],
+    params:[["X",-2,2,0.01,1],["Y",-2,2,0.01,0.75],["Twist",-2,2,0.01,0.5],["Tilt",-2,2,0.01,-0.25],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opMcarpet(vec2 q, vec4 P, vec4 P2){
+  float x = P.x, y = P.y, twist = P.z, tilt = P.w, amount = (P2.x<=0.0)?1.0:P2.x;
+  float T = (dot(q,q)/4.0 + 1.0);
+  float r = amount/T;
+  vec2 o = vec2(q.x*r*x, q.y*r*y);
+  o.x += (1.0 - twist*q.x*q.x + q.y)*amount;
+  o.y += tilt*q.x*amount;
+  return o;
+}` },
+  { name:'Mask', fn:'opMask', deps:["coshf"],
+    params:[["X shift",-3,3,0.05,0],["Y shift",-3,3,0.05,0],["U shift",0,3,0.05,1],["X scale",0.1,5,0.05,1],["Y scale",0.1,5,0.05,1],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opMask(vec2 q, vec4 P, vec4 P2){
+  float xshift = P.x, yshift = P.y, ushift = P.z, xscale = P.w, yscale = P2.x, amount = (P2.y<=0.0)?1.0:P2.y;
+  float sumsq = dot(q, q);
+  if(sumsq < 1e-6) return q;
+  float xf = xscale*q.x + xshift;
+  float yf = clamp(yscale*q.y + yshift, -10.0, 10.0);
+  float k = (amount/sumsq)*(coshf(yf)+ushift)*sin(xf)*sin(xf);
+  return vec2(k*sin(xf), k*cos(xf));
+}` },
 ];
 export { OPS };
