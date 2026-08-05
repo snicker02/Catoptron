@@ -1351,5 +1351,72 @@ const OPS = [
   }
   return q;
 }` },
+  { name:'Hexagonal', fn:'opHexagonal', deps:[],
+    params:[["Scale",0.1,3,0.05,0.3],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opHexagonal(vec2 q, vec4 P){
+  float scale = max(abs(P.x), 1e-4), amount = (P.y<=0.0)?1.0:P.y;
+  float SQRT3 = 1.73205081;
+  float hq = (2.0/3.0) * q.x / scale;
+  float hr = ((-1.0/3.0) * q.x + (1.0/SQRT3) * q.y) / scale;
+  float hs = -hq - hr;
+  float rq = floor(hq + 0.5), rr = floor(hr + 0.5), rs = floor(hs + 0.5);
+  float dq = abs(rq - hq), dr = abs(rr - hr), ds = abs(rs - hs);
+  if(dq > dr && dq > ds) rq = -rr - rs;
+  else if(dr > ds) rr = -rq - rs;
+  float cx = scale * 1.5 * rq;
+  float cy = scale * SQRT3 * (rr + rq*0.5);
+  return amount * (q - vec2(cx, cy));
+}` },
+  { name:'Hammer', fn:'opHammer', deps:[],
+    params:[["Scale",0.2,3,0.05,1],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opHammer(vec2 q, vec4 P){
+  float scale = P.x, amount = (P.y<=0.0)?1.0:P.y;
+  float lat = q.y * scale, lon = q.x * scale;
+  float cosLat = cos(lat);
+  float d = sqrt(1.0 + cosLat * cos(lon*0.5)) + 0.001;
+  return amount * vec2(2.82842712 * cosLat * sin(lon*0.5) / d, 1.41421356 * sin(lat) / d);
+}` },
+  { name:'Gear teeth', fn:'opGearTeeth', deps:[],
+    params:[["Teeth",2,40,1,12],["Depth",0,1,0.01,0.3],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opGearTeeth(vec2 q, vec4 P){
+  float teeth = P.x, depth = P.y, amount = (P.z<=0.0)?1.0:P.z;
+  float a = atan(q.y, q.x);
+  float r = length(q);
+  float tooth = 0.5 * (1.0 + cos(teeth * a));
+  float rmod = r + depth * tooth;
+  return amount * rmod * vec2(cos(a), sin(a));
+}` },
+  { name:'Ikeda', fn:'opIkeda', deps:[],
+    params:[["u",0,1,0.01,0.9],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opIkeda(vec2 q, vec4 P){
+  float u = P.x, amount = (P.y<=0.0)?1.0:P.y;
+  float t = 0.4 - 6.0 / (1.0 + dot(q, q));
+  float ct = cos(t), st = sin(t);
+  float nx = 1.0 + u * (q.x*ct - q.y*st);
+  float ny = u * (q.x*st + q.y*ct);
+  return amount * vec2(nx, ny);
+}` },
+  { name:'Jet stream', fn:'opJetStream', deps:[],
+    params:[["Speed",-2,2,0.02,1],["Width",0.05,2,0.01,0.3],["Center",-1.5,1.5,0.01,0],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opJetStream(vec2 q, vec4 P){
+  float speed = P.x, width = max(abs(P.y), 0.01), center = P.z, amount = (P.w<=0.0)?1.0:P.w;
+  float dy = q.y - center;
+  float prof = exp(-(dy*dy)/(width*width));
+  return amount * vec2(q.x + speed*prof, q.y);
+}` },
+  { name:'Honeycomb', fn:'opHoneycomb', deps:[],
+    params:[["Scale",0.1,3,0.05,0.3],["Pull",0,1,0.01,0.7],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opHoneycomb(vec2 q, vec4 P){
+  float s = max(abs(P.x), 0.01), pull = clamp(P.y, 0.0, 1.0), amount = (P.z<=0.0)?1.0:P.z;
+  float hq = (2.0/3.0) * q.x / s;
+  float hr = (-1.0/3.0) * q.x / s + 0.57735027 * q.y / s;
+  float rq = floor(hq + 0.5), rr = floor(hr + 0.5), rs = floor(-hq - hr + 0.5);
+  float dq = abs(rq - hq), dr = abs(rr - hr), ds = abs(rs - (-hq - hr));
+  if(dq > dr && dq > ds) rq = -rr - rs;
+  else if(dr > ds) rr = -rq - rs;
+  float cx = s * (rq + 0.5*rr);
+  float cy = s * 0.86602540 * rr;
+  return amount * vec2(cx + (q.x - cx)*pull, cy + (q.y - cy)*pull);
+}` },
 ];
 export { OPS };
