@@ -604,7 +604,6 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Spiral</td><td>Spiral distortion</td><td>Amount</td></tr>
         <tr><td>Log spiral</td><td>Logarithmic spiral arms</td><td>Scale, Turn&deg;, Arms, Mirror</td></tr>
         <tr><td>Wave warp</td><td>Sine/triangle/saw/square displacement</td><td>Amp, Freq, Wave</td></tr>
-        <tr><td>Cam</td><td>Lens distortion (barrel / pincushion)</td><td>k1, k2</td></tr>
         <tr><td>Curl noise</td><td>Divergence-free swirl</td><td>Freq, Strength</td></tr>
         <tr><td>Chladni</td><td>Standing-wave nodal warp</td><td>m, n, Amplitude</td></tr>
         <tr><td>Fault</td><td>Hard shift across a line</td><td>Angle, Displacement</td></tr>
@@ -623,6 +622,7 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Circle mirror</td><td>Reflect across a circle (ball/window)</td><td>Radius, Mode</td></tr>
         <tr><td>Radial pow</td><td>Raises radius to a power</td><td>Amount, Power</td></tr>
         <tr><td>Loonie</td><td>Circle-inversion bubbles (below)</td><td>Mode, Amount, +</td></tr>
+        <tr><td>Lens bank</td><td>Optical lens bank &mdash; 12 modes (below)</td><td>Mode + per-mode</td></tr>
       </table>
 
       <h3>Conformal &amp; complex maps</h3>
@@ -658,6 +658,7 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <li><b>Wave bank</b> &mdash; one fold, <b>17 wave styles</b> (waves22, dc_gnarly&rsquo;s 8 nested-trig modes, vibration2, waves2b Jacobi/Bessel, waves_julia/spiral/noise/mobius/power/fisheye/swirl&hellip;). Pick <b>Style</b>; only that style&rsquo;s knobs show. <b>Weight</b> blends; <b>Seed</b> feeds input back.</li>
         <li><b>Lazy</b> &mdash; the classic lazy-susan family: <b>Susan</b> (circular swirl, movable center via x/y), <b>Travis</b> (square swirl), <b>Jess</b> (n-gon swirl), plus a <b>Sensen</b> post-fold. For Travis/Jess try Amount &asymp; 0.5&ndash;0.6 to stay in frame.</li>
         <li><b>Loonie</b> &mdash; circle-inversion bubbles: <b>Loonie</b> (circle), <b>Loonie2</b> (n-gon/star/circle blend), <b>Loonie3</b> (parabolic). <b>Radius</b> sizes the bubble independently of Amount; <b>Rotate</b> spins the Loonie2 polygon.</li>
+        <li><b>Lens bank</b> &mdash; the optical zoo in one fold, <b>12 modes</b>: Brown-Conrady, Mustache, Division, four Fisheye projections (stereographic/equisolid/equidistant/orthographic), Tangential, Petzval swirl, Panini, Anamorphic, Tilt-shift. Pick <b>Mode</b>; only that mode&rsquo;s knobs show.</li>
         <li><b>BusyBrad</b> &mdash; the grid version of the lazy family: tiles the plane (Grid size), each cell a Susan/Jess/Combined swirl, with Spin/Twist/Space/N and a Sensen fold. Grid size 0 = a single centered swirl.</li>
       </ul>
 
