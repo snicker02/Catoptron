@@ -104,7 +104,7 @@ result of the one above it.
 
 ## 6. Operator reference
 
-All 53 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
+All 59 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
 reveal the rest once you pick a mode.
 
 ### Basic transforms
@@ -127,6 +127,7 @@ reveal the rest once you pick a mode.
 | **Abs fold** | Box fold — reflects anything past ±fold back inward | Fold |
 | **Brick** | Brick-wall tiling, offset alternating rows | Scale X, Scale Y |
 | **Bravais** | Softly pulls points toward a lattice | Scale, Pull |
+| **Chainmail** | Interlocking-ring tiling | Scale, Ring ratio |
 | **Wallpaper** | All 17 wallpaper groups — seamless symmetric wallpaper | Group (p1…p6m), Cell, Angle° |
 | **Frieze** | The 7 frieze (strip) symmetry groups | Group, Angle°, Period |
 | **Hyperbolic** | Hyperbolic {p,q} tiling in the Poincaré disk | p, q, Scale |
@@ -140,6 +141,10 @@ reveal the rest once you pick a mode.
 | **Spiral** | Spiral distortion | Amount |
 | **Log spiral** | Logarithmic spiral arms | Scale, Turn°, Arms, Mirror |
 | **Wave warp** | Sine / triangle / saw / square displacement | Amp, Freq, Wave |
+| **Cam** | Lens distortion — barrel (k1>0) / pincushion (k1<0) | k1, k2 |
+| **Curl noise** | Divergence-free swirl (incompressible flow) | Freq, Strength |
+| **Chladni** | Standing-wave (vibrating-plate) nodal warp | m, n, Amplitude |
+| **Fault** | Geological fault — hard shift across a line | Angle, Displacement |
 | **Wave bank** | 17-style mega wave warper (see below) | Style, + per-style knobs |
 | **Pleat** | Folded-paper pleats | Angle°, Width, Tilt° |
 | **Petal** | Flower-petal lobes | Lobes, Amp |
@@ -163,6 +168,7 @@ reveal the rest once you pick a mode.
 | **Complex sum** | 26-weight complex-function accumulator — blend many functions additively (see below) | function weights, input affine, Reflect |
 | **Mobius** | Simple Möbius transform | Offset X, Offset Y, Rotate° |
 | **Mobius abcd** | Full Möbius (az+b)/(cz+d), all 8 real/imag terms | Re/Im a,b,c,d |
+| **Foci** | Hyperbolic foci warp (Apophysis) | Amount |
 | **Bipolar** | Bipolar conformal map — lens/eye stretches | Amount, Shift |
 | **Elliptic** | Elliptic conformal map | Amount, Mode |
 | **Disc** | Disc-family conformal maps (disc, idisc, wdisc, fdisc, edisc, spiral, squircle, tan, sech) | Mode, Amount, Twist, Petal |
@@ -304,7 +310,7 @@ modules load.
 **Local testing**: ES modules don't load from `file://`, so run a static server from the repo
 folder — `python -m http.server 8000` — and open `http://localhost:8000`.
 
-**Validation**: all 53 operators × 9 renderers (477 combinations) and all 93 preset recipes are
+**Validation**: all 59 operators × 9 renderers (531 combinations) and all 93 preset recipes are
 compiled *and* rendered through headless ANGLE (the same `WebGL GLSL ES 1.0` path the browser
 uses). The one thing only a real browser exercises is `KHR_parallel_shader_compile` — the async
 recompile when you add or reorder a fold — so it's worth a quick check that reordering stays smooth.
