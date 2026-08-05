@@ -1240,13 +1240,60 @@ const OPS = [
   float ny = q.x + sin(q.y)/bs;
   return amount * vec2(nx, ny);
 }` },
-  { name:'Cam', fn:'opCam', deps:[],
-    params:[["k1",-1,1,0.01,0.5],["k2",-1,1,0.01,0],["Amount",0.1,3,0.01,1]],
-    glsl:`vec2 opCam(vec2 q, vec4 P){
-  float k1 = P.x, k2 = P.y, amount = (P.z<=0.0)?1.0:P.z;
+  { name:'Lens bank', fn:'opLensBank', deps:[],
+    params:[["Mode",0,11,1,0,["Brown-Conrady","Mustache","Division","Fisheye stereo","Fisheye equisolid","Fisheye equidist","Fisheye ortho","Tangential","Petzval swirl","Panini","Anamorphic","Tilt-shift"]],["k1",-1,1,0.01,0.4,null,[0,0,1]],["k2",-1,1,0.01,0,null,[0,0,1]],["k3",-1,1,0.01,0.3,null,[0,1]],["Lambda",-0.5,2,0.01,0.5,null,[0,2]],["FOV",0.3,2.5,0.01,1,null,[0,3,4,5,6]],["p1",-0.5,0.5,0.005,0.1,null,[0,7]],["p2",-0.5,0.5,0.005,0.1,null,[0,7]],["Swirl",-4,4,0.02,1.5,null,[0,8]],["Compression",0,2,0.01,1,null,[0,9]],["Squeeze",0.3,3,0.01,1.5,null,[0,10]],["Sq angle",0,180,1,0,null,[0,10]],["Tilt",-1.5,1.5,0.01,0.5,null,[0,11]],["Tilt axis",0,180,1,0,null,[0,11]],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opLensBank(vec2 q, vec4 P0, vec4 P1, vec4 P2, vec4 P3){
+  int m = int(floor(P0.x + 0.5));
+  float amount = (P3.z <= 0.0) ? 1.0 : P3.z;
+  float PI = 3.14159265;
   float r2 = dot(q, q);
-  float d = 1.0 + k1*r2 + k2*r2*r2;
-  return amount * q * d;
+  float r = sqrt(r2);
+  vec2 o = q;
+  if(m == 0){                                   // Brown-Conrady radial
+    o = q * (1.0 + P0.y*r2 + P0.z*r2*r2);
+  } else if(m == 1){                            // Mustache (sign-changing k3)
+    o = q * (1.0 + P0.y*r2 + P0.z*r2*r2 + P0.w*r2*r2*r2);
+  } else if(m == 2){                            // Division model
+    float dv = 1.0 + P1.x*r2;
+    dv = (abs(dv) < 0.06) ? 0.06 : dv;
+    o = q / dv;
+  } else if(m <= 6){                            // Fisheye 3=stereo 4=equisolid 5=equidist 6=ortho
+    float th = atan(r);
+    float rp;
+    if(m == 3) rp = 2.0*tan(th*0.5);
+    else if(m == 4) rp = 2.0*sin(th*0.5);
+    else if(m == 5) rp = th;
+    else rp = sin(th);
+    float sc = (r > 1e-5) ? (rp * P1.y) / r : P1.y;
+    o = q * sc;
+  } else if(m == 7){                            // Tangential / decentering
+    float dx = 2.0*P1.z*q.x*q.y + P1.w*(r2 + 2.0*q.x*q.x);
+    float dy = P1.z*(r2 + 2.0*q.y*q.y) + 2.0*P1.w*q.x*q.y;
+    o = q + vec2(dx, dy);
+  } else if(m == 8){                            // Petzval swirl (rotation grows with radius)
+    float ang = P2.x * r;
+    float ca = cos(ang), sa = sin(ang);
+    o = vec2(q.x*ca - q.y*sa, q.x*sa + q.y*ca);
+  } else if(m == 9){                            // Panini
+    float d = P2.y;
+    float phi = atan(q.x);
+    float S = (d + 1.0) / max(d + cos(phi), 0.05);
+    o = vec2(S*sin(phi), q.y*S);
+  } else if(m == 10){                           // Anamorphic squeeze
+    float aa = P2.w * PI / 180.0;
+    float ca = cos(aa), sa = sin(aa);
+    vec2 u = vec2(q.x*ca + q.y*sa, -q.x*sa + q.y*ca);
+    u.x *= P2.z;
+    o = vec2(u.x*ca - u.y*sa, u.x*sa + u.y*ca);
+  } else {                                      // Tilt-shift / keystone (projective)
+    float ta = P3.y * PI / 180.0;
+    float ca = cos(ta), sa = sin(ta);
+    vec2 u = vec2(q.x*ca + q.y*sa, -q.x*sa + q.y*ca);
+    float w = max(1.0 + P3.x*u.y, 0.05);
+    u = u / w;
+    o = vec2(u.x*ca - u.y*sa, u.x*sa + u.y*ca);
+  }
+  return amount * o;
 }` },
   { name:'Curl noise', fn:'opCurlNoise', deps:[],
     params:[["Freq",0.2,8,0.1,2],["Strength",0,1,0.01,0.3],["Amount",0.1,3,0.01,1]],
