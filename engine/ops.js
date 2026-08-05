@@ -1240,5 +1240,69 @@ const OPS = [
   float ny = q.x + sin(q.y)/bs;
   return amount * vec2(nx, ny);
 }` },
+  { name:'Cam', fn:'opCam', deps:[],
+    params:[["k1",-1,1,0.01,0.5],["k2",-1,1,0.01,0],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opCam(vec2 q, vec4 P){
+  float k1 = P.x, k2 = P.y, amount = (P.z<=0.0)?1.0:P.z;
+  float r2 = dot(q, q);
+  float d = 1.0 + k1*r2 + k2*r2*r2;
+  return amount * q * d;
+}` },
+  { name:'Curl noise', fn:'opCurlNoise', deps:[],
+    params:[["Freq",0.2,8,0.1,2],["Strength",0,1,0.01,0.3],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opCurlNoise(vec2 q, vec4 P){
+  float f = P.x, str = P.y, amount = (P.z<=0.0)?1.0:P.z;
+  float dx =  str*f*sin(f*q.x)*cos(f*q.y);
+  float dy = -str*f*cos(f*q.x)*sin(f*q.y);
+  return amount * (q + vec2(dx, dy));
+}` },
+  { name:'Chladni', fn:'opChladni', deps:[],
+    params:[["m",0,8,0.1,2],["n",0,8,0.1,3],["Amplitude",0,1,0.01,0.25],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opChladni(vec2 q, vec4 P){
+  float m = P.x, n = P.y, amp = P.z, amount = (P.w<=0.0)?1.0:P.w;
+  float PI = 3.14159265;
+  float dx = amp * cos(m*PI*q.x) * sin(n*PI*q.y);
+  float dy = amp * sin(m*PI*q.x) * cos(n*PI*q.y);
+  return amount * (q + vec2(dx, dy));
+}` },
+  { name:'Fault', fn:'opFault', deps:[],
+    params:[["Angle",0,180,1,30],["Displacement",-2,2,0.01,0.5],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opFault(vec2 q, vec4 P){
+  float PI = 3.14159265;
+  float ang = P.x * PI / 180.0;
+  float disp = P.y, amount = (P.z<=0.0)?1.0:P.z;
+  float nx = cos(ang + PI*0.5), ny = sin(ang + PI*0.5);
+  float side = sign(q.x*nx + q.y*ny);
+  return amount * (q + side*disp*vec2(cos(ang), sin(ang)));
+}` },
+  { name:'Chainmail', fn:'opChainmail', deps:[],
+    params:[["Scale",0.5,8,0.1,3],["Ring ratio",0.05,0.5,0.01,0.35],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opChainmail(vec2 q, vec4 P){
+  float scale = max(abs(P.x), 1e-4), rr = P.y, amount = (P.z<=0.0)?1.0:P.z;
+  float cx = q.x*scale, cy = q.y*scale;
+  float row = floor(cy);
+  float offset = (mod(row, 2.0) < 0.5) ? 0.5 : 0.0;
+  float lx = fract(cx + offset) - 0.5;
+  float ly = fract(cy) - 0.5;
+  float r = sqrt(lx*lx + ly*ly);
+  float sc = (r < rr) ? rr/(r + 1e-6) : 1.0;
+  return amount * vec2(lx*sc, ly*sc) / scale;
+}` },
+  { name:'Foci', fn:'opFoci', deps:[],
+    params:[["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opFoci(vec2 q, vec4 P){
+  float amount = (P.x<=0.0)?1.0:P.x;
+  float expx = exp(q.x) * 0.5;
+  float expnx = 0.25 / expx;
+  if(expx > 1e-6 && expnx > 1e-6){
+    float siny = sin(q.y), cosy = cos(q.y);
+    float tmp = expx + expnx - cosy;
+    if(abs(tmp) > 1e-9){
+      tmp = amount / tmp;
+      return vec2((expx - expnx) * tmp, siny * tmp);
+    }
+  }
+  return q;
+}` },
 ];
 export { OPS };
