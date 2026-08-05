@@ -569,7 +569,7 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
       </ul>
 
       <h2>Operator reference</h2>
-      <p>All 65 folds, grouped by what they do. The big multi-mode banks are described below the tables.</p>
+      <p>All 78 folds, grouped by what they do. The big multi-mode banks are described below the tables.</p>
 
       <h3>Basic transforms</h3>
       <table><tr><th>Fold</th><th>What it does</th><th>Key params</th></tr>
@@ -610,6 +610,11 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Chladni</td><td>Standing-wave nodal warp</td><td>m, n, Amplitude</td></tr>
         <tr><td>Fault</td><td>Hard shift across a line</td><td>Angle, Displacement</td></tr>
         <tr><td>Jet stream</td><td>Horizontal gaussian shear jet</td><td>Speed, Width, Center</td></tr>
+        <tr><td>Karman vortex</td><td>Von Karman vortex street</td><td>Freq, Strength, Sep</td></tr>
+        <tr><td>Maelstrom</td><td>Swirl-warped exponential spiral</td><td>Swirl, Freq, Scale</td></tr>
+        <tr><td>Oscilloscope</td><td>Mirror inside a cosine band</td><td>Separation, Frequency, Amplitude</td></tr>
+        <tr><td>Mitosis</td><td>Cell-division pinch/split</td><td>Separation, Width, Phase</td></tr>
+        <tr><td>Mushroom</td><td>Cap/stalk vertical profile</td><td>Cap radius, Cap width, Stalk</td></tr>
         <tr><td>Wave bank</td><td>17-style mega wave warper (below)</td><td>Style + per-style</td></tr>
         <tr><td>Pleat</td><td>Folded-paper pleats</td><td>Angle&deg;, Width, Tilt&deg;</td></tr>
         <tr><td>Petal</td><td>Flower-petal lobes</td><td>Lobes, Amp</td></tr>
@@ -626,6 +631,11 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Radial pow</td><td>Raises radius to a power</td><td>Amount, Power</td></tr>
         <tr><td>Gear teeth</td><td>Radial gear-tooth ripple</td><td>Teeth, Depth</td></tr>
         <tr><td>Hammer</td><td>Hammer-Aitoff map projection</td><td>Scale</td></tr>
+        <tr><td>Mercator</td><td>Mercator map projection</td><td>Scale</td></tr>
+        <tr><td>Klein</td><td>Circle inversion inside a radius, twist</td><td>Inner radius, Twist</td></tr>
+        <tr><td>Membrane</td><td>Drumhead ring bulge</td><td>Radius, Height, Stiff</td></tr>
+        <tr><td>Moebius strip</td><td>Half-twist ring wrap</td><td>Radius</td></tr>
+        <tr><td>Ouroboros</td><td>Radius wraps into a twisting ring</td><td>Radius, Twist</td></tr>
         <tr><td>Loonie</td><td>Circle-inversion bubbles (below)</td><td>Mode, Amount, +</td></tr>
         <tr><td>Lens bank</td><td>Optical lens bank &mdash; 12 modes (below)</td><td>Mode + per-mode</td></tr>
       </table>
@@ -637,6 +647,9 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Mobius</td><td>Simple M&ouml;bius transform</td><td>Offset X/Y, Rotate&deg;</td></tr>
         <tr><td>Mobius abcd</td><td>Full M&ouml;bius (az+b)/(cz+d)</td><td>Re/Im a,b,c,d</td></tr>
         <tr><td>Foci</td><td>Hyperbolic foci warp</td><td>Amount</td></tr>
+        <tr><td>Murl</td><td>Murl / Murl2 curl-coil</td><td>Type, c, Power</td></tr>
+        <tr><td>Mcarpet</td><td>Magic-carpet twist/tilt warp</td><td>X, Y, Twist, Tilt</td></tr>
+        <tr><td>Mask</td><td>Complex sin/cosh mask warp</td><td>shifts, scales</td></tr>
         <tr><td>Bipolar</td><td>Bipolar conformal map &mdash; lens/eye</td><td>Amount, Shift</td></tr>
         <tr><td>Elliptic</td><td>Elliptic conformal map</td><td>Amount, Mode</td></tr>
         <tr><td>Disc</td><td>Disc-family maps (disc, idisc, spiral, squircle&hellip;)</td><td>Mode, Amount, Twist, Petal</td></tr>
