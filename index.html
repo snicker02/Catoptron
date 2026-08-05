@@ -569,7 +569,7 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
       </ul>
 
       <h2>Operator reference</h2>
-      <p>All 78 folds, grouped by what they do. The big multi-mode banks are described below the tables.</p>
+      <p>All 87 folds, grouped by what they do. The big multi-mode banks are described below the tables.</p>
 
       <h3>Basic transforms</h3>
       <table><tr><th>Fold</th><th>What it does</th><th>Key params</th></tr>
@@ -598,6 +598,8 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Hyperbolic</td><td>Hyperbolic {p,q} tiling (Poincar&eacute; disk)</td><td>p, q, Scale</td></tr>
         <tr><td>Polyhedral</td><td>Spherical/polyhedral {p,q} symmetry</td><td>p, q, Scale</td></tr>
         <tr><td>Aperiodic</td><td>Quasicrystal tilings (Penrose, Ammann)</td><td>Grids, Cell, Gamma, Mode, Levels, Inflation</td></tr>
+        <tr><td>Quasicrystal</td><td>5-fold quasicrystal interference</td><td>Freq, Amp</td></tr>
+        <tr><td>Penrose fold</td><td>Golden-ratio Penrose lattice fold</td><td>Scale</td></tr>
       </table>
 
       <h3>Swirls, spirals &amp; waves</h3>
@@ -611,6 +613,8 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Fault</td><td>Hard shift across a line</td><td>Angle, Displacement</td></tr>
         <tr><td>Jet stream</td><td>Horizontal gaussian shear jet</td><td>Speed, Width, Center</td></tr>
         <tr><td>Karman vortex</td><td>Von Karman vortex street</td><td>Freq, Strength, Sep</td></tr>
+        <tr><td>PDJ</td><td>Four-sine PDJ warp (phase offsets)</td><td>a, b, c, d, e, f</td></tr>
+        <tr><td>Popcorn2</td><td>Parametrized popcorn jitter</td><td>X, Y, C</td></tr>
         <tr><td>Maelstrom</td><td>Swirl-warped exponential spiral</td><td>Swirl, Freq, Scale</td></tr>
         <tr><td>Oscilloscope</td><td>Mirror inside a cosine band</td><td>Separation, Frequency, Amplitude</td></tr>
         <tr><td>Mitosis</td><td>Cell-division pinch/split</td><td>Separation, Width, Phase</td></tr>
@@ -632,6 +636,10 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Gear teeth</td><td>Radial gear-tooth ripple</td><td>Teeth, Depth</td></tr>
         <tr><td>Hammer</td><td>Hammer-Aitoff map projection</td><td>Scale</td></tr>
         <tr><td>Mercator</td><td>Mercator map projection</td><td>Scale</td></tr>
+        <tr><td>Perspective</td><td>Apophysis perspective tilt</td><td>Angle, Dist</td></tr>
+        <tr><td>Projective</td><td>Full 9-coefficient projective</td><td>A&ndash;C2</td></tr>
+        <tr><td>Quadrupole</td><td>4-pole cos(2&theta;)/r&sup2; field</td><td>Strength, Smooth</td></tr>
+        <tr><td>Rainbow arc</td><td>Bends radius bands into an arc</td><td>Radius, Width, Arc</td></tr>
         <tr><td>Klein</td><td>Circle inversion inside a radius, twist</td><td>Inner radius, Twist</td></tr>
         <tr><td>Membrane</td><td>Drumhead ring bulge</td><td>Radius, Height, Stiff</td></tr>
         <tr><td>Moebius strip</td><td>Half-twist ring wrap</td><td>Radius</td></tr>
@@ -663,6 +671,7 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Shatter</td><td>Tilted cells (shattered glass)</td><td>Cells, Tilt</td></tr>
         <tr><td>Bedhead</td><td>Chaotic-attractor warp — organic, glitchy</td><td>a, b</td></tr>
         <tr><td>Ikeda</td><td>Ikeda attractor — swirl-collapse chaos</td><td>u</td></tr>
+        <tr><td>Pickover</td><td>Pickover attractor — chaotic sine map</td><td>a, b, c, d</td></tr>
         <tr><td>Kleinian</td><td>Kleinian-group inversion fractal</td><td>Circles, Radius, Iters, Scale, Bound, Spin&deg;, Twist&deg;, Frame</td></tr>
         <tr><td>Fuchsian</td><td>Fuchsian group (hyperbolic tilings)</td><td>trace ta/tb/tab, Iters</td></tr>
         <tr><td>Apollonian</td><td>Apollonian gasket circle packing</td><td>Iters, Radius, Scale</td></tr>
