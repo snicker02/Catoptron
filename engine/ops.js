@@ -1573,5 +1573,90 @@ const OPS = [
   float k = (amount/sumsq)*(coshf(yf)+ushift)*sin(xf)*sin(xf);
   return vec2(k*sin(xf), k*cos(xf));
 }` },
+  { name:'Perspective', fn:'opPerspective', deps:[],
+    params:[["Angle",0,1,0.01,0.62],["Dist",0.1,5,0.05,2.2],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opPerspective(vec2 q, vec4 P){
+  float angle = P.x, dist = P.y, amount = (P.z<=0.0)?1.0:P.z;
+  float ang = angle * 1.57079633;
+  float vsin = sin(ang);
+  float vfcos = dist * cos(ang);
+  float d = dist - q.y*vsin;
+  if(abs(d) < 1e-4) d = (d < 0.0) ? -1e-4 : 1e-4;
+  float t = 1.0/d;
+  return amount * vec2(dist*q.x*t, vfcos*q.y*t);
+}` },
+  { name:'Projective', fn:'opProjective', deps:[],
+    params:[["A",-3,3,0.01,0],["B",-3,3,0.01,-0.4],["C",-3,3,0.01,1],["A1",-3,3,0.01,1],["B1",-3,3,0.01,0.1],["C1",-3,3,0.01,0],["A2",-3,3,0.01,0],["B2",-3,3,0.01,1.1],["C2",-3,3,0.01,1],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opProjective(vec2 q, vec4 P0, vec4 P1, vec4 P2){
+  float A=P0.x, B=P0.y, C=P0.z, A1=P0.w, B1=P1.x, C1=P1.y, A2=P1.z, B2=P1.w, C2=P2.x, amount=(P2.y<=0.0)?1.0:P2.y;
+  float U = A*q.x + B*q.y + C;
+  if(abs(U) < 1e-4) U = (U<0.0) ? -1e-4 : 1e-4;
+  return amount * vec2((A1*q.x + B1*q.y + C1)/U, (A2*q.x + B2*q.y + C2)/U);
+}` },
+  { name:'PDJ', fn:'opPdj', deps:[],
+    params:[["a",-4,4,0.01,-0.7],["b",-4,4,0.01,1],["c",-4,4,0.01,0],["d",-4,4,0.01,2],["e",-3.14,3.14,0.01,0],["f",-3.14,3.14,0.01,0],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opPdj(vec2 q, vec4 P0, vec4 P1){
+  float a=P0.x, b=P0.y, c=P0.z, d=P0.w, e=P1.x, f=P1.y, amount=(P1.z<=0.0)?1.0:P1.z;
+  return amount * vec2(sin(a*q.y + e) - cos(b*q.x + e), sin(c*q.x + f) - cos(d*q.y + f));
+}` },
+  { name:'Pickover', fn:'opPickover', deps:[],
+    params:[["a",-4,4,0.01,1],["b",-4,4,0.01,2],["c",-2,2,0.01,0.5],["d",-2,2,0.01,-0.5],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opPickover(vec2 q, vec4 P0, vec4 P1){
+  float a=P0.x, b=P0.y, c=P0.z, d=P0.w, amount=(P1.x<=0.0)?1.0:P1.x;
+  return amount * vec2(sin(a*q.y) + c*cos(a*q.x), sin(b*q.x) + d*cos(b*q.y));
+}` },
+  { name:'Quadrupole', fn:'opQuadrupole', deps:[],
+    params:[["Strength",-2,2,0.01,0.3],["Smooth",0.01,2,0.01,0.1],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opQuadrupole(vec2 q, vec4 P){
+  float strength=P.x, smth=P.y, amount=(P.z<=0.0)?1.0:P.z;
+  float r2 = dot(q,q) + smth;
+  float theta = atan(q.y, q.x);
+  float fr = strength*cos(2.0*theta)/max(r2,1e-4);
+  float ft = strength*sin(2.0*theta)/max(r2,1e-4);
+  float r = sqrt(dot(q,q) + 1e-10);
+  float nr = r + fr, nt = theta + ft;
+  return amount * nr * vec2(cos(nt), sin(nt));
+}` },
+  { name:'Quasicrystal', fn:'opQuasicrystal', deps:[],
+    params:[["Freq",0.2,10,0.1,3],["Amp",0,1,0.01,0.3],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opQuasicrystal(vec2 q, vec4 P){
+  float freq=P.x, amp=P.y, amount=(P.z<=0.0)?1.0:P.z;
+  float sx=0.0, sy=0.0;
+  float step = 1.25663706;
+  for(int k=0; k<5; k++){
+    float ang = float(k)*step;
+    float proj = q.x*cos(ang) + q.y*sin(ang);
+    float wave = cos(freq*proj);
+    sx += wave*cos(ang);
+    sy += wave*sin(ang);
+  }
+  return amount * (q + amp*vec2(sx,sy)*0.2);
+}` },
+  { name:'Penrose fold', fn:'opPenroseFold', deps:[],
+    params:[["Scale",0.3,8,0.1,2],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opPenroseFold(vec2 q, vec4 P){
+  float scale=max(abs(P.x),1e-4), amount=(P.y<=0.0)?1.0:P.y;
+  float phi=1.61803399;
+  float x=q.x*scale, y=q.y*scale;
+  float u=x+phi*y, v=y-x/phi;
+  float fu=u-floor(u+0.5), fv=v-floor(v+0.5);
+  return amount * vec2((fu - fv/phi)/scale, (fv + fu/phi)/scale);
+}` },
+  { name:'Popcorn2', fn:'opPopcorn2', deps:[],
+    params:[["X",-2,2,0.01,1],["Y",-2,2,0.01,0.5],["C",0.1,5,0.05,1.5],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opPopcorn2(vec2 q, vec4 P){
+  float x=P.x, y=P.y, c=P.z, amount=(P.w<=0.0)?1.0:P.w;
+  return amount * vec2(q.x + x*sin(tan(q.y*c)), q.y + y*sin(tan(q.x*c)));
+}` },
+  { name:'Rainbow arc', fn:'opRainbowArc', deps:[],
+    params:[["Radius",0.05,2,0.01,0.5],["Width",0.01,1,0.01,0.2],["Arc",0.1,3.14,0.01,3.14],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opRainbowArc(vec2 q, vec4 P){
+  float radius=max(abs(P.x),0.01), width=max(abs(P.y),0.001), arc=max(abs(P.z),0.01), amount=(P.w<=0.0)?1.0:P.w;
+  float r=length(q), theta=atan(q.y,q.x);
+  float bandr = floor((r-radius)/width + 0.5)*width + radius;
+  float nr = mix(r, max(bandr,1e-4), 0.6);
+  float nt = clamp(theta, -arc, arc);
+  return amount * nr * vec2(cos(nt), sin(nt));
+}` },
 ];
 export { OPS };
