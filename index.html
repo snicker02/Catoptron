@@ -569,7 +569,7 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
       </ul>
 
       <h2>Operator reference</h2>
-      <p>All 53 folds, grouped by what they do. The big multi-mode banks are described below the tables.</p>
+      <p>All 59 folds, grouped by what they do. The big multi-mode banks are described below the tables.</p>
 
       <h3>Basic transforms</h3>
       <table><tr><th>Fold</th><th>What it does</th><th>Key params</th></tr>
@@ -590,6 +590,7 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Abs fold</td><td>Box fold — reflects past &plusmn;fold back inward</td><td>Fold</td></tr>
         <tr><td>Brick</td><td>Brick-wall tiling, offset rows</td><td>Scale X, Scale Y</td></tr>
         <tr><td>Bravais</td><td>Softly pulls points toward a lattice</td><td>Scale, Pull</td></tr>
+        <tr><td>Chainmail</td><td>Interlocking-ring tiling</td><td>Scale, Ring ratio</td></tr>
         <tr><td>Wallpaper</td><td>All 17 wallpaper groups</td><td>Group, Cell, Angle&deg;</td></tr>
         <tr><td>Frieze</td><td>The 7 frieze (strip) groups</td><td>Group, Angle&deg;, Period</td></tr>
         <tr><td>Hyperbolic</td><td>Hyperbolic {p,q} tiling (Poincar&eacute; disk)</td><td>p, q, Scale</td></tr>
@@ -603,6 +604,10 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Spiral</td><td>Spiral distortion</td><td>Amount</td></tr>
         <tr><td>Log spiral</td><td>Logarithmic spiral arms</td><td>Scale, Turn&deg;, Arms, Mirror</td></tr>
         <tr><td>Wave warp</td><td>Sine/triangle/saw/square displacement</td><td>Amp, Freq, Wave</td></tr>
+        <tr><td>Cam</td><td>Lens distortion (barrel / pincushion)</td><td>k1, k2</td></tr>
+        <tr><td>Curl noise</td><td>Divergence-free swirl</td><td>Freq, Strength</td></tr>
+        <tr><td>Chladni</td><td>Standing-wave nodal warp</td><td>m, n, Amplitude</td></tr>
+        <tr><td>Fault</td><td>Hard shift across a line</td><td>Angle, Displacement</td></tr>
         <tr><td>Wave bank</td><td>17-style mega wave warper (below)</td><td>Style + per-style</td></tr>
         <tr><td>Pleat</td><td>Folded-paper pleats</td><td>Angle&deg;, Width, Tilt&deg;</td></tr>
         <tr><td>Petal</td><td>Flower-petal lobes</td><td>Lobes, Amp</td></tr>
@@ -626,6 +631,7 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Complex sum</td><td>26-weight complex accumulator (below)</td><td>weights, affine, Reflect</td></tr>
         <tr><td>Mobius</td><td>Simple M&ouml;bius transform</td><td>Offset X/Y, Rotate&deg;</td></tr>
         <tr><td>Mobius abcd</td><td>Full M&ouml;bius (az+b)/(cz+d)</td><td>Re/Im a,b,c,d</td></tr>
+        <tr><td>Foci</td><td>Hyperbolic foci warp</td><td>Amount</td></tr>
         <tr><td>Bipolar</td><td>Bipolar conformal map &mdash; lens/eye</td><td>Amount, Shift</td></tr>
         <tr><td>Elliptic</td><td>Elliptic conformal map</td><td>Amount, Mode</td></tr>
         <tr><td>Disc</td><td>Disc-family maps (disc, idisc, spiral, squircle&hellip;)</td><td>Mode, Amount, Twist, Petal</td></tr>
