@@ -1663,28 +1663,34 @@ hqBtn.addEventListener('click', async ()=>{
   }
 });
 
-/* ================= HQ still: offline supersampled PNG ================= */
-$('hqStillBtn').addEventListener('click', async ()=>{
+/* ================= export PNG — single best path: SSAA + full-res feedback ================= */
+$('exportBtn').addEventListener('click', async ()=>{
+  if(recorder){ toast('stop recording first'); return; }
   if(exporting){ toast('HQ export in progress'); return; }
-  if(recorder){ toast('stop the live recording first'); return; }
-  const stillBtn = $('hqStillBtn');
-  const arNow = canvas.width / Math.max(1, canvas.height);
+  const btn = $('exportBtn');
   const cap = Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE), 8192);
-  let th = +$('hqStillSize').value;
-  let tw = Math.round(th * arNow);
-  const fit = Math.min(1, cap / Math.max(tw, th));
-  tw = Math.max(2, Math.floor(tw * fit));
-  th = Math.max(2, Math.floor(th * fit));
-  const ss = (Math.max(tw, th) * 2 <= cap) ? 2 : 1;   // supersample if the GPU allows
-  const rw = tw * ss, rh = th * ss;
+  const pw = canvas.width, ph2 = canvas.height;   // live framing
+  const sizeSel = $('exportSize').value;
+  let ow, oh;
+  if(sizeSel.charAt(0) === 'h'){        // fixed output height in px
+    const th0 = parseInt(sizeSel.slice(1), 10);
+    oh = th0; ow = Math.round(th0 * (pw / Math.max(1, ph2)));
+  } else {                              // multiplier of the live framing
+    const scale = parseFloat(sizeSel.slice(1)) || 1;
+    ow = Math.round(pw * scale); oh = Math.round(ph2 * scale);
+  }
+  const s = Math.min(1, cap / Math.max(ow, oh));
+  ow = Math.max(2, Math.round(ow * s)); oh = Math.max(2, Math.round(oh * s));
+  const ss = (Math.max(ow, oh) * 2 <= cap) ? 2 : 1;   // 2× supersample for AA when it still fits
+  const rw = ow * ss, rh = oh * ss;
 
   exporting = true;
-  const save = {phase, spinA, wavePh, cw: canvas.width, ch: canvas.height};
-  stillBtn.textContent = 'rendering\u2026';
+  const save = {phase, spinA, wavePh};
+  btn.textContent = 'rendering\u2026';
   try{
     canvas.width = rw; canvas.height = rh;
     if(state.rend === 5){
-      /* rebuild feedback history at render resolution */
+      /* feedback history is causal — rebuild it at render resolution so it exports at full res */
       ensureFB(rw, rh);
       const period = state.flip ? 2 : 1;
       const warm = Math.min(600, Math.max(60, Math.round(6 / (1 - state.fbAmt + 0.001))));
@@ -1694,76 +1700,39 @@ $('hqStillBtn').addEventListener('click', async ()=>{
         spinA  += (1/60) * state.spin * 0.5;
         wavePh += (1/60) * state.wobble * 1.5;
         phase = ((phase % period) + period) % period;
-        if(i % 20 === 0){
-          stillBtn.textContent = `warmup ${i}/${warm}`;
-          await new Promise(r => requestAnimationFrame(r));
-        }
+        if(i % 20 === 0){ btn.textContent = `warmup ${i}/${warm}`; await new Promise(r => requestAnimationFrame(r)); }
       }
     }
     renderScene(rw, rh);
 
-    /* downsample for anti-aliasing */
-    const out = document.createElement('canvas');
-    out.width = tw; out.height = th;
-    const ctx = out.getContext('2d');
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(canvas, 0, 0, tw, th);
-    await new Promise((res, rej)=> out.toBlob(b=>{
-      if(!b){ rej(new Error('encode failed')); return; }
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(b);
-      a.download = `hall-of-mirrors-still-${Date.now()}.png`;
-      a.click();
-      setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
-      res();
-    }, 'image/png'));
-    toast(`HQ still: ${tw}\u00d7${th}${ss === 2 ? ' (2\u00d7 supersampled)' : ''}`);
-  } catch(_){
-    toast('HQ still failed');
-  } finally {
-    canvas.width = save.cw; canvas.height = save.ch;
-    phase = save.phase; spinA = save.spinA; wavePh = save.wavePh;
-    exporting = false;
-    stillBtn.textContent = 'HQ Still';
-  }
-});
-
-/* ================= export PNG ================= */
-$('exportBtn').addEventListener('click', ()=>{
-  if(recorder){ toast('stop recording first'); return; }
-  if(exporting){ toast('HQ export in progress'); return; }
-  if(state.rend === 5){
-    /* feedback history is causal — snapshot the live frame as-is */
-    canvas.toBlob(blob=>{
-      if(!blob){ toast('export failed'); return; }
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `hall-of-mirrors-${Date.now()}.png`;
-      a.click();
-      setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
-      toast(`exported ${canvas.width}\u00d7${canvas.height} (feedback exports live at 1\u00d7)`);
-    }, 'image/png');
-    return;
-  }
-  const scale = +$('exportScale').value;
-  const pw = canvas.width, ph2 = canvas.height;   // current viewer framing
-  const max = Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE), 8192);
-  let ow = Math.round(pw * scale), oh = Math.round(ph2 * scale);
-  const s = Math.min(1, max / Math.max(ow, oh));
-  ow = Math.round(ow * s); oh = Math.round(oh * s);
-  canvas.width = ow; canvas.height = oh;
-  renderScene(ow, oh);
-  canvas.toBlob(blob=>{
-    canvas.width = pw; canvas.height = ph2;
-    if(!blob){ toast('export failed'); return; }
+    let blob;
+    if(ss === 1){
+      /* already full render resolution: read the GL canvas directly */
+      blob = await new Promise((res, rej)=> canvas.toBlob(b => b ? res(b) : rej(new Error('encode failed')), 'image/png'));
+    } else {
+      /* 2:1 supersample downsample for anti-aliasing */
+      const out = document.createElement('canvas');
+      out.width = ow; out.height = oh;
+      const ctx = out.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(canvas, 0, 0, ow, oh);
+      blob = await new Promise((res, rej)=> out.toBlob(b => b ? res(b) : rej(new Error('encode failed')), 'image/png'));
+    }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `hall-of-mirrors-${Date.now()}.png`;
     a.click();
     setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
-    toast(`exported ${ow}\u00d7${oh}`);
-  }, 'image/png');
+    toast(`exported ${ow}\u00d7${oh}${ss === 2 ? ' (2\u00d7 SSAA)' : ''}`);
+  } catch(_){
+    toast('export failed');
+  } finally {
+    canvas.width = pw; canvas.height = ph2;
+    phase = save.phase; spinA = save.spinA; wavePh = save.wavePh;
+    exporting = false;
+    btn.textContent = 'Export PNG';
+  }
 });
 
 
