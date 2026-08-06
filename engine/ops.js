@@ -1783,5 +1783,221 @@ const OPS = [
   float nt=th + r*pitch;
   return amount * r * vec2(cos(nt), sin(nt));
 }` },
+  { name:'Worley', fn:'opWorley', deps:[],
+    params:[["Scale",0.1,5,0.05,1],["Jitter",0,1,0.01,0.8],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opWorley(vec2 q, vec4 P){
+  float s=max(abs(P.x),0.01), j=clamp(P.y,0.0,1.0), amount=(P.z<=0.0)?1.0:P.z;
+  float cx=floor(q.x/s), cy=floor(q.y/s);
+  float mind=1e10, nx=0.0, ny=0.0;
+  for(int di=-1; di<=1; di++){ for(int dj=-1; dj<=1; dj++){
+    vec2 cell=vec2(cx+float(di), cy+float(dj));
+    float hx=fract(sin(dot(cell,vec2(127.1,311.7)))*43758.5453);
+    float hy=fract(sin(dot(cell,vec2(269.5,183.3)))*43758.5453);
+    vec2 site=(cell+vec2(hx,hy)*j+(1.0-j)*0.5)*s;
+    float d=length(q-site); if(d<mind){ mind=d; nx=site.x; ny=site.y; }
+  }}
+  return amount * vec2((q.x-nx)/(s+1e-6), (q.y-ny)/(s+1e-6));
+}` },
+  { name:'Voronoi fold', fn:'opVoronoiFold', deps:[],
+    params:[["Scale",0.1,5,0.05,1],["Fold",0,1,0.01,0.5],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opVoronoiFold(vec2 q, vec4 P){
+  float s=max(abs(P.x),0.01), fold=P.y, amount=(P.z<=0.0)?1.0:P.z;
+  float cx=floor(q.x/s), cy=floor(q.y/s);
+  vec2 nearest=vec2(0.0); float mind=1e10;
+  for(int di=-1; di<=1; di++){ for(int dj=-1; dj<=1; dj++){
+    vec2 cell=vec2(cx+float(di), cy+float(dj));
+    float hx=fract(sin(dot(cell,vec2(127.1,311.7)))*43758.5453);
+    float hy=fract(sin(dot(cell,vec2(269.5,183.3)))*43758.5453);
+    vec2 site=(cell+vec2(hx,hy))*s;
+    float d=length(q-site); if(d<mind){ mind=d; nearest=site; }
+  }}
+  return amount * vec2(nearest.x+(q.x-nearest.x)*(1.0-fold), nearest.y+(q.y-nearest.y)*(1.0-fold));
+}` },
+  { name:'Tessellated', fn:'opTessellatedT', deps:[],
+    params:[["Mode",0,9,1,0,["Square power","Square sine","Hex offset","Square radial","True hex","Radial tiling","Exp/log","Tangent","Polynomial","Julia"]],["Scale",-10,10,0.1,2],["Distort X",-5,5,0.05,1.5],["Distort Y",-5,5,0.05,1.5],["Symmetry",0,5,1,0,["None","X-reflect","Y-reflect","Quadrant","D4","Dn"]],["Fold n",1,20,1,6,null,[4,5]],["Edge blend",0,0.5,0.01,0],["Grid rotate",-180,180,1,0],["Cell rotate",-180,180,1,0],["Cell rotate2",-180,180,1,0,null,[10,1,2,3]],["Rotate pattern",0,3,1,0,["Off","Checker","Rows","Columns"]],["Num sectors",1,32,1,8,null,[0,5]],["Julia iters",1,20,1,4,null,[0,9]],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opTessellatedT(vec2 q, vec4 P0, vec4 P1, vec4 P2, vec4 P3){
+  int mode = int(floor(P0.x+0.5));
+  float scale = P0.y, distortX = P0.z, distortY = P0.w;
+  int symmetry = int(floor(P1.x+0.5));
+  int fold_n = int(floor(P1.y+0.5));
+  float edge_blend = P1.z, grid_rotate = P1.w;
+  float cell_rotate = P2.x, cell_rotate2 = P2.y;
+  int rotate_pattern = int(floor(P2.z+0.5));
+  int num_sectors = int(floor(P2.w+0.5));
+  int julia_iterations = int(floor(P3.x+0.5));
+  float amount = (P3.y<=0.0)?1.0:P3.y;
+  float PI = 3.14159265;
+  float x = q.x, y = q.y;
+  float dx = 0.0, dy = 0.0, base_fx = 0.0, base_fy = 0.0;
+  int ixp = 0, iyp = 0;
+  bool allow_edge = false;
+  if(grid_rotate != 0.0){ float ga=grid_rotate*PI/180.0; float cg=cos(ga), sg=sin(ga); float x0=x, y0=y; x=x0*cg-y0*sg; y=x0*sg+y0*cg; }
+  if(mode==0||mode==1||mode==3||mode==6||mode==7||mode==8||mode==9){
+    allow_edge=true; float sx=x*scale, sy=y*scale; ixp=int(floor(sx)); iyp=int(floor(sy));
+    base_fx=sx-float(ixp)-0.5; base_fy=sy-float(iyp)-0.5;
+  } else if(mode==2){
+    allow_edge=true; float sx=x*scale, sy=y*scale; int iyh=int(floor(sy));
+    float off=(mod(float(iyh),2.0)!=0.0)?0.5:0.0; float sxh=sx+off;
+    ixp=int(floor(sxh)); iyp=iyh; base_fx=sxh-float(ixp)-0.5; base_fy=sy-float(iyh)-0.5;
+  } else if(mode==4){
+    allow_edge=false; float hs=(scale==0.0)?1.0:1.0/abs(scale);
+    float qh=(0.57735*x-0.33333*y)/hs; float rh=(0.66667*y)/hs;
+    float rx=floor(qh+0.5), ry=floor(-qh-rh+0.5), rz=floor(rh+0.5);
+    float xd=abs(rx-qh), yd=abs(ry-(-qh-rh)), zd=abs(rz-rh);
+    if(xd>yd && xd>zd){ rx=-ry-rz; } else if(yd>zd){ ry=-rx-rz; } else { rz=-rx-ry; }
+    ixp=int(rx); iyp=int(rz); float fq=qh-rx, fr=rh-rz;
+    base_fx=hs*(1.73205*fq+0.866025*fr); base_fy=hs*(1.5*fr);
+  } else if(mode==5){
+    allow_edge=false; int sectors=(num_sectors<1)?1:num_sectors;
+    float rpo=length(q); float ap=atan(y,x); float sr=scale*rpo;
+    ixp=int(floor(sr)); float na=(ap+PI)/(2.0*PI); iyp=int(floor(na*float(sectors)));
+    base_fx=(sr-float(ixp))-0.5; base_fy=(na*float(sectors)-float(iyp))-0.5;
+  }
+  float sfx=base_fx, sfy=base_fy;
+  if(symmetry==1){ sfy=abs(base_fy); }
+  else if(symmetry==2){ sfx=abs(base_fx); }
+  else if(symmetry==3){ sfx=abs(base_fx); sfy=abs(base_fy); }
+  else if(symmetry==4){ float ax=abs(base_fx), ay=abs(base_fy); sfx=min(ax,ay); sfy=max(ax,ay); }
+  else if(symmetry==5){ int N=(fold_n<1)?1:fold_n; if(N>1){ float rs=sqrt(base_fx*base_fx+base_fy*base_fy);
+    if(rs>1e-9){ float as=atan(base_fy,base_fx); if(as<0.0) as+=2.0*PI; float wa=PI/float(N);
+    float am=mod(as,2.0*wa); float af=(am>wa)?(2.0*wa-am):am; sfx=rs*cos(af); sfy=rs*sin(af); } } }
+  if(mode==0||mode==2||mode==4){ dx=sign(base_fx)*pow(abs(sfx),distortX); dy=sign(base_fy)*pow(abs(sfy),distortY); }
+  else if(mode==1){ dx=sfx+(distortX-1.0)*sin(sfy*2.0*PI)*0.1; dy=sfy+(distortY-1.0)*sin(sfx*2.0*PI)*0.1; }
+  else if(mode==3||mode==5){ float rr=sqrt(sfx*sfx+sfy*sfy); float aa=atan(sfy,sfx); float rd=pow(rr,distortX); float ad=aa+(distortY-1.0)*rr*2.0; dx=rd*cos(ad); dy=rd*sin(ad); }
+  else if(mode==6){ float r6=sqrt(sfx*sfx+sfy*sfy); float a6=atan(sfy,sfx); float rn6=r6*exp(distortX*(r6-distortY)); dx=rn6*cos(a6); dy=rn6*sin(a6); }
+  else if(mode==7){ dx=sfx+distortX*tan(sfy*PI*0.5*0.999); dy=sfy+distortY*tan(sfx*PI*0.5*0.999); }
+  else if(mode==8){ float sf8=1.0+distortX*sfx+distortY*sfy; dx=sfx*sf8; dy=sfy*sf8; }
+  else { float zx=sfx, zy=sfy, cx=distortX, cy=distortY;
+    for(int i=0;i<20;i++){ if(i>=julia_iterations) break; float zxn=zx*zx-zy*zy+cx; float zyn=2.0*zx*zy+cy; zx=zxn; zy=zyn; }
+    dx=zx; dy=zy; }
+  float bdx=dx, bdy=dy;
+  if(allow_edge && edge_blend>0.0){ float ceb=min(edge_blend,0.5); float dfc=max(abs(base_fx),abs(base_fy));
+    float bf=1.0-smoothstep(0.5-ceb,0.5,dfc); bdx=mix(base_fx,dx,bf); bdy=mix(base_fy,dy,bf); }
+  float ccr=cell_rotate;
+  if(rotate_pattern>0){ bool ixe=(mod(float(ixp),2.0)==0.0); bool iye=(mod(float(iyp),2.0)==0.0);
+    if(rotate_pattern==1 && (ixe!=iye)) ccr=cell_rotate2;
+    if(rotate_pattern==2 && !iye) ccr=cell_rotate2;
+    if(rotate_pattern==3 && !ixe) ccr=cell_rotate2; }
+  float fdx=bdx, fdy=bdy;
+  if(ccr!=0.0){ float ca=ccr*PI/180.0; float cc=cos(ca), sc=sin(ca); fdx=bdx*cc-bdy*sc; fdy=bdx*sc+bdy*cc; }
+  return amount * vec2(fdx, fdy);
+}` },
+  { name:'Truchet2', fn:'opTruchet2', deps:[],
+    params:[["Exponent1",0.1,3,0.05,1],["Exponent2",0.1,3,0.05,2],["Width1",0,1,0.01,0.5],["Width2",0,1,0.01,0.5],["Scale",1,30,0.5,10],["Seed",0,100,1,50],["Tiles",0.2,10,0.1,3],["Inverse",0,1,1,0,["Off","On"]],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opTruchet2(vec2 q, vec4 P0, vec4 P1, vec4 P2){
+  float exponent1=P0.x, exponent2=P0.y, width1=P0.z, width2=P0.w;
+  float scale=P1.x, seed=P1.y, tiles=max(abs(P1.z),0.2); int inverse=int(floor(P1.w+0.5));
+  float amount=(P2.x<=0.0)?1.0:P2.x;
+  float qx=q.x*tiles, qy=q.y*tiles;
+  float xp=abs((qx/scale - floor(qx/scale))-0.5)*2.0;
+  float width=width1*(1.0-xp)+xp*width2; width=(width<1.0)?width:1.0;
+  if(width<=0.0){ return amount*q; }
+  float xp2=exponent1*(1.0-xp)+xp*exponent2; float n=xp2; n=(n<2.0)?n:2.0;
+  if(n<=0.0){ return amount*q; }
+  float onen=1.0/xp2; seed=abs(seed);
+  float seed2=sqrt(seed+seed/2.0+1e-6)/((seed*0.5)+1e-6)*0.25;
+  float r0=0.0, r1=0.0; float x=qx, y=qy;
+  float intx=floor(x+0.5), inty=floor(y+0.5);
+  float r=x-intx; x=(r<0.0)?1.0+r:r; r=y-inty; y=(r<0.0)?1.0+r:r;
+  float tiletype=0.0;
+  if(seed==0.0) tiletype=0.0; else if(seed==1.0) tiletype=1.0;
+  else { float xr=floor(qx+0.5)*seed2, yr=floor(qy+0.5)*seed2; float niter=xr+yr+xr*yr;
+    float randint=(niter+seed)*seed2/2.0; randint=mod(randint*32747.0+12345.0,65535.0); tiletype=mod(randint,2.0); }
+  if(tiletype<1.0){ r0=pow(pow(abs(x),n)+pow(abs(y),n),onen); r1=pow(pow(abs(x-1.0),n)+pow(abs(y-1.0),n),onen); }
+  else { r0=pow(pow(abs(x-1.0),n)+pow(abs(y),n),onen); r1=pow(pow(abs(x),n)+pow(abs(y-1.0),n),onen); }
+  float rmax=0.5*(pow(2.0,onen)-1.0)*width;
+  float r00=abs(r0-0.5)/rmax, r11=abs(r1-0.5)/rmax;
+  vec2 o;
+  if(inverse==0){ if(r00<1.0||r11<1.0){ o=vec2(x+floor(qx), y+floor(qy)); } else { o=vec2(100.0,100.0); } }
+  else { if(r00>1.0&&r11>1.0){ o=vec2(x+floor(qx), y+floor(qy)); } else { o=vec2(10000.0,10000.0); } }
+  return amount * o / tiles;
+}` },
+  { name:'Wedge', fn:'opWedge', deps:[],
+    params:[["Angle",0,6.28,0.01,1.5708],["Hole",-1,1,0.01,0],["Count",1,12,1,1],["Swirl",-2,2,0.01,0.1],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opWedge(vec2 q, vec4 P0, vec4 P1){
+  float angle=P0.x, hole=P0.y, count=P0.z, swirl=P0.w, amount=(P1.x<=0.0)?1.0:P1.x;
+  float PI=3.14159265;
+  float r=length(q); float th=atan(q.y,q.x);
+  float a=th+swirl*r;
+  float c=floor((count*a+PI)*(1.0/PI)*0.5);
+  float cf=1.0-angle*count*(1.0/PI)*0.5;
+  a=a*cf+c*angle; r=amount*(r+hole);
+  return r * vec2(cos(a), sin(a));
+}` },
+  { name:'Whorl', fn:'opWhorl', deps:[],
+    params:[["Inside",-2,2,0.01,0.1],["Outside",-2,2,0.01,0.2],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opWhorl(vec2 q, vec4 P){
+  float inside=P.x, outside=P.y, amount=(P.z<=0.0)?1.0:P.z;
+  float r=length(q); float th=atan(q.y,q.x);
+  float denom=amount-r; if(abs(denom)<1e-4) denom=(denom<0.0)?-1e-4:1e-4;
+  float a=th+((r<amount)?inside:outside)/denom;
+  return amount * r * vec2(cos(a), sin(a));
+}` },
+  { name:'Tri lattice', fn:'opTriLattice', deps:[],
+    params:[["Scale",0.1,8,0.1,2],["Morph",0,1,0.01,1],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opTriLattice(vec2 q, vec4 P){
+  float scale=P.x, morph=P.y, amount=(P.z<=0.0)?1.0:P.z;
+  float ax=q.x*scale, ay=q.y*scale;
+  float u=ax-ay*0.57735026919; float v=ay*1.15470053838;
+  float fu=u-floor(u+0.5); float fv=v-floor(v+0.5);
+  float bx=fu+fv*0.5; float by=fv*0.86602540378;
+  return amount * vec2(mix(q.x, bx/scale, morph), mix(q.y, by/scale, morph));
+}` },
+  { name:'Wood grain', fn:'opWoodGrain', deps:[],
+    params:[["Freq",0.5,20,0.1,5],["Amp",0,1,0.01,0.2],["Grain",0,3,0.01,0.5],["Grain freq",0.5,20,0.1,6],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opWoodGrain(vec2 q, vec4 P0, vec4 P1){
+  float freq=P0.x, amp=P0.y, grain=P0.z, grainFreq=P0.w, amount=(P1.x<=0.0)?1.0:P1.x;
+  float r=length(q); float th=atan(q.y,q.x);
+  float ring=sin(freq*r + grain*cos(grainFreq*th));
+  float disp=amp*ring;
+  return amount * vec2(q.x + disp*cos(th), q.y + disp*sin(th));
+}` },
+  { name:'Weave', fn:'opWeave', deps:[],
+    params:[["Scale",0.1,3,0.05,0.5],["Warp",0,1,0.01,0.3],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opWeave(vec2 q, vec4 P){
+  float scale=max(abs(P.x),0.01), warp=P.y, amount=(P.z<=0.0)?1.0:P.z;
+  float PI=3.14159265;
+  float col=floor(q.x/scale), row=floor(q.y/scale);
+  float lx=q.x/scale-col-0.5; float ly=q.y/scale-row-0.5;
+  float over=2.0*mod(col+row,2.0)-1.0;
+  float dx=warp*over*sin(PI*ly); float dy=warp*(-over)*sin(PI*lx);
+  return amount * vec2(q.x+dx*scale, q.y+dy*scale);
+}` },
+  { name:'Tidal lock', fn:'opTidalLock', deps:[],
+    params:[["Ratio",-3,3,0.01,1],["Ecc",-2,2,0.01,0.3],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opTidalLock(vec2 q, vec4 P){
+  float ratio=P.x, ecc=P.y, amount=(P.z<=0.0)?1.0:P.z;
+  float r=length(q); float a=atan(q.y,q.x);
+  float na=a*ratio+ecc*sin(2.0*a);
+  return amount * r * vec2(cos(na), sin(na));
+}` },
+  { name:'Zhukowski', fn:'opZhukowski', deps:[],
+    params:[["c",-2,2,0.01,0.5],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opZhukowski(vec2 q, vec4 P){
+  float c=P.x, amount=(P.y<=0.0)?1.0:P.y;
+  float r2=dot(q,q)+1e-6;
+  return amount * vec2(q.x + c*q.x/r2, q.y - c*q.y/r2);
+}` },
+  { name:'Target', fn:'opTarget', deps:[],
+    params:[["Even",-3.14,3.14,0.01,0],["Odd",-3.14,3.14,0.01,0.6],["Size",0.1,6,0.01,1.5708],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opTarget(vec2 q, vec4 P){
+  float even=P.x, odd=P.y, size=P.z, amount=(P.w<=0.0)?1.0:P.w;
+  float s2=0.5*size; float a=atan(q.y,q.x); float r=length(q);
+  float t=log(max(r,1e-6)); if(t<0.0) t-=s2; t=mod(abs(t),size);
+  if(t<s2) a+=even; else a+=odd;
+  return amount * r * vec2(cos(a), sin(a));
+}` },
+  { name:'Target sp', fn:'opTargetSp', deps:[],
+    params:[["Twist",-2,2,0.01,0],["N of sp",1,12,1,1],["Size",0.1,6,0.01,1.25],["Tightness",-3,3,0.01,0.55],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opTargetSp(vec2 q, vec4 P0, vec4 P1){
+  float twist=P0.x, n_of_sp=P0.y, size=P0.z, tightness=P0.w, amount=(P1.x<=0.0)?1.0:P1.x;
+  float PI=3.14159265; float s2=0.5*size;
+  float rota=PI*twist; float rotb=-PI+rota;
+  float a=atan(q.y,q.x); float r=length(q);
+  float t=tightness*log(max(r,1e-6)) + n_of_sp*(1.0/PI)*(a+PI);
+  if(t<0.0) t-=s2; t=mod(abs(t),size);
+  if(t<s2) a+=rota; else a+=rotb;
+  return amount * r * vec2(cos(a), sin(a));
+}` },
 ];
 export { OPS };
