@@ -1658,5 +1658,130 @@ const OPS = [
   float nt = clamp(theta, -arc, arc);
   return amount * nr * vec2(cos(nt), sin(nt));
 }` },
+  { name:'Shape warp', fn:'opShapeWarp', deps:[],
+    params:[["Shape",0,9,1,0,["Square","Rectangle","Circle","Diamond","Triangle","Pentagon","Hexagon","Flower","Star","Cloud"]],["Size",0,10,0.05,1],["Aspect",0.1,10,0.05,1,null,[0,1,2,3]],["Center X",-5,5,0.05,0],["Center Y",-5,5,0.05,0],["Inner radius",0,2,0.01,0],["Outer radius",0,2,0.01,1],["Warp mode",0,5,1,0,["Rotate","Scale radial","Swirl","Scale XY","Fisheye","Shear"]],["Warp amount",-10,10,0.05,3.14159,null,[7,0,1,2,4]],["Warp amount X",-5,5,0.05,1,null,[7,3,5]],["Warp amount Y",-5,5,0.05,1,null,[7,3,5]],["Warp center X",-5,5,0.05,0],["Warp center Y",-5,5,0.05,0],["Warp curve",0.01,10,0.05,1],["Warp invert",0,1,1,0,["Off","On"]],["Flower petals",2,20,1,5,null,[0,7]],["Star points",3,20,1,5,null,[0,8]],["Star depth",0,1,0.01,0.5,null,[0,8]],["Cloud amplitude",0,2,0.01,0.2,null,[0,9]],["Cloud frequency",0.1,20,0.1,5,null,[0,9]],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opShapeWarp(vec2 q, vec4 P0, vec4 P1, vec4 P2, vec4 P3, vec4 P4, vec4 P5){
+  int shape = int(floor(P0.x+0.5));
+  float size = P0.y, aspect = P0.z, centerX = P0.w;
+  float centerY = P1.x, innerRadius = P1.y, outerRadius = P1.z;
+  int warpMode = int(floor(P1.w+0.5));
+  float warpAmount = P2.x, warpAmountX = P2.y, warpAmountY = P2.z, warpCenterX = P2.w;
+  float warpCenterY = P3.x, warpCurve = P3.y;
+  int warpInvert = int(floor(P3.z+0.5));
+  int flowerPetals = int(floor(P3.w+0.5));
+  int starPoints = int(floor(P4.x+0.5));
+  float starDepth = P4.y, cloudAmplitude = P4.z, cloudFrequency = P4.w;
+  float amount = (P5.x<=0.0)?1.0:P5.x;
+  float PI = 3.14159265;
+  float currentAspect = (shape==1||shape==2||shape==3) ? aspect : 1.0;
+  float cInner = max(0.0, innerRadius);
+  float cOuter = max(cInner + 1e-9, outerRadius);
+  float cCurve = max(1e-6, warpCurve);
+  bool invert = (warpInvert >= 1);
+  float srx = q.x - centerX, sry = q.y - centerY;
+  float hw = max(1e-9, size*currentAspect*0.5);
+  float hh = max(1e-9, size*0.5);
+  float R = max(1e-9, size*0.5);
+  float dist = 0.0;
+  float rp = sqrt(srx*srx + sry*sry);
+  float angle = 0.0;
+  if(rp > 1e-9){ angle = atan(sry, srx); if(angle < 0.0) angle += 2.0*PI; }
+  if(shape==2){ float nx=srx/hw, ny=sry/hh; dist=sqrt(nx*nx+ny*ny); }
+  else if(shape==3){ float nx=srx/hw, ny=sry/hh; dist=abs(nx)+abs(ny); }
+  else if(shape==4){ if(rp<1e-9){dist=0.0;} else { float sa=2.0*PI/3.0; float ad=mod(angle,sa)-(PI/3.0); float b=R*cos(PI/3.0)/max(1e-9,abs(cos(ad))); dist=rp/max(1e-9,b); } }
+  else if(shape==5){ if(rp<1e-9){dist=0.0;} else { float sa=2.0*PI/5.0; float ad=mod(angle,sa)-(PI/5.0); float b=R*cos(PI/5.0)/max(1e-9,abs(cos(ad))); dist=rp/max(1e-9,b); } }
+  else if(shape==6){ if(rp<1e-9){dist=0.0;} else { float sa=PI/3.0; float ad=mod(angle,sa)-(PI/6.0); float b=R*cos(PI/6.0)/max(1e-9,abs(cos(ad))); dist=rp/max(1e-9,b); } }
+  else if(shape==7){ if(rp<1e-9){dist=0.0;} else { float b=R*abs(cos(float(flowerPetals)*angle)); dist=rp/max(1e-9,b); } }
+  else if(shape==8){ if(rp<1e-9){dist=0.0;} else { float k=float(starPoints); float Ro=R; float Ri=R*starDepth; float apv=PI/k; int si=int(floor(angle/apv)); float ais=angle-float(si)*apv; float t=ais/apv; float tn=2.0*abs(t-0.5); float b=(mod(float(si),2.0)==0.0)?mix(Ro,Ri,tn):mix(Ri,Ro,tn); dist=rp/max(1e-9,b); } }
+  else if(shape==9){ if(rp<1e-9){dist=0.0;} else { float cnoise=0.6*sin(cloudFrequency*angle)+0.3*sin(2.1*cloudFrequency*angle+1.23)+0.1*sin(4.3*cloudFrequency*angle+4.56); float b=R*(1.0+cloudAmplitude*cnoise); b=max(R*0.1,b); dist=rp/b; } }
+  else { float nx=srx/hw, ny=sry/hh; dist=max(abs(nx),abs(ny)); }
+  float wf = 0.0;
+  float rng = cOuter - cInner;
+  if(dist <= cInner) wf = 0.0;
+  else if(dist >= cOuter) wf = 1.0;
+  else wf = (rng > 1e-9) ? (dist - cInner)/rng : 1.0;
+  wf = pow(wf, cCurve);
+  if(invert) wf = 1.0 - wf;
+  float ew = wf*warpAmount, ewx = wf*warpAmountX, ewy = wf*warpAmountY;
+  float wrx = q.x - warpCenterX, wry = q.y - warpCenterY;
+  float wx = wrx, wy = wry;
+  if(warpMode==0){ float ca=cos(ew), sa=sin(ew); wx=wrx*ca-wry*sa; wy=wrx*sa+wry*ca; }
+  else if(warpMode==1){ float sf=max(1e-9,1.0+ew); wx=wrx*sf; wy=wry*sf; }
+  else if(warpMode==2){ float ca=atan(wry,wrx); float rr=sqrt(wrx*wrx+wry*wry); float na=ca+ew*rr; wx=rr*cos(na); wy=rr*sin(na); }
+  else if(warpMode==3){ float sx=max(1e-9,1.0+ewx); float sy=max(1e-9,1.0+ewy); wx=wrx*sx; wy=wry*sy; }
+  else if(warpMode==4){ float af=atan(wry,wrx); float rf=sqrt(wrx*wrx+wry*wry); if(rf>1e-9){ float pw=1.0-ew; if(abs(pw-1.0)>1e-9){ float nrd=pow(rf,pw); wx=nrd*cos(af); wy=nrd*sin(af); } } }
+  else { wx=wrx+ewx*wry; wy=wry+ewy*wrx; }
+  return amount * vec2(wx + warpCenterX, wy + warpCenterY);
+}` },
+  { name:'Svensson', fn:'opSvensson', deps:[],
+    params:[["a",-3,3,0.01,1.4],["b",-3,3,0.01,1.56],["c",-3,3,0.01,1.4],["d",-8,8,0.01,-6.56],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opSvensson(vec2 q, vec4 P0, vec4 P1){
+  float a=P0.x, b=P0.y, c=P0.z, d=P0.w, amount=(P1.x<=0.0)?1.0:P1.x;
+  return amount * vec2(d*sin(a*q.x) - sin(b*q.y), c*cos(a*q.x) + cos(b*q.y));
+}` },
+  { name:'Symmetric icon', fn:'opSymmetricIcon', deps:[],
+    params:[["Lambda",-3,3,0.01,1.56],["Alpha",-3,3,0.01,-1],["Beta",-2,2,0.01,0.1],["Omega",-3,3,0.01,-0.82],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opSymmetricIcon(vec2 q, vec4 P0, vec4 P1){
+  float lambda=P0.x, alpha=P0.y, beta=P0.z, omega=P0.w, amount=(P1.x<=0.0)?1.0:P1.x;
+  float r2 = dot(q,q);
+  float nx = lambda*q.x + alpha*(q.x*q.x - q.y*q.y) + beta*r2*q.x + omega*q.x*q.y;
+  float ny = lambda*q.y + 2.0*alpha*q.x*q.y + beta*r2*q.y + omega*q.x*q.x;
+  return amount * vec2(nx, ny);
+}` },
+  { name:'Stereographic plane', fn:'opStereographicPlane', deps:[],
+    params:[["Scale",0.2,3,0.05,1],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opStereographicPlane(vec2 q, vec4 P){
+  float scale=P.x, amount=(P.y<=0.0)?1.0:P.y;
+  float lat = q.y*scale, lon = q.x*scale;
+  float cl = cos(lat);
+  float denom = max(1.0 - sin(lat), 0.001);
+  return amount * vec2(cl*cos(lon)/denom, cl*sin(lon)/denom);
+}` },
+  { name:'Supernova', fn:'opSupernova', deps:[],
+    params:[["Radius",0.05,2,0.01,0.5],["Boost",-3,3,0.01,2],["Spin",-3,3,0.01,0.3],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opSupernova(vec2 q, vec4 P){
+  float radius=max(abs(P.x),0.01), boost=P.y, spin=P.z, amount=(P.w<=0.0)?1.0:P.w;
+  float r=length(q), theta=atan(q.y,q.x);
+  float ring=r-radius;
+  float env=exp(-ring*ring/(radius*radius*0.1 + 1e-6));
+  float nr = r + env*boost*r;
+  float nt = theta + spin*env;
+  return amount * nr * vec2(cos(nt), sin(nt));
+}` },
+  { name:'Superposition', fn:'opSuperposition', deps:[],
+    params:[["Freq1",0.1,15,0.1,3],["Freq2",0.1,15,0.1,5],["Phase",0,6.28,0.01,0],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opSuperposition(vec2 q, vec4 P){
+  float freq1=P.x, freq2=P.y, phase=P.z, amount=(P.w<=0.0)?1.0:P.w;
+  float r=length(q);
+  float wave = 0.5*(sin(freq1*r) + sin(freq2*r + phase));
+  return amount * q * wave;
+}` },
+  { name:'Satin', fn:'opSatin', deps:[],
+    params:[["Freq",0.2,15,0.1,4],["Sheen",0,1,0.01,0.2],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opSatin(vec2 q, vec4 P){
+  float freq=max(abs(P.x),0.01), sheen=P.y, amount=(P.z<=0.0)?1.0:P.z;
+  float d1=(q.x+q.y)*0.70710678, d2=(q.x-q.y)*0.70710678;
+  return amount * vec2(q.x + sheen*sin(freq*d1), q.y + sheen*cos(freq*d2));
+}` },
+  { name:'Stwin', fn:'opStwin', deps:[],
+    params:[["Distort",-3,3,0.01,1],["Offset xy",-5,5,0.05,0],["Offset x2",-5,5,0.05,1],["Offset y2",-5,5,0.05,1],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opStwin(vec2 q, vec4 P0, vec4 P1){
+  float distort=P0.x, offxy=P0.y, offx2=P0.z, offy2=P0.w, amount=(P1.x<=0.0)?1.0:P1.x;
+  float x = q.x*amount*0.05, y = q.y*amount*0.05;
+  float x2 = x*x + offx2*0.0001;
+  float y2 = y*y + offy2*0.0001;
+  float result = (x2-y2)*sin(6.28318531*distort*(x+y+offxy*0.1));
+  float divident = x2+y2; if(divident == 0.0) divident = 1.0;
+  result = result/divident;
+  return vec2(amount*q.x + result, amount*q.y + result);
+}` },
+  { name:'Screw', fn:'opScrew', deps:[],
+    params:[["Pitch",-5,5,0.05,2],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opScrew(vec2 q, vec4 P){
+  float pitch=P.x, amount=(P.y<=0.0)?1.0:P.y;
+  float r=length(q), th=atan(q.y,q.x);
+  float nt=th + r*pitch;
+  return amount * r * vec2(cos(nt), sin(nt));
+}` },
 ];
 export { OPS };
