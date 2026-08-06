@@ -569,7 +569,7 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
       </ul>
 
       <h2>Operator reference</h2>
-      <p>All 87 folds, grouped by what they do. The big multi-mode banks are described below the tables.</p>
+      <p>All 96 folds, grouped by what they do. The big multi-mode banks are described below the tables.</p>
 
       <h3>Basic transforms</h3>
       <table><tr><th>Fold</th><th>What it does</th><th>Key params</th></tr>
@@ -600,6 +600,7 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Aperiodic</td><td>Quasicrystal tilings (Penrose, Ammann)</td><td>Grids, Cell, Gamma, Mode, Levels, Inflation</td></tr>
         <tr><td>Quasicrystal</td><td>5-fold quasicrystal interference</td><td>Freq, Amp</td></tr>
         <tr><td>Penrose fold</td><td>Golden-ratio Penrose lattice fold</td><td>Scale</td></tr>
+        <tr><td>Shape warp</td><td>Shape-boundary warp bank (below)</td><td>Shape, Warp mode, +</td></tr>
       </table>
 
       <h3>Swirls, spirals &amp; waves</h3>
@@ -615,6 +616,10 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Karman vortex</td><td>Von Karman vortex street</td><td>Freq, Strength, Sep</td></tr>
         <tr><td>PDJ</td><td>Four-sine PDJ warp (phase offsets)</td><td>a, b, c, d, e, f</td></tr>
         <tr><td>Popcorn2</td><td>Parametrized popcorn jitter</td><td>X, Y, C</td></tr>
+        <tr><td>Superposition</td><td>Two-frequency interference rings</td><td>Freq1, Freq2, Phase</td></tr>
+        <tr><td>Satin</td><td>Diagonal double-sine sheen</td><td>Freq, Sheen</td></tr>
+        <tr><td>Stwin</td><td>Twin-swirl distortion</td><td>Distort, Offsets</td></tr>
+        <tr><td>Screw</td><td>Radial screw / helix twist</td><td>Pitch</td></tr>
         <tr><td>Maelstrom</td><td>Swirl-warped exponential spiral</td><td>Swirl, Freq, Scale</td></tr>
         <tr><td>Oscilloscope</td><td>Mirror inside a cosine band</td><td>Separation, Frequency, Amplitude</td></tr>
         <tr><td>Mitosis</td><td>Cell-division pinch/split</td><td>Separation, Width, Phase</td></tr>
@@ -637,6 +642,8 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Hammer</td><td>Hammer-Aitoff map projection</td><td>Scale</td></tr>
         <tr><td>Mercator</td><td>Mercator map projection</td><td>Scale</td></tr>
         <tr><td>Perspective</td><td>Apophysis perspective tilt</td><td>Angle, Dist</td></tr>
+        <tr><td>Stereographic plane</td><td>Stereographic plane projection</td><td>Scale</td></tr>
+        <tr><td>Supernova</td><td>Spinning ring-shell shockwave</td><td>Radius, Boost, Spin</td></tr>
         <tr><td>Projective</td><td>Full 9-coefficient projective</td><td>A&ndash;C2</td></tr>
         <tr><td>Quadrupole</td><td>4-pole cos(2&theta;)/r&sup2; field</td><td>Strength, Smooth</td></tr>
         <tr><td>Rainbow arc</td><td>Bends radius bands into an arc</td><td>Radius, Width, Arc</td></tr>
@@ -672,6 +679,8 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Bedhead</td><td>Chaotic-attractor warp — organic, glitchy</td><td>a, b</td></tr>
         <tr><td>Ikeda</td><td>Ikeda attractor — swirl-collapse chaos</td><td>u</td></tr>
         <tr><td>Pickover</td><td>Pickover attractor — chaotic sine map</td><td>a, b, c, d</td></tr>
+        <tr><td>Svensson</td><td>Svensson attractor — sine/cos map</td><td>a, b, c, d</td></tr>
+        <tr><td>Symmetric icon</td><td>Symmetric-icon quadratic map</td><td>Lambda, Alpha, Beta, Omega</td></tr>
         <tr><td>Kleinian</td><td>Kleinian-group inversion fractal</td><td>Circles, Radius, Iters, Scale, Bound, Spin&deg;, Twist&deg;, Frame</td></tr>
         <tr><td>Fuchsian</td><td>Fuchsian group (hyperbolic tilings)</td><td>trace ta/tb/tab, Iters</td></tr>
         <tr><td>Apollonian</td><td>Apollonian gasket circle packing</td><td>Iters, Radius, Scale</td></tr>
@@ -687,6 +696,7 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <li><b>Lazy</b> &mdash; the classic lazy-susan family: <b>Susan</b> (circular swirl, movable center via x/y), <b>Travis</b> (square swirl), <b>Jess</b> (n-gon swirl), plus a <b>Sensen</b> post-fold. For Travis/Jess try Amount &asymp; 0.5&ndash;0.6 to stay in frame.</li>
         <li><b>Loonie</b> &mdash; circle-inversion bubbles: <b>Loonie</b> (circle), <b>Loonie2</b> (n-gon/star/circle blend), <b>Loonie3</b> (parabolic). <b>Radius</b> sizes the bubble independently of Amount; <b>Rotate</b> spins the Loonie2 polygon.</li>
         <li><b>Lens bank</b> &mdash; the optical zoo in one fold, <b>12 modes</b>: Brown-Conrady, Mustache, Division, four Fisheye projections (stereographic/equisolid/equidistant/orthographic), Tangential, Petzval swirl, Panini, Anamorphic, Tilt-shift. Pick <b>Mode</b>; only that mode&rsquo;s knobs show.</li>
+        <li><b>Shape warp</b> &mdash; a warp bank in one fold: pick a <b>Shape</b> (square, circle, diamond, triangle, pentagon, hexagon, flower, star, cloud&hellip;) whose boundary drives an inner&rarr;outer falloff, then a <b>Warp mode</b> (rotate, scale-radial, swirl, scale-XY, fisheye, shear). Shape-specific knobs appear only for the relevant shape.</li>
         <li><b>BusyBrad</b> &mdash; the grid version of the lazy family: tiles the plane (Grid size), each cell a Susan/Jess/Combined swirl, with Spin/Twist/Space/N and a Sensen fold. Grid size 0 = a single centered swirl.</li>
       </ul>
 
