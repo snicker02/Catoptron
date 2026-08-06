@@ -569,7 +569,7 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
       </ul>
 
       <h2>Operator reference</h2>
-      <p>All 96 folds, grouped by what they do. The big multi-mode banks are described below the tables.</p>
+      <p>All 109 folds, grouped by what they do. The big multi-mode banks are described below the tables.</p>
 
       <h3>Basic transforms</h3>
       <table><tr><th>Fold</th><th>What it does</th><th>Key params</th></tr>
@@ -601,6 +601,10 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Quasicrystal</td><td>5-fold quasicrystal interference</td><td>Freq, Amp</td></tr>
         <tr><td>Penrose fold</td><td>Golden-ratio Penrose lattice fold</td><td>Scale</td></tr>
         <tr><td>Shape warp</td><td>Shape-boundary warp bank (below)</td><td>Shape, Warp mode, +</td></tr>
+        <tr><td>Tessellated</td><td>Grid/distort tiling bank (below)</td><td>Mode, Symmetry, Scale, +</td></tr>
+        <tr><td>Tri lattice</td><td>Triangular-lattice fold</td><td>Scale, Morph</td></tr>
+        <tr><td>Truchet2</td><td>Truchet arc tiling</td><td>Exponents, Widths, Tiles, Seed</td></tr>
+        <tr><td>Weave</td><td>Over/under basket weave</td><td>Scale, Warp</td></tr>
       </table>
 
       <h3>Swirls, spirals &amp; waves</h3>
@@ -627,6 +631,12 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Wave bank</td><td>17-style mega wave warper (below)</td><td>Style + per-style</td></tr>
         <tr><td>Pleat</td><td>Folded-paper pleats</td><td>Angle&deg;, Width, Tilt&deg;</td></tr>
         <tr><td>Petal</td><td>Flower-petal lobes</td><td>Lobes, Amp</td></tr>
+        <tr><td>Wedge</td><td>Angular pie-slice fan with swirl</td><td>Angle, Hole, Count, Swirl</td></tr>
+        <tr><td>Whorl</td><td>Inside/outside differential spiral</td><td>Inside, Outside</td></tr>
+        <tr><td>Tidal lock</td><td>Angular ratio spin + wobble</td><td>Ratio, Ecc</td></tr>
+        <tr><td>Wood grain</td><td>Concentric wood-ring displacement</td><td>Freq, Amp, Grain</td></tr>
+        <tr><td>Target</td><td>Log-ring alternating rotate</td><td>Even, Odd, Size</td></tr>
+        <tr><td>Target sp</td><td>Target with log-spiral tweak</td><td>Twist, N, Size, Tightness</td></tr>
       </table>
 
       <h3>Lenses, rings &amp; bubbles</h3>
@@ -668,6 +678,7 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Bipolar</td><td>Bipolar conformal map &mdash; lens/eye</td><td>Amount, Shift</td></tr>
         <tr><td>Elliptic</td><td>Elliptic conformal map</td><td>Amount, Mode</td></tr>
         <tr><td>Disc</td><td>Disc-family maps (disc, idisc, spiral, squircle&hellip;)</td><td>Mode, Amount, Twist, Petal</td></tr>
+        <tr><td>Zhukowski</td><td>Joukowski airfoil conformal map</td><td>c</td></tr>
       </table>
 
       <h3>Fractal folds</h3>
@@ -686,6 +697,8 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Apollonian</td><td>Apollonian gasket circle packing</td><td>Iters, Radius, Scale</td></tr>
         <tr><td>Juliascope</td><td>Julia-set wedge mapping</td><td>Power, Dist, Wedge, Iters</td></tr>
         <tr><td>Julian</td><td>Julia mapping</td><td>Power, Dist, Wedge</td></tr>
+        <tr><td>Worley</td><td>Worley / cellular (F1) noise fold</td><td>Scale, Jitter</td></tr>
+        <tr><td>Voronoi fold</td><td>Voronoi-cell fold toward nearest site</td><td>Scale, Fold</td></tr>
       </table>
 
       <h3>The big multi-mode banks</h3>
@@ -697,6 +710,7 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <li><b>Loonie</b> &mdash; circle-inversion bubbles: <b>Loonie</b> (circle), <b>Loonie2</b> (n-gon/star/circle blend), <b>Loonie3</b> (parabolic). <b>Radius</b> sizes the bubble independently of Amount; <b>Rotate</b> spins the Loonie2 polygon.</li>
         <li><b>Lens bank</b> &mdash; the optical zoo in one fold, <b>12 modes</b>: Brown-Conrady, Mustache, Division, four Fisheye projections (stereographic/equisolid/equidistant/orthographic), Tangential, Petzval swirl, Panini, Anamorphic, Tilt-shift. Pick <b>Mode</b>; only that mode&rsquo;s knobs show.</li>
         <li><b>Shape warp</b> &mdash; a warp bank in one fold: pick a <b>Shape</b> (square, circle, diamond, triangle, pentagon, hexagon, flower, star, cloud&hellip;) whose boundary drives an inner&rarr;outer falloff, then a <b>Warp mode</b> (rotate, scale-radial, swirl, scale-XY, fisheye, shear). Shape-specific knobs appear only for the relevant shape.</li>
+        <li><b>Tessellated</b> &mdash; a tiling/distortion bank: pick a <b>Mode</b> (square power/sine/radial, hex offset, true hex, radial tiling, exp-log, tangent, polynomial, Julia) and a <b>Symmetry</b> (none, X/Y-reflect, quadrant, D4, Dn). <b>Scale</b> sets cell density, <b>Edge blend</b> softens seams, and <b>Grid/Cell rotate</b> with a <b>Rotate pattern</b> spin whole cells. Mode-specific knobs show only when relevant.</li>
         <li><b>BusyBrad</b> &mdash; the grid version of the lazy family: tiles the plane (Grid size), each cell a Susan/Jess/Combined swirl, with Spin/Twist/Space/N and a Sensen fold. Grid size 0 = a single centered swirl.</li>
       </ul>
 
