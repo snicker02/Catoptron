@@ -306,18 +306,18 @@ input[type=file]{display:none}
       <div class="btns">
         <label class="filebtn" for="file">Load image</label>
         <button id="exportBtn">Export PNG</button>
-        <select id="exportScale" style="flex:0 0 auto" title="Export size (× viewer resolution — export matches exactly what you see)">
-          <option value="1">1×</option>
-          <option value="2" selected>2×</option>
-          <option value="4">4×</option>
-        </select>
-      </div>
-      <div class="btns" style="margin-top:6px">
-        <button id="hqStillBtn">HQ Still</button>
-        <select id="hqStillSize" style="flex:0 0 auto" title="HQ still height — rendered at 2× and downsampled for anti-aliasing">
-          <option value="1080" selected>1080p</option>
-          <option value="1440">1440p</option>
-          <option value="2160">2160p</option>
+        <select id="exportSize" style="flex:0 0 auto" title="Export size — × the live view, or a fixed height. Supersampled (2× SSAA) and downsampled for clean edges when it fits under the GPU limit.">
+          <optgroup label="× live view">
+            <option value="x1">1×</option>
+            <option value="x2" selected>2×</option>
+            <option value="x4">4×</option>
+          </optgroup>
+          <optgroup label="fixed height">
+            <option value="h1080">1080p</option>
+            <option value="h1440">1440p</option>
+            <option value="h2160">2160p</option>
+            <option value="h2880">2880p</option>
+          </optgroup>
         </select>
       </div>
       <input type="file" id="file" accept="image/*">
@@ -488,7 +488,7 @@ input[type=file]{display:none}
         </select>
         <button id="hqBtn" class="rec" style="flex:1.2">HQ Video</button>
       </div>
-      <div class="note">Record captures the live canvas in realtime. HQ Video renders offline frame-by-frame via WebCodecs &mdash; loops close exactly, and Feedback history is rebuilt at export resolution. HQ Still lives up in the Image group.</div>
+      <div class="note">Record captures the live canvas in realtime. HQ Video renders offline frame-by-frame via WebCodecs &mdash; loops close exactly, and Feedback history is rebuilt at export resolution.</div>
     </div>
 
     <div class="group">
@@ -720,7 +720,7 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
       <h2>Presets, export &amp; recording</h2>
       <ul>
         <li><b>Presets</b>: load a factory recipe, save your own, Randomize, Reseed, and Copy/Paste or Import/Export as text to share.</li>
-        <li><b>Export PNG</b> at 1&times;/2&times;/4&times;; <b>HQ Still</b> for a super-sampled frame.</li>
+        <li><b>Export PNG</b> at 1&times;/2&times;/4&times; the live view or a fixed height (1080p&ndash;2880p) &mdash; supersampled (2&times; SSAA) and downsampled for clean edges when it fits under the GPU limit; Feedback is rebuilt at export resolution.</li>
         <li><b>Record (WebM)</b> captures the live canvas; <b>HQ Video</b> renders offline frame-by-frame (loops close exactly, Feedback rebuilt at full res).</li>
         <li><b>Aspect</b> locks the composition to any common ratio before export.</li>
       </ul>
