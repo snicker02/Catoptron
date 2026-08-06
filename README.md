@@ -104,7 +104,7 @@ result of the one above it.
 
 ## 6. Operator reference
 
-All 96 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
+All 109 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
 reveal the rest once you pick a mode.
 
 ### Basic transforms
@@ -138,6 +138,10 @@ reveal the rest once you pick a mode.
 | **Quasicrystal** | 5-fold quasicrystal interference shimmer | Freq, Amp |
 | **Penrose fold** | Golden-ratio Penrose lattice fold | Scale |
 | **Shape warp** | Shape-boundary warp bank — 10 shapes × 6 warp modes (see below) | Shape, Warp mode, + |
+| **Tessellated** | Grid/distort tiling bank — 10 modes × 6 symmetries (see below) | Mode, Symmetry, Scale, + |
+| **Tri lattice** | Triangular-lattice fold (morphable) | Scale, Morph |
+| **Truchet2** | Truchet arc tiling (random per-cell orientation) | Exponents, Widths, Tiles, Seed, Inverse |
+| **Weave** | Over/under basket-weave distortion | Scale, Warp |
 
 ### Swirls, spirals & waves
 | Fold | What it does | Key params |
@@ -165,6 +169,12 @@ reveal the rest once you pick a mode.
 | **Wave bank** | 17-style mega wave warper (see below) | Style, + per-style knobs |
 | **Pleat** | Folded-paper pleats | Angle°, Width, Tilt° |
 | **Petal** | Flower-petal lobes | Lobes, Amp |
+| **Wedge** | Angular pie-slice fan with swirl | Angle, Hole, Count, Swirl |
+| **Whorl** | Inside/outside differential spiral | Inside, Outside |
+| **Tidal lock** | Angular ratio spin with eccentric wobble | Ratio, Ecc |
+| **Wood grain** | Concentric wood-ring displacement | Freq, Amp, Grain, Grain freq |
+| **Target** | Log-ring alternating angular rotate | Even, Odd, Size |
+| **Target sp** | Target with log-spiral tweak | Twist, N of sp, Size, Tightness |
 
 ### Lenses, rings & bubbles
 | Fold | What it does | Key params |
@@ -205,6 +215,7 @@ reveal the rest once you pick a mode.
 | **Bipolar** | Bipolar conformal map — lens/eye stretches | Amount, Shift |
 | **Elliptic** | Elliptic conformal map | Amount, Mode |
 | **Disc** | Disc-family conformal maps (disc, idisc, wdisc, fdisc, edisc, spiral, squircle, tan, sech) | Mode, Amount, Twist, Petal |
+| **Zhukowski** | Joukowski airfoil conformal map | c |
 
 ### Fractal folds
 | Fold | What it does | Key params |
@@ -223,6 +234,8 @@ reveal the rest once you pick a mode.
 | **Apollonian** | Apollonian gasket circle packing | Iters, Radius, Scale |
 | **Juliascope** | Julia-set wedge mapping | Power, Dist, Wedge cover, Iters |
 | **Julian** | Julia mapping | Power, Dist, Wedge cover |
+| **Worley** | Worley / cellular (F1) noise fold | Scale, Jitter |
+| **Voronoi fold** | Voronoi-cell fold toward nearest site | Scale, Fold |
 
 ### The big multi-mode banks
 
@@ -247,6 +260,15 @@ reveal the rest once you pick a mode.
 - **BusyBrad** — the grid version of the lazy family: tiles the plane into cells (Grid size), each
   running a **Susan / Jess / Combined** swirl, with Spin, Twist, Space, N, offsets, and a Sensen
   fold. Grid size 0 makes it a single centered swirl.
+- **Shape warp** — a warp bank driven by a shape boundary: pick a **Shape** (square, rectangle,
+  circle, diamond, triangle, pentagon, hexagon, flower, star, cloud) whose outline sets an
+  inner→outer falloff, then a **Warp mode** (rotate, scale-radial, swirl, scale-XY, fisheye,
+  shear) applied by that falloff. Shape-specific knobs appear only for the relevant shape.
+- **Tessellated** — a tiling/distortion bank: pick a **Mode** (square power/sine/radial, hex
+  offset, true hex, radial tiling, exp-log, tangent, polynomial, Julia) and a **Symmetry**
+  (none, X/Y-reflect, quadrant, D4, Dn). **Scale** sets cell density; **Edge blend** softens cell
+  seams; **Grid/Cell rotate** with a **Rotate pattern** (checker/rows/columns) spin whole cells.
+  Mode-specific knobs (Num sectors, Julia iters, Fold n) show only when relevant.
 
 ### Recolor
 - **Counterchange** — the one fold that changes **color, not geometry**. It splits the plane into
@@ -347,7 +369,7 @@ modules load.
 **Local testing**: ES modules don't load from `file://`, so run a static server from the repo
 folder — `python -m http.server 8000` — and open `http://localhost:8000`.
 
-**Validation**: all 96 operators × 9 renderers (864 combinations) and all 93 preset recipes are
+**Validation**: all 109 operators × 9 renderers (981 combinations) and all 93 preset recipes are
 compiled *and* rendered through headless ANGLE (the same `WebGL GLSL ES 1.0` path the browser
 uses). The one thing only a real browser exercises is `KHR_parallel_shader_compile` — the async
 recompile when you add or reorder a fold — so it's worth a quick check that reordering stays smooth.
