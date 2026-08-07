@@ -2151,5 +2151,28 @@ const OPS = [
   float slide=(floor(lum*bands)/bands - 0.5)*amt;
   return amount*(q + d*slide);
 }` },
+  { name:'Multi-fold IFS', fn:'opMultiIfs', deps:[],
+    params:[["Iters",1,12,1,6],["Centers",2,8,1,3],["Scale",1.02,2,0.005,1.4],["Angle°",-180,180,0.5,0],["Radius",0.2,2.5,0.01,1]],
+    glsl:`vec2 opMultiIfs(vec2 q, vec4 P0, vec4 P1){
+  float iters=P0.x, N=max(P0.y,1.0), scale=P0.z, ang=P0.w, rad=P1.x;
+  mat2 R=rot(ang*DEG);
+  vec2 p=q;
+  for(int i=0;i<12;i++){
+    if(float(i)>=iters) break;
+    vec2 best=vec2(0.0);
+    float bd=1e9;
+    for(int k=0;k<8;k++){
+      if(float(k)>=N) break;
+      float a=TAU*float(k)/N;
+      vec2 c=vec2(cos(a),sin(a))*rad;
+      float d=dot(p-c,p-c);
+      if(d<bd){ bd=d; best=c; }
+    }
+    vec2 rel=p-best;
+    rel=R*rel*scale;
+    p=best+rel;
+  }
+  return p;
+}` },
 ];
 export { OPS };
