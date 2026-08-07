@@ -1,5 +1,7 @@
 # Catoptron — User Guide
 
+*Catoptron* (from the Greek **κάτοπτρον**, "mirror") — the root of *catoptrics*, the classical science of reflection. A fitting name for a tool whose oldest heart is mirrors and reflected light, though it has since grown into a general image-folding engine where reflection is just one of ten renderers.
+
 Catoptron turns a photo (or a built-in pattern) into kaleidoscopic, fractal, and
 conformal artwork. You build an effect by **stacking coordinate "folds"** and choosing a
 **renderer** that reflects/recurses the result, then dress it with color, framing, and motion.
