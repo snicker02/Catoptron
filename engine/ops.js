@@ -2188,5 +2188,33 @@ const OPS = [
   }
   return p;
 }` },
+  { name:'Inversive IFS', fn:'opInvIfs', deps:[],
+    params:[["Iters",1,16,1,8],["Circles",2,8,1,3],["Circle radius",0.1,2,0.01,0.8],["Ring radius",0.2,2.5,0.01,1],["Spin°",-180,180,0.5,0],["Offset°",-180,180,0.5,0],["Mode",0,1,1,0,["Limit set","Kaleido"]],["Blend",0,1,0.01,1]],
+    glsl:`vec2 opInvIfs(vec2 q, vec4 P0, vec4 P1){
+  float iters=P0.x, N=max(P0.y,1.0), crad=P0.z, rad=P0.w;
+  float spin=P1.x*DEG, offs=P1.y*DEG, mode=P1.z, blend=P1.w;
+  vec2 p=q;
+  mat2 R=rot(spin);
+  float r2=crad*crad;
+  for(int i=0;i<16;i++){
+    if(float(i)>=iters) break;
+    vec2 best=vec2(0.0); float bd=1e9;
+    for(int k=0;k<8;k++){
+      if(float(k)>=N) break;
+      float a=TAU*float(k)/N + offs;
+      vec2 c=vec2(cos(a),sin(a))*rad;
+      float dd=dot(p-c,p-c);
+      if(dd<bd){ bd=dd; best=c; }
+    }
+    vec2 d=p-best; float d2=dot(d,d);
+    if(mode<0.5){
+      if(d2 < r2) p = best + r2*d/max(d2,1e-4);
+    } else {
+      p = best + r2*d/max(d2,1e-4);
+    }
+    p = R*p;
+  }
+  return mix(q, p, blend);
+}` },
 ];
 export { OPS };
