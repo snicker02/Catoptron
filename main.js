@@ -22,7 +22,15 @@ uniform float uVign;
 uniform float uGrain;
 uniform float uWavePh;
 uniform float uSeed;
+uniform float uExposure;
+uniform float uContrast;
+uniform float uSat;
+uniform float uWarm;
+uniform float uPosterize;
+uniform float uScan;
+uniform float uHueRot;
 float hash1(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)) + uSeed)*43758.5453); }
+vec3 hueShift(vec3 c, float a){ const vec3 k = vec3(0.57735027); return c*cos(a) + cross(k, c)*sin(a) + k*dot(k, c)*(1.0-cos(a)); }
 void main(){
   vec3 col = texture2D(uSrc, vUv).rgb;
   vec2 vq = vUv - 0.5;
@@ -30,6 +38,15 @@ void main(){
   if(uGrain > 0.001){
     col += (hash1(gl_FragCoord.xy * 0.71 + fract(uWavePh)*7.0) - 0.5) * uGrain * 0.14;
   }
+  col *= uExposure;
+  col = (col - 0.5) * uContrast + 0.5;
+  float _lm = dot(col, vec3(0.299,0.587,0.114));
+  col = mix(vec3(_lm), col, uSat);
+  col.r *= 1.0 + uWarm*0.35; col.b *= 1.0 - uWarm*0.35;
+  if(abs(uHueRot) > 0.0001) col = hueShift(col, uHueRot);
+  if(uPosterize >= 1.5) col = floor(col * uPosterize + 0.5) / uPosterize;
+  if(uScan > 0.001){ float _sl = 0.5 + 0.5*cos(gl_FragCoord.y * 3.14159265); col *= 1.0 - uScan*0.6*_sl; }
+  col = clamp(col, 0.0, 1.0);
   gl_FragColor = vec4(col, 1.0);
 }`;
 
@@ -58,7 +75,7 @@ gl.attachShader(postProg, compile(gl.FRAGMENT_SHADER, POSTFS));
 gl.linkProgram(postProg);
 if(!gl.getProgramParameter(postProg, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(postProg));
 const PU = {};
-['uSrc','uVign','uGrain','uWavePh','uSeed'].forEach(n => PU[n] = gl.getUniformLocation(postProg, n));
+['uSrc','uVign','uGrain','uWavePh','uSeed','uExposure','uContrast','uSat','uWarm','uPosterize','uScan','uHueRot'].forEach(n => PU[n] = gl.getUniformLocation(postProg, n));
 const postLoc = gl.getAttribLocation(postProg, 'aPos');
 
 /* ================= assembled-program cache ================= */
@@ -296,6 +313,8 @@ const state = {
   frame: 0.45, frameW: 0.035, tint: '#5d8f86', tintA: 0.30,
   hue: 0, chroma: 0, ripple: 0, vign: 0.35, grain: 0.06,
   drift: 0.15, spin: 0, wobble: 0, rot: 0,
+  exposure: 1, contrast: 1, sat: 1, warm: 0, posterize: 0, scan: 0,
+  pulse: 0, sway: 0, hueCycle: 0,
   cx: 0.5, cy: 0.5, seed: 7.13, aspect: 'free', fbAmt: 0.9, src: 'orbs',
   ccMode: 0, ccTint: '#ff5d7a',
   srcScale: 1, srcHue: 0, srcVar: 0.5
@@ -434,6 +453,15 @@ const sliders = [
   ['spin','spinV',    v=>v.toFixed(2)],
   ['rot','rotV',      v=>v.toFixed(0)],
   ['wobble','wobbleV',v=>v.toFixed(2)],
+  ['exposure','exposureV',v=>v.toFixed(2)],
+  ['contrast','contrastV',v=>v.toFixed(2)],
+  ['sat','satV',v=>v.toFixed(2)],
+  ['warm','warmV',v=>v.toFixed(2)],
+  ['posterize','posterizeV',v=>v.toFixed(0)],
+  ['scan','scanV',v=>v.toFixed(2)],
+  ['pulse','pulseV',v=>v.toFixed(2)],
+  ['sway','swayV',v=>v.toFixed(2)],
+  ['hueCycle','hueCycleV',v=>v.toFixed(2)],
   ['srcScale','srcScaleV',v=>v.toFixed(2)],
   ['srcHue','srcHueV',v=>v.toFixed(0)],
   ['srcVar','srcVarV',v=>v.toFixed(2)],
@@ -768,6 +796,15 @@ function applyPreset(val){
     if('ripple' in d) state.ripple = d.ripple;
     if('vign'  in d) state.vign  = d.vign;
     if('grain' in d) state.grain = d.grain;
+    if('exposure' in d) state.exposure = d.exposure;
+    if('contrast' in d) state.contrast = d.contrast;
+    if('sat' in d) state.sat = d.sat;
+    if('warm' in d) state.warm = d.warm;
+    if('posterize' in d) state.posterize = d.posterize;
+    if('scan' in d) state.scan = d.scan;
+    if('pulse' in d) state.pulse = d.pulse;
+    if('sway' in d) state.sway = d.sway;
+    if('hueCycle' in d) state.hueCycle = d.hueCycle;
     if('tint'  in d) state.tint  = d.tint;
     if('tintA' in d) state.tintA = d.tintA;
     if('zoom'  in d) state.zoom  = d.zoom;
@@ -1083,6 +1120,7 @@ function toast(msg){
 /* ================= render loop ================= */
 function hexToRgb(h){ return [1,3,5].map(i=> parseInt(h.slice(i,i+2),16)/255); }
 let phase = 0, spinA = 0, wavePh = 0, lastT = performance.now();
+let pulsePh = 0, swayPh = 0, hueRotPh = 0;
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* aspect lock: letterbox the canvas inside the stage */
@@ -1165,9 +1203,9 @@ function setUniforms(entry, w, h){
   gl.uniform1f(L.uStep, state.step);
   gl.uniform1f(L.uTwist, state.twist * Math.PI/180);
   gl.uniform1f(L.uFlip, state.flip);
-  gl.uniform2f(L.uCenter, state.cx, state.cy);
+  gl.uniform2f(L.uCenter, state.cx + 0.05*state.sway*Math.sin(swayPh), state.cy + 0.05*state.sway*Math.cos(swayPh*0.9));
   gl.uniform2f(L.uShift, state.shiftX, state.shiftY);
-  gl.uniform1f(L.uZoom, state.zoom);
+  gl.uniform1f(L.uZoom, state.zoom * (1.0 + 0.15*state.pulse*Math.sin(pulsePh)));
   gl.uniform1f(L.uFrame, state.frame);
   gl.uniform1f(L.uFrameW, state.frameW);
   const t = hexToRgb(state.tint);
@@ -1178,6 +1216,13 @@ function setUniforms(entry, w, h){
   gl.uniform1f(L.uRipple, state.ripple);
   gl.uniform1f(L.uVign, state.vign);
   gl.uniform1f(L.uGrain, state.grain);
+  gl.uniform1f(L.uExposure, state.exposure);
+  gl.uniform1f(L.uContrast, state.contrast);
+  gl.uniform1f(L.uSat, state.sat);
+  gl.uniform1f(L.uWarm, state.warm);
+  gl.uniform1f(L.uPosterize, state.posterize);
+  gl.uniform1f(L.uScan, state.scan);
+  gl.uniform1f(L.uHueRot, hueRotPh);
   gl.uniform1f(L.uPhase, phase);
   gl.uniform1f(L.uSpinA, spinA + (state.rot || 0) * Math.PI / 180);
   gl.uniform1f(L.uWavePh, wavePh);
@@ -1203,6 +1248,13 @@ function presentFeedback(w, h, srcTexIdx){
   gl.uniform1f(PU.uGrain, state.grain);
   gl.uniform1f(PU.uWavePh, wavePh);
   gl.uniform1f(PU.uSeed, state.seed);
+  gl.uniform1f(PU.uExposure, state.exposure);
+  gl.uniform1f(PU.uContrast, state.contrast);
+  gl.uniform1f(PU.uSat, state.sat);
+  gl.uniform1f(PU.uWarm, state.warm);
+  gl.uniform1f(PU.uPosterize, state.posterize);
+  gl.uniform1f(PU.uScan, state.scan);
+  gl.uniform1f(PU.uHueRot, hueRotPh);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 
@@ -1285,6 +1337,9 @@ function frame(now){
     phase  += dt * state.drift * 0.6;
     spinA  += dt * state.spin * 0.5;
     wavePh += dt * state.wobble * 1.5;
+    pulsePh += dt * 1.8;
+    swayPh  += dt * 1.3;
+    hueRotPh += dt * state.hueCycle * 0.7;
   }
   if(kfPlaying && !paused) kfTick(dt);
   const period = state.flip ? 2 : 1;
@@ -1594,13 +1649,14 @@ hqBtn.addEventListener('click', async ()=>{
 
   exporting = true; hqAbort = false;
   hqBtn.classList.add('on');
-  const save = {phase, spinA, wavePh, cw:canvas.width, ch:canvas.height};
+  const save = {phase, spinA, wavePh, pulsePh, swayPh, hueRotPh, cw:canvas.width, ch:canvas.height};
   const kfBase = kfActive() ? kfSnapshot() : null;
   canvas.width = ew; canvas.height = eh;
   if(lenSel === 'loop1' || lenSel === 'loop2') phase = 0;
 
   const step = ()=>{
     phase += phaseStep; spinA += spinStep; wavePh += waveStep;
+    pulsePh += (1/fps) * 1.8; swayPh += (1/fps) * 1.3; hueRotPh += (1/fps) * state.hueCycle * 0.7;
     phase = ((phase % period) + period) % period;
   };
   const breathe = ()=> new Promise(r => requestAnimationFrame(r));
@@ -1656,6 +1712,7 @@ hqBtn.addEventListener('click', async ()=>{
   } finally {
     canvas.width = save.cw; canvas.height = save.ch;
     phase = save.phase; spinA = save.spinA; wavePh = save.wavePh;
+    pulsePh = save.pulsePh; swayPh = save.swayPh; hueRotPh = save.hueRotPh;
     exporting = false;
     if(kfBase) kfRestore(kfBase);
     hqBtn.classList.remove('on');
@@ -1685,7 +1742,7 @@ $('exportBtn').addEventListener('click', async ()=>{
   const rw = ow * ss, rh = oh * ss;
 
   exporting = true;
-  const save = {phase, spinA, wavePh};
+  const save = {phase, spinA, wavePh, pulsePh, swayPh, hueRotPh};
   btn.textContent = 'rendering\u2026';
   try{
     canvas.width = rw; canvas.height = rh;
@@ -1699,6 +1756,7 @@ $('exportBtn').addEventListener('click', async ()=>{
         phase  += (1/60) * state.drift * 0.6;
         spinA  += (1/60) * state.spin * 0.5;
         wavePh += (1/60) * state.wobble * 1.5;
+        pulsePh += (1/60) * 1.8; swayPh += (1/60) * 1.3; hueRotPh += (1/60) * state.hueCycle * 0.7;
         phase = ((phase % period) + period) % period;
         if(i % 20 === 0){ btn.textContent = `warmup ${i}/${warm}`; await new Promise(r => requestAnimationFrame(r)); }
       }
@@ -1730,6 +1788,7 @@ $('exportBtn').addEventListener('click', async ()=>{
   } finally {
     canvas.width = pw; canvas.height = ph2;
     phase = save.phase; spinA = save.spinA; wavePh = save.wavePh;
+    pulsePh = save.pulsePh; swayPh = save.swayPh; hueRotPh = save.hueRotPh;
     exporting = false;
     btn.textContent = 'Export PNG';
   }
