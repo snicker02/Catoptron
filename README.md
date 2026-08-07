@@ -227,7 +227,7 @@ reveal the rest once you pick a mode.
 | Fold | What it does | Key params |
 |---|---|---|
 | **KIFS** | Kaleidoscopic IFS fractal fold | Iters, Fold, Angle°, Scale |
-| **Multi-fold IFS** | Multi-attractor KIFS: each iteration folds toward the *nearest* of N ring-arranged centres (a deterministic stand-in for an IFS's random map pick) | Iters, Centres, Scale, Angle°, Radius |
+| **Multi-fold IFS** | Multi-attractor KIFS: each iteration folds toward the *nearest* of N ring-arranged centres (a deterministic stand-in for an IFS's random map pick). Fold adds a KIFS abs-crinkle per centre, Radius decay nests the rings, Variation breaks the symmetry per centre | Iters, Centres, Scale, Angle°, Radius, Fold, Offset°, Radius decay, Variation |
 | **Koch fold** | Koch-curve folding (snowflake edges) | Iters, Scale |
 | **DModulus** | Double-modulus fractal tiling | Size X/Y, Angle°, Iters |
 | **Shatter** | Breaks the plane into tilted cells (shattered glass) | Cells, Tilt |
