@@ -2152,25 +2152,32 @@ const OPS = [
   return amount*(q + d*slide);
 }` },
   { name:'Multi-fold IFS', fn:'opMultiIfs', deps:[],
-    params:[["Iters",1,12,1,6],["Centers",2,8,1,3],["Scale",1.02,2,0.005,1.4],["Angle°",-180,180,0.5,0],["Radius",0.2,2.5,0.01,1]],
-    glsl:`vec2 opMultiIfs(vec2 q, vec4 P0, vec4 P1){
-  float iters=P0.x, N=max(P0.y,1.0), scale=P0.z, ang=P0.w, rad=P1.x;
-  mat2 R=rot(ang*DEG);
+    params:[["Iters",1,12,1,6],["Centers",2,8,1,3],["Scale",1.02,2,0.005,1.4],["Angle°",-180,180,0.5,0],["Radius",0.2,2.5,0.01,1],["Fold",0,1,0.005,0],["Offset°",-180,180,0.5,0],["Radius decay",0.5,1.5,0.005,1],["Variation",0,1,0.01,0]],
+    glsl:`vec2 opMultiIfs(vec2 q, vec4 P0, vec4 P1, vec4 P2){
+  float iters=P0.x, N=max(P0.y,1.0), scale=P0.z, ang=P0.w;
+  float rad=P1.x, fold=P1.y, offs=P1.z*DEG, decay=P1.w;
+  float variation=P2.x;
   vec2 p=q;
+  float rr=rad;
   for(int i=0;i<12;i++){
     if(float(i)>=iters) break;
     vec2 best=vec2(0.0);
-    float bd=1e9;
+    float bd=1e9, bestVar=0.0;
     for(int k=0;k<8;k++){
       if(float(k)>=N) break;
-      float a=TAU*float(k)/N;
-      vec2 c=vec2(cos(a),sin(a))*rad;
+      float a=TAU*float(k)/N + offs;
+      vec2 c=vec2(cos(a),sin(a))*rr;
       float d=dot(p-c,p-c);
-      if(d<bd){ bd=d; best=c; }
+      if(d<bd){ bd=d; best=c; bestVar=fract(sin(float(k)*97.13)*43758.5453); }
     }
+    float vfac=(bestVar-0.5)*variation;
+    float sc=scale*(1.0+vfac*0.8);
+    mat2 Rk=rot((ang+vfac*180.0)*DEG);
     vec2 rel=p-best;
-    rel=R*rel*scale;
+    if(fold>0.001) rel=abs(rel)-fold*rr;
+    rel=Rk*rel*sc;
     p=best+rel;
+    rr*=decay;
   }
   return p;
 }` },
