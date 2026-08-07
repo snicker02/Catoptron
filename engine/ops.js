@@ -2152,32 +2152,39 @@ const OPS = [
   return amount*(q + d*slide);
 }` },
   { name:'Multi-fold IFS', fn:'opMultiIfs', deps:[],
-    params:[["Iters",1,12,1,6],["Centers",2,8,1,3],["Scale",1.02,2,0.005,1.4],["Angle°",-180,180,0.5,0],["Radius",0.2,2.5,0.01,1],["Fold",0,1,0.005,0],["Offset°",-180,180,0.5,0],["Radius decay",0.5,1.5,0.005,1],["Variation",0,1,0.01,0]],
-    glsl:`vec2 opMultiIfs(vec2 q, vec4 P0, vec4 P1, vec4 P2){
+    params:[["Iters",1,12,1,6],["Centers",2,8,1,3],["Scale",1.02,2,0.005,1.4],["Angle°",-180,180,0.5,0],["Radius",0.2,2.5,0.01,1],["Fold",0,1,0.005,0],["Offset°",-180,180,0.5,0],["Radius decay",0.5,1.5,0.005,1],["Variation",0,1,0.01,0],["Shear",-1,1,0.01,0],["Softness",0,1,0.01,0],["Precession°",-45,45,0.5,0],["Pull",-0.6,0.6,0.005,0]],
+    glsl:`vec2 opMultiIfs(vec2 q, vec4 P0, vec4 P1, vec4 P2, vec4 P3){
   float iters=P0.x, N=max(P0.y,1.0), scale=P0.z, ang=P0.w;
   float rad=P1.x, fold=P1.y, offs=P1.z*DEG, decay=P1.w;
-  float variation=P2.x;
+  float variation=P2.x, shear=P2.y, soft=P2.z, prec=P2.w*DEG;
+  float pull=P3.x;
   vec2 p=q;
-  float rr=rad;
+  float rr=rad, off=offs;
   for(int i=0;i<12;i++){
     if(float(i)>=iters) break;
-    vec2 best=vec2(0.0);
-    float bd=1e9, bestVar=0.0;
+    vec2 best=vec2(0.0), wsum=vec2(0.0);
+    float bd=1e9, bestVar=0.0, wtot=0.0;
     for(int k=0;k<8;k++){
       if(float(k)>=N) break;
-      float a=TAU*float(k)/N + offs;
+      float a=TAU*float(k)/N + off;
       vec2 c=vec2(cos(a),sin(a))*rr;
       float d=dot(p-c,p-c);
       if(d<bd){ bd=d; best=c; bestVar=fract(sin(float(k)*97.13)*43758.5453); }
+      float w=1.0/(d+0.05);
+      wsum+=c*w; wtot+=w;
     }
+    vec2 center=mix(best, wsum/max(wtot,1e-4), soft);
     float vfac=(bestVar-0.5)*variation;
     float sc=scale*(1.0+vfac*0.8);
     mat2 Rk=rot((ang+vfac*180.0)*DEG);
-    vec2 rel=p-best;
+    vec2 rel=p-center;
     if(fold>0.001) rel=abs(rel)-fold*rr;
+    rel.x += rel.y*shear;
     rel=Rk*rel*sc;
-    p=best+rel;
+    p=center+rel;
+    p=mix(p, center, pull);
     rr*=decay;
+    off+=prec;
   }
   return p;
 }` },
