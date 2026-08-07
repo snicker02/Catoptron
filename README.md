@@ -108,7 +108,7 @@ result of the one above it.
 
 ## 6. Operator reference
 
-All 116 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
+All 122 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
 reveal the rest once you pick a mode.
 
 ### Basic transforms
@@ -249,9 +249,20 @@ Digital-corruption folds — all keyed to the global **Seed**, so **Reseed** rer
 | **Row tear** | Offsets horizontal bands sideways (VHS tearing) | Bands, Shift, Density |
 | **Bit crush** | Snaps coordinates to a coarse grid (chunky mosaic) | Levels, Mix |
 | **Shear cascade** | Per-band horizontal shear that jumps at hashed steps | Steps, Shear |
-| **Luma displace** | Pushes coordinates along the image's own brightness (self-melt) | Push, Freq |
 | **DCT ring** | 8×8-style block quantize with a cosine wobble (JPEG ringing) | Size, Ring, Freq |
 | **Block shuffle** | Snaps whole blocks to a different grid cell (tile-swap) | Size, Density, Spread |
+
+### Image-driven folds
+These read the **photo itself** — sampling brightness, colour, or the local gradient at each point and letting the image content steer the warp. Order matters especially here: placed after another fold, they read the *already-folded* image. No Seed dependence — they're driven by the picture, not randomness.
+| Fold | What it does | Key params |
+|---|---|---|
+| **Luma displace** | Pushes coordinates along the image's own brightness (self-melt) | Push, Freq |
+| **Gradient displace** | Pushes along the brightness gradient — relief (downhill) or contour (perpendicular flow) | Push, Detail, Mode |
+| **Refract** | Treats brightness as a height field and refracts through it, like wet / rippled glass | Index, Detail |
+| **Flow march** | Marches coordinates along the image's flow for N steps — streamline smear (your flow-field plotter, in coordinate space) | Steps, Step len, Detail |
+| **Edge shock** | Displaces only where edges are strong; flat areas stay put | Push, Detail, Gate |
+| **Channel drive** | Steers the warp by a chosen channel (R / G / B) or hue instead of luma | Push, Channel, Freq |
+| **Value slide** | Slides sample position proportional to banded brightness — a pixel-sort cousin | Slide, Bands, Direction |
 
 ### The big multi-mode banks
 
@@ -392,7 +403,7 @@ modules load.
 **Local testing**: ES modules don't load from `file://`, so run a static server from the repo
 folder — `python -m http.server 8000` — and open `http://localhost:8000`.
 
-**Validation**: all 116 operators × 10 renderers (1,160 combinations) and all 93 preset recipes are
+**Validation**: all 122 operators × 10 renderers (1,220 combinations) and all 93 preset recipes are
 compiled *and* rendered through headless ANGLE (the same `WebGL GLSL ES 1.0` path the browser
 uses). The one thing only a real browser exercises is `KHR_parallel_shader_compile` — the async
 recompile when you add or reorder a fold — so it's worth a quick check that reordering stays smooth.
