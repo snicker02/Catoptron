@@ -104,6 +104,13 @@ const RENDERERS = {
     vec2 pf = f / vec2(ca, 1.0) + c + uShift * 0.05;
     if(uFlip > 0.5) pf.x = 2.0*c.x - pf.x;
     pf = rippled(pf, 1.5);
+    if(uMosh > 0.001){
+      vec2 mcell = floor(pf * mix(4.0, 28.0, uMosh));
+      float mstep = floor(uPhase * 3.0);
+      float mh = fract(sin(dot(mcell, vec2(127.1,311.7)) + uSeed + mstep)*43758.5453);
+      float mh2 = fract(sin(dot(mcell, vec2(269.5,183.3)) + uSeed + mstep)*43758.5453);
+      if(mh < uMosh*0.6) pf += (vec2(mh2, fract(mh*7.0)) - 0.5) * 0.12 * uMosh;
+    }
     vec3 fb;
     if(uChroma > 0.001){
       vec2 d2 = (pf - 0.5) * uChroma * 0.002;
@@ -165,6 +172,15 @@ const RENDERERS = {
     } else {
       col = shade(uv, 24.0, 999.0) * 0.10;
     }`,
+  9: `
+    vec2 d = (uv - c) * vec2(ca, 1.0);
+    d = rot(uTwist * 0.1) * d;
+    float dens = mix(1.5, 8.0, (uStep - 0.42) / 0.52);
+    float march = ph * 0.6 + d.x * dens;
+    vec2 p = vec2(d.x, d.y + march) + c + uShift;
+    if(uFlip > 0.5) p.x = 2.0*c.x - p.x;
+    float e = clamp(0.6 - abs(fract(d.y + march) - 0.5), 0.0, 999.0);
+    col = shade(p, 0.0, e);`,
 };
 
 // transitive closure of helper deps, emitted in dependency order
@@ -241,6 +257,23 @@ ${RENDERERS[rend]}
     if(abs(uHueRot) > 0.0001) col = hueShift(col, uHueRot);
     if(uPosterize >= 1.5) col = floor(col * uPosterize + 0.5) / uPosterize;
     if(uScan > 0.001){ float _sl = 0.5 + 0.5*cos(gl_FragCoord.y * 3.14159265); col *= 1.0 - uScan*0.6*_sl; }
+    col = clamp(col, 0.0, 1.0);
+    if(uChanSwap > 0.001){
+      float hcs = fract(sin(dot(floor(gl_FragCoord.xy/14.0), vec2(127.1,311.7))+uSeed)*43758.5453);
+      if(hcs < uChanSwap) col = (hcs < uChanSwap*0.5) ? col.gbr : col.brg;
+    }
+    if(uDropout > 0.001){
+      float hdo = fract(sin(dot(floor(gl_FragCoord.xy/11.0), vec2(269.5,183.3))+uSeed*1.7)*43758.5453);
+      if(hdo < uDropout){ float kk=fract(hdo*13.0); col = (kk<0.4)?vec3(0.0):((kk<0.7)?vec3(1.0):(vec3(1.0)-col)); }
+    }
+    if(uDither >= 1.5){
+      float bay = fract(sin(dot(floor(gl_FragCoord.xy), vec2(12.9898,78.233)))*43758.5453);
+      col = floor(col*uDither + bay)/uDither;
+    }
+    if(uNoiseG > 0.001){
+      float hno = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233)) + uSeed + fract(uWavePh)*31.0)*43758.5453);
+      col += (hno-0.5)*uNoiseG;
+    }
     col = clamp(col, 0.0, 1.0);
   }
   gl_FragColor = vec4(col, 1.0);
