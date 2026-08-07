@@ -967,7 +967,7 @@ $('exportPresets').addEventListener('click', ()=>{
   const blob = new Blob([JSON.stringify(customPresets, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'hall-of-mirrors-presets.json';
+  a.download = 'catoptron-presets.json';
   a.click();
   setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
 });
@@ -1490,7 +1490,7 @@ recBtn.addEventListener('click', ()=>{
     const blob = new Blob(recChunks, {type: mime || 'video/webm'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `hall-of-mirrors-${Date.now()}.` + (/mp4/.test(mime)?'mp4':'webm');
+    a.download = `catoptron-${Date.now()}.` + (/mp4/.test(mime)?'mp4':'webm');
     a.click();
     setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
     recorder = null;
@@ -1556,8 +1556,8 @@ function WebMMuxer(width, height, codecId){
     const info = el([0x15,0x49,0xA9,0x66], cat([
       el([0x2A,0xD7,0xB1], u(1000000)),
       el([0x44,0x89], f64b(durMs)),
-      el([0x4D,0x80], txt('hall-of-mirrors')),
-      el([0x57,0x41], txt('hall-of-mirrors')),
+      el([0x4D,0x80], txt('catoptron')),
+      el([0x57,0x41], txt('catoptron')),
     ]));
     const tracks = el([0x16,0x54,0xAE,0x6B],
       el([0xAE], cat([
@@ -1778,7 +1778,7 @@ hqBtn.addEventListener('click', async ()=>{
       const blob = mux.finish();
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `hall-of-mirrors-hq-${Date.now()}.${ext}`;
+      a.download = `catoptron-hq-${Date.now()}.${ext}`;
       a.click();
       setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
       toast(`HQ export: ${ew}\u00d7${eh}, ${frames} frames, ${ext.toUpperCase()}`);
@@ -1859,7 +1859,7 @@ $('exportBtn').addEventListener('click', async ()=>{
     }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `hall-of-mirrors-${Date.now()}.png`;
+    a.download = `catoptron-${Date.now()}.png`;
     a.click();
     setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
     toast(`exported ${ow}\u00d7${oh}${ss === 2 ? ' (2\u00d7 SSAA)' : ''}`);
