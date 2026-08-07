@@ -592,7 +592,7 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
       </ul>
 
       <h2>Operator reference</h2>
-      <p>All 116 folds, grouped by what they do. The big multi-mode banks are described below the tables.</p>
+      <p>All 122 folds, grouped by what they do. The big multi-mode banks are described below the tables.</p>
 
       <h3>Basic transforms</h3>
       <table><tr><th>Fold</th><th>What it does</th><th>Key params</th></tr>
@@ -722,6 +722,29 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Julian</td><td>Julia mapping</td><td>Power, Dist, Wedge</td></tr>
         <tr><td>Worley</td><td>Worley / cellular (F1) noise fold</td><td>Scale, Jitter</td></tr>
         <tr><td>Voronoi fold</td><td>Voronoi-cell fold toward nearest site</td><td>Scale, Fold</td></tr>
+      </table>
+
+      <h3>Glitch folds</h3>
+      <p>Digital-corruption folds — all keyed to the global <b>Seed</b>, so <b>Reseed</b> rerolls their block / tear patterns.</p>
+      <table><tr><th>Fold</th><th>What it does</th><th>Key params</th></tr>
+        <tr><td>Block displace</td><td>Quantizes into blocks and jumps each a hashed distance</td><td>Size, Shift, Density</td></tr>
+        <tr><td>Row tear</td><td>Offsets horizontal bands sideways (VHS tearing)</td><td>Bands, Shift, Density</td></tr>
+        <tr><td>Bit crush</td><td>Snaps coordinates to a coarse grid (chunky mosaic)</td><td>Levels, Mix</td></tr>
+        <tr><td>Shear cascade</td><td>Per-band horizontal shear that jumps at hashed steps</td><td>Steps, Shear</td></tr>
+        <tr><td>DCT ring</td><td>8&times;8-style block quantize with a cosine wobble (JPEG ringing)</td><td>Size, Ring, Freq</td></tr>
+        <tr><td>Block shuffle</td><td>Snaps whole blocks to a different grid cell (tile-swap)</td><td>Size, Density, Spread</td></tr>
+      </table>
+
+      <h3>Image-driven folds</h3>
+      <p>These read the <b>photo itself</b> — sampling brightness, colour, or the local gradient and letting image content steer the warp. Order matters: placed after another fold, they read the <i>already-folded</i> image. No Seed dependence.</p>
+      <table><tr><th>Fold</th><th>What it does</th><th>Key params</th></tr>
+        <tr><td>Luma displace</td><td>Pushes coordinates along the image's own brightness (self-melt)</td><td>Push, Freq</td></tr>
+        <tr><td>Gradient displace</td><td>Pushes along the brightness gradient — relief or contour flow</td><td>Push, Detail, Mode</td></tr>
+        <tr><td>Refract</td><td>Brightness as a height field, refracted like wet glass</td><td>Index, Detail</td></tr>
+        <tr><td>Flow march</td><td>Marches along the image's flow for N steps — streamline smear</td><td>Steps, Step len, Detail</td></tr>
+        <tr><td>Edge shock</td><td>Displaces only where edges are strong; flat areas stay put</td><td>Push, Detail, Gate</td></tr>
+        <tr><td>Channel drive</td><td>Steers by a chosen channel (R/G/B) or hue instead of luma</td><td>Push, Channel, Freq</td></tr>
+        <tr><td>Value slide</td><td>Slides sample position by banded brightness — a pixel-sort cousin</td><td>Slide, Bands, Direction</td></tr>
       </table>
 
       <h3>The big multi-mode banks</h3>
