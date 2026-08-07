@@ -2066,5 +2066,90 @@ const OPS = [
   vec2 shift=(h<amt)?floor((vec2(h2,fract(h*11.0))-0.5)*spread)*size:vec2(0.0);
   return amount*(q + shift);
 }` },
+  { name:'Gradient displace', fn:'opGradientDisplace', deps:[],
+    params:[["Push",-1,1,0.01,0.4],["Detail",0.001,0.02,0.001,0.005],["Mode",0,1,1,0,["Relief","Contour"]],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opGradientDisplace(vec2 q, vec4 P){
+  float amt=P.x, eps=max(P.y,0.0005), mode=P.z, amount=(P.w<=0.0)?1.0:P.w;
+  float ca=uCanvas.x/uCanvas.y;
+  vec2 uv=q/vec2(ca,1.0)+uCenter;
+  float lx1=dot(photo(uv+vec2(eps,0.0)),vec3(0.299,0.587,0.114)), lx0=dot(photo(uv-vec2(eps,0.0)),vec3(0.299,0.587,0.114));
+  float ly1=dot(photo(uv+vec2(0.0,eps)),vec3(0.299,0.587,0.114)), ly0=dot(photo(uv-vec2(0.0,eps)),vec3(0.299,0.587,0.114));
+  vec2 g=vec2(lx1-lx0, ly1-ly0);
+  if(mode>0.5) g=vec2(-g.y, g.x);
+  return amount*(q + g*amt*vec2(ca,1.0));
+}` },
+  { name:'Refract', fn:'opRefract', deps:[],
+    params:[["Index",0,3,0.01,1.4],["Detail",0.001,0.02,0.001,0.005],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opRefract(vec2 q, vec4 P){
+  float ior=P.x, eps=max(P.y,0.0005), amount=(P.z<=0.0)?1.0:P.z;
+  float ca=uCanvas.x/uCanvas.y;
+  vec2 uv=q/vec2(ca,1.0)+uCenter;
+  float lx1=dot(photo(uv+vec2(eps,0.0)),vec3(0.299,0.587,0.114)), lx0=dot(photo(uv-vec2(eps,0.0)),vec3(0.299,0.587,0.114));
+  float ly1=dot(photo(uv+vec2(0.0,eps)),vec3(0.299,0.587,0.114)), ly0=dot(photo(uv-vec2(0.0,eps)),vec3(0.299,0.587,0.114));
+  vec2 grad=vec2(lx1-lx0, ly1-ly0);
+  vec3 nrm=normalize(vec3(-grad*4.0, 1.0));
+  vec2 bend=nrm.xy*(ior-1.0)*0.3;
+  return amount*(q + bend*vec2(ca,1.0));
+}` },
+  { name:'Flow march', fn:'opFlowMarch', deps:[],
+    params:[["Steps",1,24,1,8],["Step len",0,2,0.01,0.5],["Detail",0.001,0.02,0.001,0.005],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opFlowMarch(vec2 q, vec4 P){
+  float steps=P.x, sl=P.y, eps=max(P.z,0.0005), amount=(P.w<=0.0)?1.0:P.w;
+  float ca=uCanvas.x/uCanvas.y;
+  vec2 uv=q/vec2(ca,1.0)+uCenter;
+  int N=int(clamp(steps,1.0,24.0));
+  for(int i=0;i<24;i++){
+    if(i>=N) break;
+    float lx1=dot(photo(uv+vec2(eps,0.0)),vec3(0.299,0.587,0.114)), lx0=dot(photo(uv-vec2(eps,0.0)),vec3(0.299,0.587,0.114));
+    float ly1=dot(photo(uv+vec2(0.0,eps)),vec3(0.299,0.587,0.114)), ly0=dot(photo(uv-vec2(0.0,eps)),vec3(0.299,0.587,0.114));
+    vec2 g=vec2(-(lx1-lx0), -(ly1-ly0));
+    g=vec2(-g.y, g.x);
+    uv += g*sl*0.02;
+  }
+  vec2 nq=(uv-uCenter)*vec2(ca,1.0);
+  return amount*nq;
+}` },
+  { name:'Edge shock', fn:'opEdgeShock', deps:[],
+    params:[["Push",-1,1,0.01,0.35],["Detail",0.001,0.02,0.001,0.005],["Gate",0,1,0.01,0.12],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opEdgeShock(vec2 q, vec4 P){
+  float amt=P.x, eps=max(P.y,0.0005), gate=P.z, amount=(P.w<=0.0)?1.0:P.w;
+  float ca=uCanvas.x/uCanvas.y;
+  vec2 uv=q/vec2(ca,1.0)+uCenter;
+  float lx1=dot(photo(uv+vec2(eps,0.0)),vec3(0.299,0.587,0.114)), lx0=dot(photo(uv-vec2(eps,0.0)),vec3(0.299,0.587,0.114));
+  float ly1=dot(photo(uv+vec2(0.0,eps)),vec3(0.299,0.587,0.114)), ly0=dot(photo(uv-vec2(0.0,eps)),vec3(0.299,0.587,0.114));
+  vec2 g=vec2(lx1-lx0, ly1-ly0);
+  float mag=length(g)*3.0;
+  float e=smoothstep(gate*0.5, gate*0.5+0.15, mag);
+  vec2 dir=(mag>0.0001)?g/mag:vec2(0.0);
+  return amount*(q + dir*e*amt*vec2(ca,1.0));
+}` },
+  { name:'Channel drive', fn:'opChannelDrive', deps:[],
+    params:[["Push",-1,1,0.01,0.35],["Channel",0,3,1,0,["Red","Green","Blue","Hue"]],["Freq",0.1,8,0.05,1],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opChannelDrive(vec2 q, vec4 P){
+  float amt=P.x, chan=P.y, freq=P.z, amount=(P.w<=0.0)?1.0:P.w;
+  float ca=uCanvas.x/uCanvas.y;
+  vec2 uv=q/vec2(ca,1.0)+uCenter;
+  vec3 c=photo(uv);
+  float v;
+  if(chan<0.5) v=c.r; else if(chan<1.5) v=c.g; else if(chan<2.5) v=c.b;
+  else { float mx=max(max(c.r,c.g),c.b), mn=min(min(c.r,c.g),c.b), d=mx-mn;
+    if(d<0.0001) v=0.0;
+    else if(mx==c.r) v=mod((c.g-c.b)/d,6.0)/6.0;
+    else if(mx==c.g) v=((c.b-c.r)/d+2.0)/6.0;
+    else v=((c.r-c.g)/d+4.0)/6.0; }
+  float a=v*freq*6.28318;
+  return amount*(q + vec2(cos(a),sin(a))*amt*v);
+}` },
+  { name:'Value slide', fn:'opValueSlide', deps:[],
+    params:[["Slide",-1,1,0.01,0.3],["Bands",2,64,1,16],["Direction",0,1,1,0,["Horizontal","Vertical"]],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opValueSlide(vec2 q, vec4 P){
+  float amt=P.x, bands=max(P.y,1.0), dir=P.z, amount=(P.w<=0.0)?1.0:P.w;
+  float ca=uCanvas.x/uCanvas.y;
+  vec2 uv=q/vec2(ca,1.0)+uCenter;
+  float lum=dot(photo(uv),vec3(0.299,0.587,0.114));
+  vec2 d=(dir<0.5)?vec2(1.0,0.0):vec2(0.0,1.0);
+  float slide=(floor(lum*bands)/bands - 0.5)*amt;
+  return amount*(q + d*slide);
+}` },
 ];
 export { OPS };
