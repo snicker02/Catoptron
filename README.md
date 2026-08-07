@@ -110,7 +110,7 @@ result of the one above it.
 
 ## 6. Operator reference
 
-All 123 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
+All 124 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
 reveal the rest once you pick a mode.
 
 ### Basic transforms
@@ -227,7 +227,7 @@ reveal the rest once you pick a mode.
 | Fold | What it does | Key params |
 |---|---|---|
 | **KIFS** | Kaleidoscopic IFS fractal fold | Iters, Fold, Angle°, Scale |
-| **Multi-fold IFS** | Multi-attractor KIFS: each iteration folds toward the *nearest* of N ring-arranged centres (a deterministic stand-in for an IFS's random map pick). Fold adds a KIFS abs-crinkle per centre, Radius decay nests the rings, Variation breaks the symmetry per centre | Iters, Centres, Scale, Angle°, Radius, Fold, Offset°, Radius decay, Variation |
+| **Multi-fold IFS** | Multi-attractor KIFS: each iteration folds toward the *nearest* of N ring-arranged centres (a deterministic stand-in for an IFS's random map pick). Fold adds a KIFS abs-crinkle per centre, Radius decay nests the rings, Variation breaks the symmetry per centre; Shear opens affine (fern-like) attractors, Softness blends crisp Voronoi facets into organic blobs, Precession spirals the ring per iteration, Pull biases contraction toward the nearest centre | Iters, Centres, Scale, Angle°, Radius, Fold, Offset°, Radius decay, Variation, Shear, Softness, Precession°, Pull |
 | **Koch fold** | Koch-curve folding (snowflake edges) | Iters, Scale |
 | **DModulus** | Double-modulus fractal tiling | Size X/Y, Angle°, Iters |
 | **Shatter** | Breaks the plane into tilted cells (shattered glass) | Cells, Tilt |
@@ -239,6 +239,7 @@ reveal the rest once you pick a mode.
 | **Kleinian** | Kleinian-group circle-inversion fractal | Circles, Radius, Iters, Scale, Bound, Spin°, Twist°, Frame |
 | **Fuchsian** | Fuchsian group (hyperbolic tilings) | trace ta/tb/tab, Iters |
 | **Apollonian** | Apollonian gasket circle packing | Iters, Radius, Scale |
+| **Inversive IFS** | Chaos-game circle-inversion IFS — each iteration inverts through the *nearest* of N ring-arranged circles (inversive sibling of Multi-fold IFS; distinct from Kleinian's group and Apollonian's packing). Limit-set mode inverts only inside a circle; Kaleido inverts always | Iters, Circles, Circle radius, Ring radius, Spin°, Offset°, Mode, Blend |
 | **Juliascope** | Julia-set wedge mapping | Power, Dist, Wedge cover, Iters |
 | **Julian** | Julia mapping | Power, Dist, Wedge cover |
 | **Worley** | Worley / cellular (F1) noise fold | Scale, Jitter |
@@ -406,7 +407,7 @@ modules load.
 **Local testing**: ES modules don't load from `file://`, so run a static server from the repo
 folder — `python -m http.server 8000` — and open `http://localhost:8000`.
 
-**Validation**: all 123 operators × 10 renderers (1,230 combinations) and all 93 preset recipes are
+**Validation**: all 124 operators × 10 renderers (1,240 combinations) and all 93 preset recipes are
 compiled *and* rendered through headless ANGLE (the same `WebGL GLSL ES 1.0` path the browser
 uses). The one thing only a real browser exercises is `KHR_parallel_shader_compile` — the async
 recompile when you add or reorder a fold — so it's worth a quick check that reordering stays smooth.
