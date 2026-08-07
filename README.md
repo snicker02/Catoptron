@@ -1,6 +1,6 @@
-# Hall of Mirrors — User Guide
+# Catoptron — User Guide
 
-Hall of Mirrors turns a photo (or a built-in pattern) into kaleidoscopic, fractal, and
+Catoptron turns a photo (or a built-in pattern) into kaleidoscopic, fractal, and
 conformal artwork. You build an effect by **stacking coordinate "folds"** and choosing a
 **renderer** that reflects/recurses the result, then dress it with color, framing, and motion.
 Everything runs live on the GPU in your browser — no install, nothing uploaded.
