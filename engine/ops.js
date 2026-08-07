@@ -1999,5 +1999,72 @@ const OPS = [
   if(t<s2) a+=rota; else a+=rotb;
   return amount * r * vec2(cos(a), sin(a));
 }` },
+  { name:'Block displace', fn:'opBlockDisplace', deps:[],
+    params:[["Size",0.02,1,0.01,0.2],["Shift",0,1,0.01,0.25],["Density",0,1,0.01,0.6],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opBlockDisplace(vec2 q, vec4 P){
+  float size=max(abs(P.x),0.02), amt=P.y, prob=clamp(P.z,0.0,1.0), amount=(P.w<=0.0)?1.0:P.w;
+  vec2 cell=floor(q/size);
+  float h=fract(sin(dot(cell,vec2(127.1,311.7))+uSeed)*43758.5453);
+  float h2=fract(sin(dot(cell,vec2(269.5,183.3))+uSeed)*43758.5453);
+  vec2 jump=(h<prob)?(vec2(h2,fract(h*7.0))-0.5)*amt:vec2(0.0);
+  return amount*(q+jump);
+}` },
+  { name:'Row tear', fn:'opRowTear', deps:[],
+    params:[["Bands",2,80,1,24],["Shift",0,1,0.01,0.3],["Density",0,1,0.01,0.5],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opRowTear(vec2 q, vec4 P){
+  float bands=max(P.x,1.0), amt=P.y, prob=clamp(P.z,0.0,1.0), amount=(P.w<=0.0)?1.0:P.w;
+  float row=floor(q.y*bands);
+  float h=fract(sin(row*12.9898+uSeed)*43758.5453);
+  float h2=fract(sin(row*78.233+uSeed)*43758.5453);
+  float off=(h<prob)?(h2-0.5)*amt:0.0;
+  return amount*vec2(q.x+off, q.y);
+}` },
+  { name:'Bit crush', fn:'opBitCrush', deps:[],
+    params:[["Levels",1,64,1,8],["Mix",0,1,0.01,1],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opBitCrush(vec2 q, vec4 P){
+  float lv=max(P.x,1.0), mixv=clamp(P.y,0.0,1.0), amount=(P.z<=0.0)?1.0:P.z;
+  vec2 qc=floor(q*lv+0.5)/lv;
+  return amount*mix(q,qc,mixv);
+}` },
+  { name:'Shear cascade', fn:'opShearCascade', deps:[],
+    params:[["Steps",1,40,1,10],["Shear",-2,2,0.01,0.6],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opShearCascade(vec2 q, vec4 P){
+  float steps=max(P.x,1.0), amt=P.y, amount=(P.z<=0.0)?1.0:P.z;
+  float band=floor(q.y*steps);
+  float h=fract(sin(band*45.233+uSeed)*43758.5453);
+  float sh=(h-0.5)*amt;
+  return amount*vec2(q.x+sh, q.y);
+}` },
+  { name:'Luma displace', fn:'opLumaDisplace', deps:[],
+    params:[["Push",-1,1,0.01,0.35],["Freq",0.1,8,0.05,1],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opLumaDisplace(vec2 q, vec4 P){
+  float amt=P.x, freq=P.y, amount=(P.z<=0.0)?1.0:P.z;
+  float ca=uCanvas.x/uCanvas.y;
+  vec2 uv=q/vec2(ca,1.0)+uCenter;
+  vec3 c=photo(uv);
+  float lum=dot(c,vec3(0.299,0.587,0.114));
+  float a=lum*freq*6.28318;
+  return amount*(q + vec2(cos(a),sin(a))*amt*lum);
+}` },
+  { name:'DCT ring', fn:'opDctRing', deps:[],
+    params:[["Size",0.02,1,0.01,0.18],["Ring",0,1,0.01,0.4],["Freq",1,12,0.1,4],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opDctRing(vec2 q, vec4 P){
+  float size=max(abs(P.x),0.02), amt=P.y, freq=P.z, amount=(P.w<=0.0)?1.0:P.w;
+  vec2 cell=floor(q/size);
+  vec2 loc=q/size-cell-0.5;
+  float fx=loc.x*freq*3.14159, fy=loc.y*freq*3.14159;
+  vec2 ring=amt*0.5*vec2(cos(fx)*sin(fy), sin(fx)*cos(fy));
+  return amount*(q + ring*size);
+}` },
+  { name:'Block shuffle', fn:'opBlockShuffle', deps:[],
+    params:[["Size",0.05,1,0.01,0.25],["Density",0,1,0.01,0.5],["Spread",1,8,1,4],["Amount",0.1,3,0.01,1]],
+    glsl:`vec2 opBlockShuffle(vec2 q, vec4 P){
+  float size=max(abs(P.x),0.05), amt=clamp(P.y,0.0,1.0), spread=max(P.z,1.0), amount=(P.w<=0.0)?1.0:P.w;
+  vec2 cell=floor(q/size);
+  float h=fract(sin(dot(cell,vec2(127.1,311.7))+uSeed)*43758.5453);
+  float h2=fract(sin(dot(cell,vec2(269.5,183.3))+uSeed)*43758.5453);
+  vec2 shift=(h<amt)?floor((vec2(h2,fract(h*11.0))-0.5)*spread)*size:vec2(0.0);
+  return amount*(q + shift);
+}` },
 ];
 export { OPS };
