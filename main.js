@@ -29,10 +29,20 @@ uniform float uWarm;
 uniform float uPosterize;
 uniform float uScan;
 uniform float uHueRot;
+uniform float uChanSplit;
+uniform float uChanSwap;
+uniform float uDropout;
+uniform float uDither;
+uniform float uNoiseG;
+uniform float uInterlace;
 float hash1(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)) + uSeed)*43758.5453); }
 vec3 hueShift(vec3 c, float a){ const vec3 k = vec3(0.57735027); return c*cos(a) + cross(k, c)*sin(a) + k*dot(k, c)*(1.0-cos(a)); }
 void main(){
-  vec3 col = texture2D(uSrc, vUv).rgb;
+  vec2 sv = vUv;
+  if(uInterlace > 0.001){ float rr = step(0.5, fract(gl_FragCoord.y*0.25)); sv.x += (rr-0.5)*uInterlace*0.02; }
+  vec3 col;
+  if(uChanSplit > 0.001){ vec2 ds=vec2(uChanSplit*0.03,0.0); col=vec3(texture2D(uSrc,sv+ds).r, texture2D(uSrc,sv).g, texture2D(uSrc,sv-ds).b); }
+  else col = texture2D(uSrc, sv).rgb;
   vec2 vq = vUv - 0.5;
   col *= 1.0 - uVign * smoothstep(0.35, 0.95, dot(vq, vq)*2.2);
   if(uGrain > 0.001){
@@ -46,6 +56,23 @@ void main(){
   if(abs(uHueRot) > 0.0001) col = hueShift(col, uHueRot);
   if(uPosterize >= 1.5) col = floor(col * uPosterize + 0.5) / uPosterize;
   if(uScan > 0.001){ float _sl = 0.5 + 0.5*cos(gl_FragCoord.y * 3.14159265); col *= 1.0 - uScan*0.6*_sl; }
+  col = clamp(col, 0.0, 1.0);
+  if(uChanSwap > 0.001){
+    float hcs = fract(sin(dot(floor(gl_FragCoord.xy/14.0), vec2(127.1,311.7))+uSeed)*43758.5453);
+    if(hcs < uChanSwap) col = (hcs < uChanSwap*0.5) ? col.gbr : col.brg;
+  }
+  if(uDropout > 0.001){
+    float hdo = fract(sin(dot(floor(gl_FragCoord.xy/11.0), vec2(269.5,183.3))+uSeed*1.7)*43758.5453);
+    if(hdo < uDropout){ float kk=fract(hdo*13.0); col = (kk<0.4)?vec3(0.0):((kk<0.7)?vec3(1.0):(vec3(1.0)-col)); }
+  }
+  if(uDither >= 1.5){
+    float bay = fract(sin(dot(floor(gl_FragCoord.xy), vec2(12.9898,78.233)))*43758.5453);
+    col = floor(col*uDither + bay)/uDither;
+  }
+  if(uNoiseG > 0.001){
+    float hno = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233)) + uSeed + fract(uWavePh)*31.0)*43758.5453);
+    col += (hno-0.5)*uNoiseG;
+  }
   col = clamp(col, 0.0, 1.0);
   gl_FragColor = vec4(col, 1.0);
 }`;
@@ -75,7 +102,7 @@ gl.attachShader(postProg, compile(gl.FRAGMENT_SHADER, POSTFS));
 gl.linkProgram(postProg);
 if(!gl.getProgramParameter(postProg, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(postProg));
 const PU = {};
-['uSrc','uVign','uGrain','uWavePh','uSeed','uExposure','uContrast','uSat','uWarm','uPosterize','uScan','uHueRot'].forEach(n => PU[n] = gl.getUniformLocation(postProg, n));
+['uSrc','uVign','uGrain','uWavePh','uSeed','uExposure','uContrast','uSat','uWarm','uPosterize','uScan','uHueRot','uChanSplit','uChanSwap','uDropout','uDither','uNoiseG','uInterlace'].forEach(n => PU[n] = gl.getUniformLocation(postProg, n));
 const postLoc = gl.getAttribLocation(postProg, 'aPos');
 
 /* ================= assembled-program cache ================= */
@@ -315,6 +342,8 @@ const state = {
   drift: 0.15, spin: 0, wobble: 0, rot: 0,
   exposure: 1, contrast: 1, sat: 1, warm: 0, posterize: 0, scan: 0,
   pulse: 0, sway: 0, hueCycle: 0,
+  chanSplit: 0, chanSwap: 0, dropout: 0, dither: 0, noiseG: 0, interlace: 0,
+  stutter: 0, jitter: 0, burst: 0, mosh: 0,
   cx: 0.5, cy: 0.5, seed: 7.13, aspect: 'free', fbAmt: 0.9, src: 'orbs',
   ccMode: 0, ccTint: '#ff5d7a',
   srcScale: 1, srcHue: 0, srcVar: 0.5
@@ -330,7 +359,8 @@ const rendNotes = [
   'Optical feedback: every frame re-enters through the folds. Pull draws inward, Feedback sets persistence, glass applies per generation. Causal \u2014 loop recordings won\u2019t seam.',
   'Wallpaper tiling: the plane repeats in a rectangular grid. Tile size sets the cell, twist spins each cell, mirrored flips alternate cells.',
   'Kaleidoscope: reflected into N radial wedges with mirrored rings. Segments = wedge count, zoom scales, spin rotates.',
-  'Sphere: the image wraps onto a rotating ball. Ball size scales it, spin turns the globe, shift scrolls the surface.'
+  'Sphere: the image wraps onto a rotating ball. Ball size scales it, spin turns the globe, shift scrolls the surface.',
+  'Slit-scan: each column samples a different time slice, smearing motion diagonally across the frame. Time density = column rate, skew tilts the smear, drift/spin animate it.'
 ];
 
 /* ================= presets (lite set uses operator indices 0\u201314) ================= */
@@ -462,6 +492,16 @@ const sliders = [
   ['pulse','pulseV',v=>v.toFixed(2)],
   ['sway','swayV',v=>v.toFixed(2)],
   ['hueCycle','hueCycleV',v=>v.toFixed(2)],
+  ['chanSplit','chanSplitV',v=>v.toFixed(2)],
+  ['chanSwap','chanSwapV',v=>v.toFixed(2)],
+  ['dropout','dropoutV',v=>v.toFixed(2)],
+  ['dither','ditherV',v=>v.toFixed(0)],
+  ['noiseG','noiseGV',v=>v.toFixed(2)],
+  ['interlace','interlaceV',v=>v.toFixed(2)],
+  ['stutter','stutterV',v=>v.toFixed(2)],
+  ['jitter','jitterV',v=>v.toFixed(2)],
+  ['burst','burstV',v=>v.toFixed(2)],
+  ['mosh','moshV',v=>v.toFixed(2)],
   ['srcScale','srcScaleV',v=>v.toFixed(2)],
   ['srcHue','srcHueV',v=>v.toFixed(0)],
   ['srcVar','srcVarV',v=>v.toFixed(2)],
@@ -521,19 +561,20 @@ function syncUI(){
   $('depthRow').style.display = (state.rend===0 || state.rend===7) ? '' : 'none';
   { const dl=$('depthLbl'); if(dl) dl.textContent = state.rend===7 ? 'Segments' : 'Depth'; }
   $('fbRow').style.display    = state.rend===5 ? '' : 'none';
+  { const mr=$('moshRow'); if(mr) mr.style.display = state.rend===5 ? '' : 'none'; }
   $('stepLbl').textContent  = (state.rend===2||state.rend===3) ? 'Pane length'
                             : (state.rend===4 ? 'Band width'
                             : (state.rend===5 ? 'Pull'
                             : (state.rend===6 ? 'Tile size'
                             : (state.rend===7 ? 'Zoom'
-                            : (state.rend===8 ? 'Ball size' : 'Step scale')))));
+                            : (state.rend===8 ? 'Ball size' : (state.rend===9 ? 'Time density' : 'Step scale'))))));
   $('twistLbl').textContent = state.rend===1 ? 'Spiral'
                             : ((state.rend===2||state.rend===3) ? 'Roll'
                             : (state.rend===4 ? 'Skew'
                             : (state.rend===5 ? 'Rotate'
                             : (state.rend===6 ? 'Cell spin'
                             : (state.rend===7 ? 'Spin'
-                            : (state.rend===8 ? 'Ball spin' : 'Twist'))))));
+                            : (state.rend===8 ? 'Ball spin' : (state.rend===9 ? 'Skew' : 'Twist')))))));
   $('rendNote').textContent = rendNotes[state.rend];
   renderStack();
 }
@@ -805,6 +846,16 @@ function applyPreset(val){
     if('pulse' in d) state.pulse = d.pulse;
     if('sway' in d) state.sway = d.sway;
     if('hueCycle' in d) state.hueCycle = d.hueCycle;
+    if('chanSplit' in d) state.chanSplit = d.chanSplit;
+    if('chanSwap' in d) state.chanSwap = d.chanSwap;
+    if('dropout' in d) state.dropout = d.dropout;
+    if('dither' in d) state.dither = d.dither;
+    if('noiseG' in d) state.noiseG = d.noiseG;
+    if('interlace' in d) state.interlace = d.interlace;
+    if('stutter' in d) state.stutter = d.stutter;
+    if('jitter' in d) state.jitter = d.jitter;
+    if('burst' in d) state.burst = d.burst;
+    if('mosh' in d) state.mosh = d.mosh;
     if('tint'  in d) state.tint  = d.tint;
     if('tintA' in d) state.tintA = d.tintA;
     if('zoom'  in d) state.zoom  = d.zoom;
@@ -1121,6 +1172,20 @@ function toast(msg){
 function hexToRgb(h){ return [1,3,5].map(i=> parseInt(h.slice(i,i+2),16)/255); }
 let phase = 0, spinA = 0, wavePh = 0, lastT = performance.now();
 let pulsePh = 0, swayPh = 0, hueRotPh = 0;
+let glitchClock = 0;
+let gJx = 0, gJy = 0, gJr = 0, gBurst = 0, gStut = 0;
+function updateGlitch(){
+  const fr = x => x - Math.floor(x);
+  gJx = gJy = gJr = gBurst = 0;
+  gStut = state.stutter > 0.001 ? (0.02 + state.stutter*0.3) : 0;
+  if(state.jitter > 0.001){ const f = Math.floor(glitchClock*30.0);
+    gJx = (fr(Math.sin(f*12.9898)*43758.5453)-0.5)*state.jitter*0.06;
+    gJy = (fr(Math.sin(f*78.233)*43758.5453)-0.5)*state.jitter*0.06;
+    gJr = (fr(Math.sin(f*45.164)*43758.5453)-0.5)*state.jitter*0.3; }
+  if(state.burst > 0.001){ const beat = Math.floor(glitchClock*1.5);
+    if(fr(Math.sin(beat*91.7)*43758.5453) < state.burst*0.5) gBurst = Math.max(0, 1.0 - fr(glitchClock*1.5)*3.0)*state.burst; }
+}
+const gStQ = v => gStut > 0 ? Math.round(v/gStut)*gStut : v;
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* aspect lock: letterbox the canvas inside the stage */
@@ -1199,12 +1264,13 @@ function setUniforms(entry, w, h){
     const rl = L[`uR${i}`];
     if(rl) gl.uniform1f(rl, (slot.rot || 0) * Math.PI / 180);
   }
+  updateGlitch();
   gl.uniform1f(L.uDepth, state.depth);
   gl.uniform1f(L.uStep, state.step);
   gl.uniform1f(L.uTwist, state.twist * Math.PI/180);
   gl.uniform1f(L.uFlip, state.flip);
   gl.uniform2f(L.uCenter, state.cx + 0.05*state.sway*Math.sin(swayPh), state.cy + 0.05*state.sway*Math.cos(swayPh*0.9));
-  gl.uniform2f(L.uShift, state.shiftX, state.shiftY);
+  gl.uniform2f(L.uShift, state.shiftX + gJx, state.shiftY + gJy);
   gl.uniform1f(L.uZoom, state.zoom * (1.0 + 0.15*state.pulse*Math.sin(pulsePh)));
   gl.uniform1f(L.uFrame, state.frame);
   gl.uniform1f(L.uFrameW, state.frameW);
@@ -1223,13 +1289,20 @@ function setUniforms(entry, w, h){
   gl.uniform1f(L.uPosterize, state.posterize);
   gl.uniform1f(L.uScan, state.scan);
   gl.uniform1f(L.uHueRot, hueRotPh);
-  gl.uniform1f(L.uPhase, phase);
-  gl.uniform1f(L.uSpinA, spinA + (state.rot || 0) * Math.PI / 180);
-  gl.uniform1f(L.uWavePh, wavePh);
+  gl.uniform1f(L.uChanSplit, Math.min(1, state.chanSplit + gBurst*0.6));
+  gl.uniform1f(L.uChanSwap, state.chanSwap);
+  gl.uniform1f(L.uDropout, Math.min(1, state.dropout + gBurst*0.4));
+  gl.uniform1f(L.uDither, state.dither);
+  gl.uniform1f(L.uNoiseG, Math.min(1, state.noiseG + gBurst*0.5));
+  gl.uniform1f(L.uInterlace, state.interlace);
+  gl.uniform1f(L.uPhase, gStQ(phase));
+  gl.uniform1f(L.uSpinA, gStQ(spinA + gJr) + (state.rot || 0) * Math.PI / 180);
+  gl.uniform1f(L.uWavePh, gStQ(wavePh));
   gl.uniform1f(L.uWobble, state.wobble);
   gl.uniform1f(L.uSeed, state.seed);
   gl.uniform1i(L.uPrev, 1);
   gl.uniform1f(L.uFbAmt, state.fbAmt);
+  gl.uniform1f(L.uMosh, state.mosh);
   gl.uniform1f(L.uCcMode, state.ccMode);
   const ct = hexToRgb(state.ccTint);
   gl.uniform3f(L.uCcTint, ct[0], ct[1], ct[2]);
@@ -1255,6 +1328,12 @@ function presentFeedback(w, h, srcTexIdx){
   gl.uniform1f(PU.uPosterize, state.posterize);
   gl.uniform1f(PU.uScan, state.scan);
   gl.uniform1f(PU.uHueRot, hueRotPh);
+  gl.uniform1f(PU.uChanSplit, Math.min(1, state.chanSplit + gBurst*0.6));
+  gl.uniform1f(PU.uChanSwap, state.chanSwap);
+  gl.uniform1f(PU.uDropout, Math.min(1, state.dropout + gBurst*0.4));
+  gl.uniform1f(PU.uDither, state.dither);
+  gl.uniform1f(PU.uNoiseG, Math.min(1, state.noiseG + gBurst*0.5));
+  gl.uniform1f(PU.uInterlace, state.interlace);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 
@@ -1340,6 +1419,7 @@ function frame(now){
     pulsePh += dt * 1.8;
     swayPh  += dt * 1.3;
     hueRotPh += dt * state.hueCycle * 0.7;
+    glitchClock += dt;
   }
   if(kfPlaying && !paused) kfTick(dt);
   const period = state.flip ? 2 : 1;
@@ -1649,14 +1729,14 @@ hqBtn.addEventListener('click', async ()=>{
 
   exporting = true; hqAbort = false;
   hqBtn.classList.add('on');
-  const save = {phase, spinA, wavePh, pulsePh, swayPh, hueRotPh, cw:canvas.width, ch:canvas.height};
+  const save = {phase, spinA, wavePh, pulsePh, swayPh, hueRotPh, glitchClock, cw:canvas.width, ch:canvas.height};
   const kfBase = kfActive() ? kfSnapshot() : null;
   canvas.width = ew; canvas.height = eh;
   if(lenSel === 'loop1' || lenSel === 'loop2') phase = 0;
 
   const step = ()=>{
     phase += phaseStep; spinA += spinStep; wavePh += waveStep;
-    pulsePh += (1/fps) * 1.8; swayPh += (1/fps) * 1.3; hueRotPh += (1/fps) * state.hueCycle * 0.7;
+    pulsePh += (1/fps) * 1.8; swayPh += (1/fps) * 1.3; hueRotPh += (1/fps) * state.hueCycle * 0.7; glitchClock += (1/fps);
     phase = ((phase % period) + period) % period;
   };
   const breathe = ()=> new Promise(r => requestAnimationFrame(r));
@@ -1712,7 +1792,7 @@ hqBtn.addEventListener('click', async ()=>{
   } finally {
     canvas.width = save.cw; canvas.height = save.ch;
     phase = save.phase; spinA = save.spinA; wavePh = save.wavePh;
-    pulsePh = save.pulsePh; swayPh = save.swayPh; hueRotPh = save.hueRotPh;
+    pulsePh = save.pulsePh; swayPh = save.swayPh; hueRotPh = save.hueRotPh; glitchClock = save.glitchClock;
     exporting = false;
     if(kfBase) kfRestore(kfBase);
     hqBtn.classList.remove('on');
@@ -1742,7 +1822,7 @@ $('exportBtn').addEventListener('click', async ()=>{
   const rw = ow * ss, rh = oh * ss;
 
   exporting = true;
-  const save = {phase, spinA, wavePh, pulsePh, swayPh, hueRotPh};
+  const save = {phase, spinA, wavePh, pulsePh, swayPh, hueRotPh, glitchClock};
   btn.textContent = 'rendering\u2026';
   try{
     canvas.width = rw; canvas.height = rh;
@@ -1756,7 +1836,7 @@ $('exportBtn').addEventListener('click', async ()=>{
         phase  += (1/60) * state.drift * 0.6;
         spinA  += (1/60) * state.spin * 0.5;
         wavePh += (1/60) * state.wobble * 1.5;
-        pulsePh += (1/60) * 1.8; swayPh += (1/60) * 1.3; hueRotPh += (1/60) * state.hueCycle * 0.7;
+        pulsePh += (1/60) * 1.8; swayPh += (1/60) * 1.3; hueRotPh += (1/60) * state.hueCycle * 0.7; glitchClock += (1/60);
         phase = ((phase % period) + period) % period;
         if(i % 20 === 0){ btn.textContent = `warmup ${i}/${warm}`; await new Promise(r => requestAnimationFrame(r)); }
       }
@@ -1788,7 +1868,7 @@ $('exportBtn').addEventListener('click', async ()=>{
   } finally {
     canvas.width = pw; canvas.height = ph2;
     phase = save.phase; spinA = save.spinA; wavePh = save.wavePh;
-    pulsePh = save.pulsePh; swayPh = save.swayPh; hueRotPh = save.hueRotPh;
+    pulsePh = save.pulsePh; swayPh = save.swayPh; hueRotPh = save.hueRotPh; glitchClock = save.glitchClock;
     exporting = false;
     btn.textContent = 'Export PNG';
   }
