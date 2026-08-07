@@ -29,6 +29,13 @@ uniform float uWarm;
 uniform float uPosterize;
 uniform float uScan;
 uniform float uHueRot;
+uniform float uChanSplit;
+uniform float uChanSwap;
+uniform float uDropout;
+uniform float uDither;
+uniform float uNoiseG;
+uniform float uInterlace;
+uniform float uMosh;
 uniform float uPhase;
 uniform float uSpinA;
 uniform float uWavePh;
@@ -63,9 +70,11 @@ vec3 photo(vec2 p){
   return texture2D(uTex, mir(t)).rgb;
 }
 vec3 sampleC(vec2 p, float dk){
-  if(uChroma <= 0.001) return photo(p);
+  if(uInterlace > 0.001){ float rr = step(0.5, fract(p.y*uCanvas.y*0.25)); p.x += (rr-0.5)*uInterlace*0.02; }
+  if(uChroma <= 0.001 && uChanSplit <= 0.001) return photo(p);
   vec2 d = (p - 0.5) * uChroma * 0.006 * (1.0 + dk*0.35);
-  return vec3(photo(p + d).r, photo(p).g, photo(p - d).b);
+  vec2 ds = vec2(uChanSplit*0.03, 0.0);
+  return vec3(photo(p + d + ds).r, photo(p).g, photo(p - d - ds).b);
 }
 vec2 rippled(vec2 p, float dk){
   if(uRipple <= 0.001) return p;
