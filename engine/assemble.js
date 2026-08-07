@@ -233,6 +233,15 @@ ${RENDERERS[rend]}
     if(uGrain > 0.001){
       col += (hash1(gl_FragCoord.xy * 0.71 + fract(uWavePh)*7.0) - 0.5) * uGrain * 0.14;
     }
+    col *= uExposure;
+    col = (col - 0.5) * uContrast + 0.5;
+    float _lm = dot(col, vec3(0.299,0.587,0.114));
+    col = mix(vec3(_lm), col, uSat);
+    col.r *= 1.0 + uWarm*0.35; col.b *= 1.0 - uWarm*0.35;
+    if(abs(uHueRot) > 0.0001) col = hueShift(col, uHueRot);
+    if(uPosterize >= 1.5) col = floor(col * uPosterize + 0.5) / uPosterize;
+    if(uScan > 0.001){ float _sl = 0.5 + 0.5*cos(gl_FragCoord.y * 3.14159265); col *= 1.0 - uScan*0.6*_sl; }
+    col = clamp(col, 0.0, 1.0);
   }
   gl_FragColor = vec4(col, 1.0);
 }`;
