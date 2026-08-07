@@ -48,11 +48,10 @@ The left panel is grouped top to bottom:
   4:5, 3:4, 2:3, 9:16, 4:3, 3:2, 16:9); **HQ Still** exports a super-sampled frame.
 - **Presets** — load, save, randomize, reseed, and copy/paste or import/export recipes as text.
 - **Fold stack** — the heart of the tool: add, order, and tune the folds (section 5).
-- **Renderer** — the six reflection engines (section 4) plus their shared controls
+- **Renderer** — the ten reflection engines (section 4) plus their shared controls
   (Depth, Step scale, Twist, Shift X/Y, Zoom, mirrored).
-- **Glass** — color and framing (section 6): Frame, Tint, Counterchange, Chroma, Ripple,
-  Vignette, Grain.
-- **Motion** — animation (section 7): Drift, Spin, Rotate, Wobble.
+- **Glass** — color, framing & signal glitch (section 6): Frame, Tint, Counterchange, Chroma, Ripple, Vignette, Grain; a post colour-**grade** (Exposure, Contrast, Saturation, Warmth, Posterize, Scanlines); and **signal glitch** (Channel split/swap, Block dropout, Dither, Signal noise, Interlace).
+- **Motion** — animation (section 7): Drift, Spin, Rotate, Wobble, Pulse, Sway, Hue cycle, plus **motion glitch** (Stutter, Jitter, Glitch burst).
 - **Record** — WebM capture and offline HQ video.
 
 ---
@@ -70,6 +69,10 @@ renderer = very different image, so try switching.
 | **Tube** | Wraps the plane around a cylinder | Tunnels, wormholes |
 | **Strip** | Repeats along a single band | Friezes, ribbon patterns |
 | **Feedback** | Feeds the previous frame back in (trails) | Painterly buildup, motion smear |
+| **Grid** | Wallpaper tiling — the plane repeats in a rectangular lattice | Mosaics, wallpaper |
+| **Kaleido** | Radial kaleidoscope — N mirrored wedges with mirrored rings | Classic kaleidoscopes |
+| **Sphere** | Wraps the image onto a rotating ball | Planet / globe looks |
+| **Slit-scan** | Each column samples a different time slice — diagonal motion smear | Time-smear, datamosh motion |
 
 Shared renderer controls:
 
@@ -79,6 +82,7 @@ Shared renderer controls:
 - **Shift X / Y**, **Zoom** — pan and zoom the whole view.
 - **mirrored** — flip alternating tiles for seamless mirror symmetry.
 - **Feedback** (Feedback renderer only) — how much of the last frame persists (trail length).
+- **Mosh** (Feedback renderer only) — datamosh: block-displaces the previous frame before it re-enters, for chunky motion-smear corruption.
 
 ---
 
@@ -104,7 +108,7 @@ result of the one above it.
 
 ## 6. Operator reference
 
-All 109 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
+All 116 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
 reveal the rest once you pick a mode.
 
 ### Basic transforms
@@ -237,6 +241,18 @@ reveal the rest once you pick a mode.
 | **Worley** | Worley / cellular (F1) noise fold | Scale, Jitter |
 | **Voronoi fold** | Voronoi-cell fold toward nearest site | Scale, Fold |
 
+### Glitch folds
+Digital-corruption folds — all keyed to the global **Seed**, so **Reseed** rerolls their block/tear patterns.
+| Fold | What it does | Key params |
+|---|---|---|
+| **Block displace** | Quantizes into blocks and jumps each a hashed distance | Size, Shift, Density |
+| **Row tear** | Offsets horizontal bands sideways (VHS tearing) | Bands, Shift, Density |
+| **Bit crush** | Snaps coordinates to a coarse grid (chunky mosaic) | Levels, Mix |
+| **Shear cascade** | Per-band horizontal shear that jumps at hashed steps | Steps, Shear |
+| **Luma displace** | Pushes coordinates along the image's own brightness (self-melt) | Push, Freq |
+| **DCT ring** | 8×8-style block quantize with a cosine wobble (JPEG ringing) | Size, Ring, Freq |
+| **Block shuffle** | Snaps whole blocks to a different grid cell (tile-swap) | Size, Density, Spread |
+
 ### The big multi-mode banks
 
 - **Complex** — apply up to **four** complex functions in sequence (identity, 1/z, z², sqrt, exp,
@@ -290,6 +306,8 @@ reveal the rest once you pick a mode.
 - **Ripple** — a final rippling distortion pass.
 - **Vignette** — darken the edges.
 - **Grain** — film grain.
+- **Post grade** — applied after everything else, to every renderer including Feedback: **Exposure**, **Contrast**, **Saturation**, **Warmth**, **Posterize** (0 = off, else colour-bands), **Scanlines** (CRT sweep).
+- **Signal glitch** — **Channel split** (RGB separation), **Channel swap** (per-region RGB permutation), **Block dropout** (punches blocks to black / white / inverted), **Dither** (ordered-dither palette crush), **Signal noise** (static), **Interlace** (scanline comb). Block patterns reroll with **Reseed**.
 - **Hue / depth** — shifts hue with recursion depth for rainbow layering.
 
 ---
@@ -302,6 +320,12 @@ Turn these up to animate for video export:
 - **Spin** — continuous rotation of the whole view.
 - **Rotate** — a fixed rotation offset (also animatable).
 - **Wobble** — gently undulates the whole pattern over time; it animates *every* fold (a global warp), plus the Wave folds and Ripple more strongly. Wobble 0 is fully static.
+- **Pulse** — breathes the zoom in and out.
+- **Sway** — drifts the framing in a slow orbit.
+- **Hue cycle** — rotates all colours over time (0 = still).
+- **Stutter** — quantizes the animation clock into hold-then-jump steps (robotic strobe).
+- **Jitter** — hashed per-frame shake on framing and rotation (signal instability).
+- **Glitch burst** — on a hashed beat, spikes channel-split / noise / dropout for a few frames then relaxes — the "freaks out every couple seconds" datamosh driver. Fires even with the Glass glitch sliders at 0.
 
 Animation loops are built to close seamlessly when exported as HQ Video.
 
@@ -322,8 +346,7 @@ re-save presets after big updates.
 
 ## 10. Export & recording
 
-- **Export PNG** — save the current frame at **1× / 2× / 4×** super-sampling.
-- **HQ Still** (in the Image group) — a high-resolution super-sampled still.
+- **Export PNG** — save a super-sampled still; the size dropdown offers **×1 / ×2 / ×4** of the live view, or a **fixed height** (1080 / 1440 / 2160 / 2880 px).
 - **Record (WebM)** — captures the live canvas in real time; set FPS, quality, and length.
 - **HQ Video** — renders **offline, frame by frame** via WebCodecs at export resolution, so loops
   close exactly and Feedback trails are rebuilt cleanly. Slower than real time but crisp.
@@ -369,7 +392,7 @@ modules load.
 **Local testing**: ES modules don't load from `file://`, so run a static server from the repo
 folder — `python -m http.server 8000` — and open `http://localhost:8000`.
 
-**Validation**: all 109 operators × 9 renderers (981 combinations) and all 93 preset recipes are
+**Validation**: all 116 operators × 10 renderers (1,160 combinations) and all 93 preset recipes are
 compiled *and* rendered through headless ANGLE (the same `WebGL GLSL ES 1.0` path the browser
 uses). The one thing only a real browser exercises is `KHR_parallel_shader_compile` — the async
 recompile when you add or reorder a fold — so it's worth a quick check that reordering stays smooth.
