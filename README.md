@@ -110,7 +110,7 @@ result of the one above it.
 
 ## 6. Operator reference
 
-All 124 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
+All 127 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
 reveal the rest once you pick a mode.
 
 ### Basic transforms
@@ -240,6 +240,9 @@ reveal the rest once you pick a mode.
 | **Fuchsian** | Fuchsian group (hyperbolic tilings) | trace ta/tb/tab, Iters |
 | **Apollonian** | Apollonian gasket circle packing | Iters, Radius, Scale |
 | **Inversive IFS** | Chaos-game circle-inversion IFS — each iteration inverts through the *nearest* of N ring-arranged circles (inversive sibling of Multi-fold IFS; distinct from Kleinian's group and Apollonian's packing). Limit-set mode inverts only inside a circle; Kaleido inverts always | Iters, Circles, Circle radius, Ring radius, Spin°, Offset°, Mode, Blend |
+| **Mandelbox fold** | Box-fold + sphere-fold iteration (reflect across walls, radially inflate, scale) — crunchy "alien-machine" structure, neither affine nor inversive | Iters, Scale, Min radius, Fixed radius, Fold limit, Blend |
+| **Power IFS** | Conformal IFS: applies a complex power about the nearest of N centres — curved, spiralling self-similarity | Iters, Centres, Power, Radius, Spin°, Offset°, Scale, Blend |
+| **Flame IFS** | Apophysis-style IFS: applies a selectable nonlinear variation (spherical / swirl / sinusoidal / horseshoe / polar) about the nearest centre each iteration | Iters, Centres, Variation, Radius, Spin°, Offset°, Scale, Blend |
 | **Juliascope** | Julia-set wedge mapping | Power, Dist, Wedge cover, Iters |
 | **Julian** | Julia mapping | Power, Dist, Wedge cover |
 | **Worley** | Worley / cellular (F1) noise fold | Scale, Jitter |
@@ -407,7 +410,7 @@ modules load.
 **Local testing**: ES modules don't load from `file://`, so run a static server from the repo
 folder — `python -m http.server 8000` — and open `http://localhost:8000`.
 
-**Validation**: all 124 operators × 10 renderers (1,240 combinations) and all 93 preset recipes are
+**Validation**: all 127 operators × 10 renderers (1,270 combinations) and all 93 preset recipes are
 compiled *and* rendered through headless ANGLE (the same `WebGL GLSL ES 1.0` path the browser
 uses). The one thing only a real browser exercises is `KHR_parallel_shader_compile` — the async
 recompile when you add or reorder a fold — so it's worth a quick check that reordering stays smooth.
