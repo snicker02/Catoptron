@@ -2256,24 +2256,31 @@ const OPS = [
   return mix(q, p, blend);
 }` },
   { name:'Flame IFS', fn:'opFlameIfs', deps:[],
-    params:[["Iters",1,12,1,6],["Centers",2,8,1,3],["Variation",0,4,1,0,["Spherical","Swirl","Sinusoidal","Horseshoe","Polar"]],["Radius",0.2,2.5,0.01,1],["Spin°",-180,180,0.5,0],["Offset°",-180,180,0.5,0],["Scale",0.2,2,0.01,0.8],["Blend",0,1,0.01,1]],
-    glsl:`vec2 opFlameIfs(vec2 q, vec4 P0, vec4 P1){
+    params:[["Iters",1,12,1,6],["Centers",2,8,1,3],["Variation",0,16,1,0,["Spherical","Swirl","Sinusoidal","Horseshoe","Polar","Handkerchief","Heart","Disc","Spiral","Hyperbolic","Diamond","Ex","Bent","Fisheye","Cylinder","Bubble","Cross"]],["Radius",0.2,2.5,0.01,1],["Spin°",-180,180,0.5,0],["Offset°",-180,180,0.5,0],["Scale",0.2,2,0.01,0.8],["Blend",0,1,0.01,1],["Var amount",0,1,0.01,1],["Precession°",-45,45,0.5,0],["Radius decay",0.5,1.5,0.005,1],["Symmetry",0,8,1,0]],
+    glsl:`vec2 opFlameIfs(vec2 q, vec4 P0, vec4 P1, vec4 P2){
   float iters=P0.x, N=max(P0.y,1.0), variation=P0.z, rad=P0.w;
   float spin=P1.x*DEG, offs=P1.y*DEG, scale=P1.z, blend=P1.w;
+  float varAmt=P2.x, prec=P2.y*DEG, decay=P2.z, sym=P2.w;
   mat2 R=rot(spin);
   int v=int(floor(variation+0.5));
   vec2 p=q;
+  float rr=rad, off=offs;
   for(int i=0;i<12;i++){
     if(float(i)>=iters) break;
     vec2 best=vec2(0.0); float bd=1e9;
     for(int k=0;k<8;k++){
       if(float(k)>=N) break;
-      float a=TAU*float(k)/N + offs;
-      vec2 c=vec2(cos(a),sin(a))*rad;
+      float a=TAU*float(k)/N + off;
+      vec2 c=vec2(cos(a),sin(a))*rr;
       float d=dot(p-c,p-c);
       if(d<bd){ bd=d; best=c; }
     }
     vec2 z=p-best;
+    if(sym>=1.0){
+      float rl=length(z), aa=atan(z.y,z.x), seg=TAU/sym;
+      aa=abs(mod(aa,seg)-seg*0.5);
+      z=rl*vec2(cos(aa),sin(aa));
+    }
     float r=length(z)+1e-4;
     float th=atan(z.y, z.x);
     vec2 w;
@@ -2281,8 +2288,22 @@ const OPS = [
     else if(v==1){ float s=sin(r*r), co=cos(r*r); w=vec2(z.x*s - z.y*co, z.x*co + z.y*s); }
     else if(v==2) w=vec2(sin(z.x), sin(z.y));
     else if(v==3) w=vec2((z.x-z.y)*(z.x+z.y), 2.0*z.x*z.y)/r;
-    else w=vec2(th*0.31831, r-1.0);
-    p=best + R*w*scale;
+    else if(v==4) w=vec2(th*0.31831, r-1.0);
+    else if(v==5) w=r*vec2(sin(th+r), cos(th-r));
+    else if(v==6) w=r*vec2(sin(th*r), -cos(th*r));
+    else if(v==7){ float pr=3.14159265*r; w=(th*0.31831)*vec2(sin(pr), cos(pr)); }
+    else if(v==8) w=vec2(cos(th)+sin(r), sin(th)-cos(r))/r;
+    else if(v==9) w=vec2(sin(th)/r, r*cos(th));
+    else if(v==10) w=vec2(sin(th)*cos(r), cos(th)*sin(r));
+    else if(v==11){ float p0=sin(th+r), p1=cos(th-r); float a3=p0*p0*p0, b3=p1*p1*p1; w=r*vec2(a3+b3, a3-b3); }
+    else if(v==12) w=vec2(z.x<0.0?z.x*2.0:z.x, z.y<0.0?z.y*0.5:z.y);
+    else if(v==13) w=(2.0/(r+1.0))*vec2(z.y, z.x);
+    else if(v==14) w=vec2(sin(z.x), z.y);
+    else if(v==15) w=(4.0/(r*r+4.0))*z;
+    else { float dn=z.x*z.x - z.y*z.y; w=z*sqrt(1.0/max(dn*dn,1e-3)); }
+    z=mix(z, w, varAmt);
+    p=best + R*z*scale;
+    rr*=decay; off+=prec;
   }
   return mix(q, p, blend);
 }` },
