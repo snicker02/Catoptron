@@ -788,6 +788,21 @@ function renderStack(){
     orow.appendChild(pick);
     div.appendChild(orow);
 
+    const rrow = document.createElement('div');
+    rrow.className = 'row';
+    const resetBtn = document.createElement('button');
+    resetBtn.textContent = 'Reset to defaults';
+    resetBtn.title = 'Reset this fold\u2019s parameters, origin and angle to their defaults';
+    resetBtn.style.flex = '1';
+    resetBtn.style.opacity = '0.8';
+    resetBtn.addEventListener('click', ()=>{
+      const d = defaultOp(slot.t);
+      slot.p = d.p; slot.o = d.o; slot.rot = d.rot;
+      pushHistory(); renderStack();
+    });
+    rrow.appendChild(resetBtn);
+    div.appendChild(rrow);
+
     list.appendChild(div);
   });
 }
