@@ -391,6 +391,16 @@ input[type=file]{display:none}
     </div>
 
     <div class="group">
+      <h2>Chance</h2>
+      <div class="btns">
+        <button id="rand">Randomize</button>
+        <button id="reseed">Reseed</button>
+        <button id="reset">Reset</button>
+      </div>
+      <div class="note">Randomize invents a fold stack. Reseed rerolls Shatter patterns.</div>
+    </div>
+
+    <div class="group">
       <h2>Glass</h2>
       <div class="row"><label>Frame</label><input type="range" id="frame" min="0" max="1" step="0.01" value="0.45"><span class="val" id="frameV"></span></div>
       <div class="row"><label>Frame width</label><input type="range" id="frameW" min="0.004" max="0.15" step="0.001" value="0.035"><span class="val" id="frameWV"></span></div>
@@ -513,15 +523,6 @@ input[type=file]{display:none}
       <div class="note">Record captures the live canvas in realtime. HQ Video renders offline frame-by-frame via WebCodecs &mdash; loops close exactly, and Feedback history is rebuilt at export resolution.</div>
     </div>
 
-    <div class="group">
-      <h2>Chance</h2>
-      <div class="btns">
-        <button id="rand">Randomize</button>
-        <button id="reseed">Reseed</button>
-        <button id="reset">Reset</button>
-      </div>
-      <div class="note">Randomize invents a fold stack. Reseed rerolls Shatter patterns.</div>
-    </div>
   </div>
 </main>
 <div id="timeline">
