@@ -2216,5 +2216,75 @@ const OPS = [
   }
   return mix(q, p, blend);
 }` },
+  { name:'Mandelbox fold', fn:'opMandelbox', deps:[],
+    params:[["Iters",1,16,1,8],["Scale",-3,3,0.01,-1.8],["Min radius",0.05,1,0.01,0.5],["Fixed radius",0.2,2,0.01,1],["Fold limit",0.2,2,0.01,1],["Blend",0,1,0.01,1]],
+    glsl:`vec2 opMandelbox(vec2 q, vec4 P0, vec4 P1){
+  float iters=P0.x, scale=P0.y, minR=P0.z, fixedR=P0.w, foldLimit=P1.x, blend=P1.y;
+  vec2 c=q, p=q;
+  float mr2=minR*minR, fr2=fixedR*fixedR;
+  for(int i=0;i<16;i++){
+    if(float(i)>=iters) break;
+    p = clamp(p, -foldLimit, foldLimit)*2.0 - p;
+    float r2=dot(p,p);
+    if(r2 < mr2) p *= fr2/mr2;
+    else if(r2 < fr2) p *= fr2/r2;
+    p = scale*p + c;
+  }
+  return mix(q, p, blend);
+}` },
+  { name:'Power IFS', fn:'opPowerIfs', deps:[],
+    params:[["Iters",1,12,1,6],["Centers",2,8,1,3],["Power",0.2,2.5,0.01,1.6],["Radius",0.2,2.5,0.01,1],["Spin°",-180,180,0.5,0],["Offset°",-180,180,0.5,0],["Scale",0.2,2,0.01,1],["Blend",0,1,0.01,1]],
+    glsl:`vec2 opPowerIfs(vec2 q, vec4 P0, vec4 P1){
+  float iters=P0.x, N=max(P0.y,1.0), power=P0.z, rad=P0.w;
+  float spin=P1.x*DEG, offs=P1.y*DEG, scale=P1.z, blend=P1.w;
+  vec2 p=q;
+  for(int i=0;i<12;i++){
+    if(float(i)>=iters) break;
+    vec2 best=vec2(0.0); float bd=1e9;
+    for(int k=0;k<8;k++){
+      if(float(k)>=N) break;
+      float a=TAU*float(k)/N + offs;
+      vec2 c=vec2(cos(a),sin(a))*rad;
+      float d=dot(p-c,p-c);
+      if(d<bd){ bd=d; best=c; }
+    }
+    vec2 z=p-best;
+    float r=pow(max(length(z),1e-4), power)*scale;
+    float th=atan(z.y, z.x)*power + spin;
+    p=best + r*vec2(cos(th), sin(th));
+  }
+  return mix(q, p, blend);
+}` },
+  { name:'Flame IFS', fn:'opFlameIfs', deps:[],
+    params:[["Iters",1,12,1,6],["Centers",2,8,1,3],["Variation",0,4,1,0,["Spherical","Swirl","Sinusoidal","Horseshoe","Polar"]],["Radius",0.2,2.5,0.01,1],["Spin°",-180,180,0.5,0],["Offset°",-180,180,0.5,0],["Scale",0.2,2,0.01,0.8],["Blend",0,1,0.01,1]],
+    glsl:`vec2 opFlameIfs(vec2 q, vec4 P0, vec4 P1){
+  float iters=P0.x, N=max(P0.y,1.0), variation=P0.z, rad=P0.w;
+  float spin=P1.x*DEG, offs=P1.y*DEG, scale=P1.z, blend=P1.w;
+  mat2 R=rot(spin);
+  int v=int(floor(variation+0.5));
+  vec2 p=q;
+  for(int i=0;i<12;i++){
+    if(float(i)>=iters) break;
+    vec2 best=vec2(0.0); float bd=1e9;
+    for(int k=0;k<8;k++){
+      if(float(k)>=N) break;
+      float a=TAU*float(k)/N + offs;
+      vec2 c=vec2(cos(a),sin(a))*rad;
+      float d=dot(p-c,p-c);
+      if(d<bd){ bd=d; best=c; }
+    }
+    vec2 z=p-best;
+    float r=length(z)+1e-4;
+    float th=atan(z.y, z.x);
+    vec2 w;
+    if(v==0) w=z/(r*r);
+    else if(v==1){ float s=sin(r*r), co=cos(r*r); w=vec2(z.x*s - z.y*co, z.x*co + z.y*s); }
+    else if(v==2) w=vec2(sin(z.x), sin(z.y));
+    else if(v==3) w=vec2((z.x-z.y)*(z.x+z.y), 2.0*z.x*z.y)/r;
+    else w=vec2(th*0.31831, r-1.0);
+    p=best + R*w*scale;
+  }
+  return mix(q, p, blend);
+}` },
 ];
 export { OPS };
