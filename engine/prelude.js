@@ -37,6 +37,7 @@ uniform float uNoiseG;
 uniform float uInterlace;
 uniform float uMosh;
 uniform float uRD;
+uniform float uRDColorPass;
 uniform float uPhase;
 uniform float uSpinA;
 uniform float uWavePh;
