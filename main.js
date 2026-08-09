@@ -1504,7 +1504,7 @@ window.addEventListener('keydown', e=>{
 });
 
 /* ================= audio reactivity ================= */
-const AUD = { ctx:null, analyser:null, freq:null, node:null, elNode:null, mediaEl:null, stream:null, bass:0, mid:0, treble:0, level:0, beat:0, _ba:0 };
+const AUD = { ctx:null, analyser:null, freq:null, node:null, elNode:null, mediaEl:null, stream:null, bass:0, mid:0, treble:0, level:0, beat:0, _ba:0, _refr:0, recDest:null };
 let AR = {};        // per-target additive offsets, recomputed each frame
 let arBurst = 0;    // audio glitch-burst, added to gBurst consumers
 const AR_BANDS = ['bass','mid','treble','level','beat'];
@@ -1563,8 +1563,11 @@ function audioSample(dt){
   const level = Math.min(1, (bass*0.5 + mid*0.35 + treble*0.25) * 1.2);
   const k = 0.12 + state.audioResp*0.75;
   AUD.bass += (bass-AUD.bass)*k; AUD.mid += (mid-AUD.mid)*k; AUD.treble += (treble-AUD.treble)*k; AUD.level += (level-AUD.level)*k;
-  AUD._ba += (AUD.bass - AUD._ba)*0.06;
-  if(AUD.bass > AUD._ba*1.3 && AUD.bass > 0.22) AUD.beat = 1; else AUD.beat = Math.max(0, AUD.beat - dt*3.5);
+  AUD._ba += (bass - AUD._ba) * 0.10;                       // running avg of RAW (unsmoothed) bass
+  const onset = bass > AUD._ba * 1.35 + 0.04 && bass > 0.15;
+  if(onset && AUD._refr <= 0){ AUD.beat = 1; AUD._refr = 0.12; }
+  else { AUD.beat = Math.max(0, AUD.beat - dt * 5.0); }
+  AUD._refr = Math.max(0, AUD._refr - dt);
 }
 function audioRoutes(){
   const o = {};
@@ -1670,6 +1673,14 @@ recBtn.addEventListener('click', ()=>{
   const mime = mimes.find(m2=> MediaRecorder.isTypeSupported(m2)) || '';
   if(_fmt === 'mp4' && !/mp4/.test(mime)) toast('MP4 not supported for live record here - saving WebM');
   const stream = canvas.captureStream(fps);
+  if(state.audioOn && AUD.ctx && AUD.node){
+    try {
+      AUD.recDest = AUD.ctx.createMediaStreamDestination();
+      AUD.node.connect(AUD.recDest);
+      const atrack = AUD.recDest.stream.getAudioTracks()[0];
+      if(atrack) stream.addTrack(atrack);
+    } catch(_){}
+  }
   recChunks = [];
   try{
     recorder = new MediaRecorder(stream, {
@@ -1682,6 +1693,7 @@ recBtn.addEventListener('click', ()=>{
   recorder.ondataavailable = e=>{ if(e.data.size) recChunks.push(e.data); };
   recorder.onstop = ()=>{
     clearInterval(recTimer); recTimer = null;
+    if(AUD.recDest){ try{ AUD.node && AUD.node.disconnect(AUD.recDest); }catch(_){} AUD.recDest = null; }
     const blob = new Blob(recChunks, {type: mime || 'video/webm'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
