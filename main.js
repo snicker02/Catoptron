@@ -1612,7 +1612,10 @@ function renderRoutes(){
     amt.addEventListener('input', ()=>{ r.amt = +amt.value; amtv.textContent = (+amt.value).toFixed(2); });
     const rx = document.createElement('span'); rx.className='rx'; rx.textContent='\u00d7'; rx.title='remove';
     rx.addEventListener('click', ()=>{ state.aroutes.splice(i,1); renderRoutes(); });
-    row.append(bandSel, arrow, tgtSel, amt, amtv, rx);
+    arrow.className = 'arw';
+    const top = document.createElement('div'); top.className = 'ar-top'; top.append(bandSel, arrow, tgtSel, rx);
+    const bot = document.createElement('div'); bot.className = 'ar-bot'; bot.append(amt, amtv);
+    row.append(top, bot);
     host.appendChild(row);
   });
 }
