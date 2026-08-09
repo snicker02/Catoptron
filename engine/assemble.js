@@ -106,12 +106,14 @@ const RENDERERS = {
                + texture2D(uPrev, uv+vec2(0.0,tx.y)).r + texture2D(uPrev, uv-vec2(0.0,tx.y)).r - 4.0*U;
       float lV = texture2D(uPrev, uv+vec2(tx.x,0.0)).g + texture2D(uPrev, uv-vec2(tx.x,0.0)).g
                + texture2D(uPrev, uv+vec2(0.0,tx.y)).g + texture2D(uPrev, uv-vec2(0.0,tx.y)).g - 4.0*V;
-      float feed = mix(0.030, 0.058, clamp((uStep-0.42)/0.52, 0.0, 1.0)) + (img-0.5)*0.012*uFbAmt;
-      float kill = mix(0.058, 0.065, clamp((uTwist+1.5708)/3.1416, 0.0, 1.0));
+      float drive = (img - 0.5) * uFbAmt;
+      float feed = clamp(mix(0.030, 0.058, clamp((uStep-0.42)/0.52, 0.0, 1.0)) + drive*0.030, 0.020, 0.064);
+      float kill = clamp(mix(0.058, 0.065, clamp((uTwist+1.5708)/3.1416, 0.0, 1.0)) - drive*0.008, 0.055, 0.068);
       float uvv = U*V*V;
       U += 0.16*lU - uvv + feed*(1.0-U);
       V += 0.08*lV + uvv - (feed+kill)*V;
-      if(hash1(cell + floor(uPhase*3.0)) > 0.9985) V = 0.6;
+      float thr = mix(0.9985, mix(0.9996, 0.988, img), uFbAmt);
+      if(hash1(cell + floor(uPhase*3.0)) > thr) V = 0.6;
       col = vec3(clamp(U,0.0,1.0), clamp(V,0.0,1.0), clamp(V,0.0,1.0));
     } else {
     vec2 p = uv;
