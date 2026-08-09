@@ -99,18 +99,19 @@ const RENDERERS = {
       vec2 tx = 1.0 / uCanvas;
       vec4 sp = texture2D(uPrev, uv);
       float U = sp.r, V = sp.g;
-      float seedL = dot(shade(uv, 0.0, 999.0), vec3(0.299,0.587,0.114));
-      if(U + V < 0.02){ U = 1.0; V = smoothstep(0.5, 0.8, seedL) * 0.4; }
+      float img = dot(shade(uv, 0.0, 999.0), vec3(0.299,0.587,0.114));
+      vec2 cell = floor(uv * uCanvas);
+      if(U + V < 0.02){ U = 1.0; V = step(1.0 - 0.4*img - 0.06, hash1(cell)) * 0.6; }
       float lU = texture2D(uPrev, uv+vec2(tx.x,0.0)).r + texture2D(uPrev, uv-vec2(tx.x,0.0)).r
                + texture2D(uPrev, uv+vec2(0.0,tx.y)).r + texture2D(uPrev, uv-vec2(0.0,tx.y)).r - 4.0*U;
       float lV = texture2D(uPrev, uv+vec2(tx.x,0.0)).g + texture2D(uPrev, uv-vec2(tx.x,0.0)).g
                + texture2D(uPrev, uv+vec2(0.0,tx.y)).g + texture2D(uPrev, uv-vec2(0.0,tx.y)).g - 4.0*V;
-      float feed = mix(0.022, 0.058, clamp((uStep-0.42)/0.52, 0.0, 1.0));
-      float kill = mix(0.051, 0.063, clamp((uTwist+1.5708)/3.1416, 0.0, 1.0));
+      float feed = mix(0.030, 0.058, clamp((uStep-0.42)/0.52, 0.0, 1.0)) + (img-0.5)*0.012*uFbAmt;
+      float kill = mix(0.058, 0.065, clamp((uTwist+1.5708)/3.1416, 0.0, 1.0));
       float uvv = U*V*V;
-      U += (0.16*lU - uvv + feed*(1.0-U));
-      V += (0.08*lV + uvv - (feed+kill)*V);
-      V += seedL * 0.02 * uFbAmt;
+      U += 0.16*lU - uvv + feed*(1.0-U);
+      V += 0.08*lV + uvv - (feed+kill)*V;
+      if(hash1(cell + floor(uPhase*3.0)) > 0.9985) V = 0.6;
       col = vec3(clamp(U,0.0,1.0), clamp(V,0.0,1.0), clamp(V,0.0,1.0));
     } else {
     vec2 p = uv;
