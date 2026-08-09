@@ -96,16 +96,17 @@ const RENDERERS = {
     col = shade(p, dk, e);`,
   5: `
     if(uRD > 0.5){
+      vec2 rc = vUv;
       vec2 tx = 1.0 / uCanvas;
-      vec4 sp = texture2D(uPrev, uv);
+      vec4 sp = texture2D(uPrev, rc);
       float U = sp.r, V = sp.g;
-      float img = dot(shade(uv, 0.0, 999.0), vec3(0.299,0.587,0.114));
-      vec2 cell = floor(uv * uCanvas);
+      float img = dot(photo(rc), vec3(0.299,0.587,0.114));
+      vec2 cell = floor(rc * uCanvas);
       if(U + V < 0.02){ U = 1.0; V = step(1.0 - 0.4*img - 0.06, hash1(cell)) * 0.6; }
-      float lU = texture2D(uPrev, uv+vec2(tx.x,0.0)).r + texture2D(uPrev, uv-vec2(tx.x,0.0)).r
-               + texture2D(uPrev, uv+vec2(0.0,tx.y)).r + texture2D(uPrev, uv-vec2(0.0,tx.y)).r - 4.0*U;
-      float lV = texture2D(uPrev, uv+vec2(tx.x,0.0)).g + texture2D(uPrev, uv-vec2(tx.x,0.0)).g
-               + texture2D(uPrev, uv+vec2(0.0,tx.y)).g + texture2D(uPrev, uv-vec2(0.0,tx.y)).g - 4.0*V;
+      float lU = texture2D(uPrev, rc+vec2(tx.x,0.0)).r + texture2D(uPrev, rc-vec2(tx.x,0.0)).r
+               + texture2D(uPrev, rc+vec2(0.0,tx.y)).r + texture2D(uPrev, rc-vec2(0.0,tx.y)).r - 4.0*U;
+      float lV = texture2D(uPrev, rc+vec2(tx.x,0.0)).g + texture2D(uPrev, rc-vec2(tx.x,0.0)).g
+               + texture2D(uPrev, rc+vec2(0.0,tx.y)).g + texture2D(uPrev, rc-vec2(0.0,tx.y)).g - 4.0*V;
       float drive = (img - 0.5) * uFbAmt;
       float feed = clamp(mix(0.030, 0.058, clamp((uStep-0.42)/0.52, 0.0, 1.0)) + drive*0.030, 0.020, 0.064);
       float kill = clamp(mix(0.058, 0.065, clamp((uTwist+1.5708)/3.1416, 0.0, 1.0)) - drive*0.008, 0.055, 0.068);
