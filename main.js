@@ -588,6 +588,7 @@ function syncUI(){
                             : (state.rend===8 ? 'Ball spin' : (state.rend===9 ? 'Skew' : (state.rend===10 ? 'Rotate' : (state.rend===11 ? 'Rotate' : 'Twist')))))))));
   { const rr=$('rdRow'); if(rr) rr.style.display = state.rend===5 ? '' : 'none'; }
   if(state.rend===5 && state.rd){ $('stepLbl').textContent='Feed'; $('twistLbl').textContent='Kill'; }
+  { const fl=$('fbLbl'); if(fl) fl.textContent = (state.rend===5 && state.rd) ? 'Image drive' : 'Feedback'; }
   $('rendNote').textContent = rendNotes[state.rend];
   renderStack();
 }
