@@ -466,10 +466,13 @@ input[type=file]{display:none}
         <button class="mode" data-rend="7">Kaleido</button>
         <button class="mode" data-rend="8">Sphere</button>
         <button class="mode" data-rend="9">Slit-scan</button>
+        <button class="mode" data-rend="10">Poincaré</button>
+        <button class="mode" data-rend="11">Hyper tiling</button>
       </div>
       <div class="row" id="depthRow"><label id="depthLbl">Depth</label><input type="range" id="depth" min="1" max="60" step="1" value="14"><span class="val" id="depthV"></span></div>
       <div class="row" id="fbRow" style="display:none"><label>Feedback</label><input type="range" id="fbAmt" min="0" max="0.98" step="0.005" value="0.9"><span class="val" id="fbAmtV"></span></div>
       <div class="row" id="moshRow" style="display:none"><label title="Datamosh: block-displace the previous frame before it re-enters">Mosh</label><input type="range" id="mosh" min="0" max="1" step="0.01" value="0"><span class="val" id="moshV"></span></div>
+      <div class="row" id="rdRow" style="display:none"><label title="Reaction-diffusion: grow Gray-Scott Turing patterns from the image (Pull/Rotate become Feed/Kill)">Reaction-diffusion</label><input type="range" id="rd" min="0" max="1" step="1" value="0"><span class="val" id="rdV"></span></div>
       <div class="row"><label id="stepLbl">Step scale</label><input type="range" id="step" min="0.42" max="0.94" step="0.005" value="0.72"><span class="val" id="stepV"></span></div>
       <div class="row"><label id="twistLbl">Twist</label><input type="range" id="twist" min="-90" max="90" step="0.5" value="8"><span class="val" id="twistV"></span></div>
       <div class="row"><label>Shift X</label><input type="range" id="shiftX" min="-0.2" max="0.2" step="0.001" value="0"><span class="val" id="shiftXV"></span></div>
@@ -579,8 +582,10 @@ image   &rarr;   fold&#8321; &rarr; fold&#8322; &rarr; &hellip;  &rarr;   Panes/
         <tr><td>Kaleido</td><td>Reflects into N radial mirror wedges</td><td>Classic kaleidoscope</td></tr>
         <tr><td>Sphere</td><td>Wraps the image onto a rotating ball</td><td>Planets, crystal balls</td></tr>
         <tr><td>Slit-scan</td><td>Each column samples a different time slice &mdash; diagonal motion smear</td><td>Time-smear, datamosh motion</td></tr>
+        <tr><td>Poincar&eacute; disk</td><td>Hyperbolic disk model &mdash; the image crowds infinitely toward the rim</td><td>Escher-like hyperbolic space</td></tr>
+        <tr><td>Hyperbolic tiling</td><td>A reflection group tessellates the disk (Escher &ldquo;Circle Limit&rdquo;)</td><td>Hyperbolic tessellations</td></tr>
       </table>
-      <p>Shared controls: <b>Depth</b> (reflection/recursion steps), <b>Step scale</b> (zoom per level), <b>Twist</b> (rotation per level), <b>Shift X/Y</b> &amp; <b>Zoom</b> (pan/zoom), <b>mirrored</b> (flip alternating tiles), and <b>Feedback</b> amount + <b>Mosh</b> (datamosh block-displacement of the fed-back frame) &mdash; both Feedback renderer only.</p>
+      <p>Shared controls: <b>Depth</b> (reflection/recursion steps), <b>Step scale</b> (zoom per level), <b>Twist</b> (rotation per level), <b>Shift X/Y</b> &amp; <b>Zoom</b> (pan/zoom), <b>mirrored</b> (flip alternating tiles), and <b>Feedback</b> amount + <b>Mosh</b> (datamosh block-displacement of the fed-back frame) &mdash; both Feedback renderer only. Feedback also has a <b>Reaction-diffusion</b> mode &mdash; Gray-Scott Turing patterns grown from the image, where Pull/Rotate become <b>Feed/Kill</b> to select the pattern type.</p>
 
       <h2>The fold stack</h2>
       <ul>
