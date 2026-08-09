@@ -284,6 +284,16 @@ input[type=file]{display:none}
 .group.collapsed > h2::after{transform:rotate(-90deg)}
 .group.collapsed > *:not(h2){display:none}
 #glc{touch-action:none}
+.meter{display:flex;align-items:center;gap:4px;margin:4px 0 8px}
+.meter span{font-size:10px;opacity:0.55;width:9px;text-align:center}
+.mbar{flex:1;height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden}
+.mbar i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#3b8a72,#7fe0c0);transition:width 0.06s linear}
+.aroute{display:flex;align-items:center;gap:5px;margin-bottom:5px}
+.aroute select{flex:0 0 auto;background:#171c22;color:#cde;border:1px solid rgba(255,255,255,0.12);border-radius:4px;padding:3px 4px;font-size:11px}
+.aroute input[type=range]{flex:1 1 auto;min-width:40px}
+.aroute .amtv{flex:0 0 30px;font-size:10.5px;opacity:0.7;text-align:right}
+.aroute .rx{flex:0 0 auto;cursor:pointer;opacity:0.55;padding:0 4px;font-weight:bold}
+.aroute .rx:hover{opacity:1;color:#f88}
 </style>
 </head>
 <body>
@@ -498,6 +508,22 @@ input[type=file]{display:none}
       <div class="row"><label>Jitter</label><input type="range" id="jitter" min="0" max="1" step="0.01" value="0"><span class="val" id="jitterV"></span></div>
       <div class="row"><label>Glitch burst</label><input type="range" id="burst" min="0" max="1" step="0.01" value="0"><span class="val" id="burstV"></span></div>
       <div class="note">Drift falls through the reflections, spin rotates everything, wobble undulates the whole pattern. Pulse breathes the zoom, sway drifts the framing, hue cycle rotates colours over time. Stutter quantises the clock into steps, jitter shakes the framing per frame, and glitch burst spikes channel-split/noise/dropout on a beat (0 = still).</div>
+    </div>
+
+    <div class="group">
+      <h2>Audio reactivity</h2>
+      <div class="row" style="gap:6px;flex-wrap:wrap">
+        <button class="toggle" id="audioOn" style="flex:0 0 auto;padding:5px 12px">enable</button>
+        <button class="toggle on" id="audioMic" style="flex:0 0 auto;padding:5px 10px">mic</button>
+        <button class="toggle" id="audioFileBtn" style="flex:0 0 auto;padding:5px 10px">file</button>
+        <input type="file" id="audioFile" accept="audio/*" style="display:none">
+      </div>
+      <div class="row"><label>Sensitivity</label><input type="range" id="audioGain" min="0.5" max="4" step="0.05" value="1.6"><span class="val" id="audioGainV"></span></div>
+      <div class="row"><label>Response</label><input type="range" id="audioResp" min="0" max="1" step="0.01" value="0.5"><span class="val" id="audioRespV"></span></div>
+      <div class="meter"><span>B</span><div class="mbar"><i id="audMBass"></i></div><span>M</span><div class="mbar"><i id="audMMid"></i></div><span>T</span><div class="mbar"><i id="audMTreble"></i></div><span>L</span><div class="mbar"><i id="audMLevel"></i></div></div>
+      <div id="aroutes"></div>
+      <button class="btn" id="addRoute" style="width:100%;margin-top:4px">+ add route</button>
+      <div class="note">Drive parameters from live sound. Enable, choose mic or a file, then map Bass / Mid / Treble / Level / Beat onto a target with a bipolar amount. Sensitivity scales input gain; Response sets how snappy the reaction is. Base values are untouched &mdash; turn audio off and everything returns to normal.</div>
     </div>
 
     <div class="group">
