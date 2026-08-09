@@ -95,12 +95,14 @@ const RENDERERS = {
     float dk = clamp(abs(s), 0.0, 48.0);
     col = shade(p, dk, e);`,
   5: `
-    if(uRD > 0.5){
+    if(uRDColorPass > 0.5){
+      col = shade(uv, 0.0, 999.0);
+    } else if(uRD > 0.5){
       vec2 rc = vUv;
       vec2 tx = 1.0 / uCanvas;
       vec4 sp = texture2D(uPrev, rc);
       float U = sp.r, V = sp.g;
-      float img = dot(photo(rc), vec3(0.299,0.587,0.114));
+      float img = dot(shade(uv, 0.0, 999.0), vec3(0.299,0.587,0.114));
       vec2 cell = floor(rc * uCanvas);
       if(U + V < 0.02){ U = 1.0; V = step(1.0 - 0.4*img - 0.06, hash1(cell)) * 0.6; }
       float lU = texture2D(uPrev, rc+vec2(tx.x,0.0)).r + texture2D(uPrev, rc-vec2(tx.x,0.0)).r
