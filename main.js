@@ -35,6 +35,7 @@ uniform float uDropout;
 uniform float uDither;
 uniform float uNoiseG;
 uniform float uInterlace;
+uniform float uRD;
 float hash1(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)) + uSeed)*43758.5453); }
 vec3 hueShift(vec3 c, float a){ const vec3 k = vec3(0.57735027); return c*cos(a) + cross(k, c)*sin(a) + k*dot(k, c)*(1.0-cos(a)); }
 void main(){
@@ -43,6 +44,7 @@ void main(){
   vec3 col;
   if(uChanSplit > 0.001){ vec2 ds=vec2(uChanSplit*0.03,0.0); col=vec3(texture2D(uSrc,sv+ds).r, texture2D(uSrc,sv).g, texture2D(uSrc,sv-ds).b); }
   else col = texture2D(uSrc, sv).rgb;
+  if(uRD > 0.5){ col = vec3(smoothstep(0.03, 0.5, texture2D(uSrc, sv).g)); }
   vec2 vq = vUv - 0.5;
   col *= 1.0 - uVign * smoothstep(0.35, 0.95, dot(vq, vq)*2.2);
   if(uGrain > 0.001){
@@ -102,7 +104,7 @@ gl.attachShader(postProg, compile(gl.FRAGMENT_SHADER, POSTFS));
 gl.linkProgram(postProg);
 if(!gl.getProgramParameter(postProg, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(postProg));
 const PU = {};
-['uSrc','uVign','uGrain','uWavePh','uSeed','uExposure','uContrast','uSat','uWarm','uPosterize','uScan','uHueRot','uChanSplit','uChanSwap','uDropout','uDither','uNoiseG','uInterlace'].forEach(n => PU[n] = gl.getUniformLocation(postProg, n));
+['uSrc','uVign','uGrain','uWavePh','uSeed','uExposure','uContrast','uSat','uWarm','uPosterize','uScan','uHueRot','uChanSplit','uChanSwap','uDropout','uDither','uNoiseG','uInterlace','uRD'].forEach(n => PU[n] = gl.getUniformLocation(postProg, n));
 const postLoc = gl.getAttribLocation(postProg, 'aPos');
 
 /* ================= assembled-program cache ================= */
@@ -1356,6 +1358,7 @@ function presentFeedback(w, h, srcTexIdx){
   gl.uniform1f(PU.uDither, state.dither);
   gl.uniform1f(PU.uNoiseG, Math.min(1, state.noiseG + gBurst*0.5));
   gl.uniform1f(PU.uInterlace, state.interlace);
+  gl.uniform1f(PU.uRD, state.rd);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 
@@ -1371,27 +1374,34 @@ function renderScene(w, h){
   gl.bindTexture(gl.TEXTURE_2D, tex);
 
   if(state.rend === 5){
-    const sizeChanged = !(fbW === w && fbH === h && fbTex.length === 2);
-    ensureFB(w, h);
+    const rdOn = state.rd > 0.5;
+    const rw = rdOn ? Math.min(w, 384) : w;
+    const rh = rdOn ? Math.max(1, Math.round(rw * h / w)) : h;
+    const sizeChanged = !(fbW === rw && fbH === rh && fbTex.length === 2);
+    ensureFB(rw, rh);
     if(paused && !exporting && !sizeChanged){
       presentFeedback(w, h, fbRead);   // frozen: re-present last generation
       return;
     }
-    const write = 1 - fbRead;
-    /* pass 1: assembled feedback program into the write buffer, reading last frame */
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbFbo[write]);
-    gl.viewport(0, 0, w, h);
     gl.useProgram(entry.prog);
     bindQuad(entry.aPos);
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, fbTex[fbRead]);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, tex);
-    setUniforms(entry, w, h);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    /* pass 2: vignette + grain to screen */
-    presentFeedback(w, h, write);
-    fbRead = write;
+    setUniforms(entry, rw, rh);
+    let rdi = fbRead;
+    const iters = rdOn ? 8 : 1;   // RD needs many Gray-Scott steps to form structure
+    for(let it = 0; it < iters; it++){
+      const write = 1 - rdi;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbFbo[write]);
+      gl.viewport(0, 0, rw, rh);
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, fbTex[rdi]);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      rdi = write;
+    }
+    /* present (upscales the capped RD buffer to the canvas) */
+    presentFeedback(w, h, rdi);
+    fbRead = rdi;
   } else {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, w, h);
