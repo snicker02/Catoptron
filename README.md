@@ -50,7 +50,7 @@ The left panel is grouped top to bottom:
   4:5, 3:4, 2:3, 9:16, 4:3, 3:2, 16:9); **HQ Still** exports a super-sampled frame.
 - **Presets** — load, save, randomize, reseed, and copy/paste or import/export recipes as text.
 - **Fold stack** — the heart of the tool: add, order, and tune the folds (section 5).
-- **Renderer** — the ten reflection engines (section 4) plus their shared controls
+- **Renderer** — the twelve reflection engines (section 4) plus their shared controls
   (Depth, Step scale, Twist, Shift X/Y, Zoom, mirrored).
 - **Glass** — color, framing & signal glitch (section 6): Frame, Tint, Counterchange, Chroma, Ripple, Vignette, Grain; a post colour-**grade** (Exposure, Contrast, Saturation, Warmth, Posterize, Scanlines); and **signal glitch** (Channel split/swap, Block dropout, Dither, Signal noise, Interlace).
 - **Motion** — animation (section 7): Drift, Spin, Rotate, Wobble, Pulse, Sway, Hue cycle, plus **motion glitch** (Stutter, Jitter, Glitch burst).
@@ -75,6 +75,8 @@ renderer = very different image, so try switching.
 | **Kaleido** | Radial kaleidoscope — N mirrored wedges with mirrored rings | Classic kaleidoscopes |
 | **Sphere** | Wraps the image onto a rotating ball | Planet / globe looks |
 | **Slit-scan** | Each column samples a different time slice — diagonal motion smear | Time-smear, datamosh motion |
+| **Poincaré disk** | The hyperbolic disk model — the image crowds infinitely toward the rim | Escher-like hyperbolic space |
+| **Hyperbolic tiling** | A {p,·} reflection group tessellates the disk (Escher "Circle Limit") | Hyperbolic tessellations |
 
 Shared renderer controls:
 
@@ -85,6 +87,7 @@ Shared renderer controls:
 - **mirrored** — flip alternating tiles for seamless mirror symmetry.
 - **Feedback** (Feedback renderer only) — how much of the last frame persists (trail length).
 - **Mosh** (Feedback renderer only) — datamosh: block-displaces the previous frame before it re-enters, for chunky motion-smear corruption.
+- **Reaction-diffusion** (Feedback renderer only) — a Gray-Scott mode that grows organic Turing patterns (spots, mazes, coral) seeded and continuously fed by the image. In this mode the Pull / Rotate knobs become **Feed / Kill**, which select the pattern type.
 
 ---
 
@@ -410,7 +413,7 @@ modules load.
 **Local testing**: ES modules don't load from `file://`, so run a static server from the repo
 folder — `python -m http.server 8000` — and open `http://localhost:8000`.
 
-**Validation**: all 127 operators × 10 renderers (1,270 combinations) and all 93 preset recipes are
+**Validation**: all 127 operators × 12 renderers (1,524 combinations) and all 93 preset recipes are
 compiled *and* rendered through headless ANGLE (the same `WebGL GLSL ES 1.0` path the browser
 uses). The one thing only a real browser exercises is `KHR_parallel_shader_compile` — the async
 recompile when you add or reorder a fold — so it's worth a quick check that reordering stays smooth.
