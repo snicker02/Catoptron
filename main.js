@@ -38,6 +38,11 @@ uniform float uInterlace;
 uniform float uRD;
 uniform vec3 uTint;
 uniform float uTintA;
+uniform sampler2D uPhoto;
+uniform vec2 uPhC;
+uniform vec2 uPhI;
+vec2 _mir(vec2 p){ return 1.0 - abs(mod(p, 2.0) - 1.0); }
+vec2 _phUV(vec2 p){ float ca=uPhC.x/uPhC.y; float ia=uPhI.x/uPhI.y; vec2 sc=(ia>ca)?vec2(ca/ia,1.0):vec2(1.0,ia/ca); return (p-0.5)*sc+0.5; }
 float hash1(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)) + uSeed)*43758.5453); }
 vec3 hueShift(vec3 c, float a){ const vec3 k = vec3(0.57735027); return c*cos(a) + cross(k, c)*sin(a) + k*dot(k, c)*(1.0-cos(a)); }
 void main(){
@@ -48,8 +53,9 @@ void main(){
   else col = texture2D(uSrc, sv).rgb;
   if(uRD > 0.5){
     float _p = smoothstep(0.02, 0.5, texture2D(uSrc, sv).g);
-    vec3 _col = mix(uTint*0.10, uTint, _p) + (vec3(1.0)-uTint)*smoothstep(0.55, 1.0, _p)*0.5;
-    col = mix(vec3(_p), _col, clamp(uTintA*2.0, 0.0, 1.0));
+    vec3 _pc = texture2D(uPhoto, _mir(_phUV(vUv))).rgb;
+    vec3 _imgC = mix(_pc*0.06, _pc, _p) + smoothstep(0.62, 1.0, _p)*0.35;
+    col = mix(vec3(_p), _imgC, clamp(uTintA*2.0, 0.0, 1.0));
   }
   vec2 vq = vUv - 0.5;
   col *= 1.0 - uVign * smoothstep(0.35, 0.95, dot(vq, vq)*2.2);
@@ -110,7 +116,7 @@ gl.attachShader(postProg, compile(gl.FRAGMENT_SHADER, POSTFS));
 gl.linkProgram(postProg);
 if(!gl.getProgramParameter(postProg, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(postProg));
 const PU = {};
-['uSrc','uVign','uGrain','uWavePh','uSeed','uExposure','uContrast','uSat','uWarm','uPosterize','uScan','uHueRot','uChanSplit','uChanSwap','uDropout','uDither','uNoiseG','uInterlace','uRD','uTint','uTintA'].forEach(n => PU[n] = gl.getUniformLocation(postProg, n));
+['uSrc','uVign','uGrain','uWavePh','uSeed','uExposure','uContrast','uSat','uWarm','uPosterize','uScan','uHueRot','uChanSplit','uChanSwap','uDropout','uDither','uNoiseG','uInterlace','uRD','uTint','uTintA','uPhoto','uPhC','uPhI'].forEach(n => PU[n] = gl.getUniformLocation(postProg, n));
 const postLoc = gl.getAttribLocation(postProg, 'aPos');
 
 /* ================= assembled-program cache ================= */
@@ -1369,6 +1375,9 @@ function presentFeedback(w, h, srcTexIdx){
   gl.uniform1f(PU.uRD, state.rd);
   { const _rt = hexToRgb(state.tint); gl.uniform3f(PU.uTint, _rt[0], _rt[1], _rt[2]); }
   gl.uniform1f(PU.uTintA, state.tintA);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(PU.uPhoto, 1);
+  gl.uniform2f(PU.uPhC, w, h);
+  gl.uniform2f(PU.uPhI, imgW, imgH);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 
