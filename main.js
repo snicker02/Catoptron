@@ -646,6 +646,17 @@ $('audioMic').addEventListener('click', ()=>{ state.audioMode='mic'; if(state.au
 $('audioFileBtn').addEventListener('click', ()=>{ $('audioFile').click(); });
 $('audioFile').addEventListener('change', e=>{ const f = e.target.files && e.target.files[0]; if(f) audioLoadFile(f); });
 $('addRoute').addEventListener('click', ()=>{ state.aroutes.push({band:'level', target:'zoom', amt:0.4}); renderRoutes(); });
+$('audPlay').addEventListener('click', ()=>{
+  if(!AUD.mediaEl){ toast('Load an audio file first'); return; }
+  if(AUD.mediaEl.paused){ if(!state.audioOn) audioEnable(true); else AUD.mediaEl.play().catch(()=>{}); }
+  else AUD.mediaEl.pause();
+  updateAudTransport();
+});
+$('audSeek').addEventListener('input', ()=>{
+  if(AUD.mediaEl && AUD.mediaEl.duration){ _seeking = true; AUD.mediaEl.currentTime = (+$('audSeek').value/1000) * AUD.mediaEl.duration;
+    const tt=$('audTime'); if(tt) tt.textContent = fmtTime(AUD.mediaEl.currentTime) + ' / ' + fmtTime(AUD.mediaEl.duration); }
+});
+$('audSeek').addEventListener('change', ()=>{ _seeking = false; });
 
 /* ---- fold stack UI ---- */
 /* display order is alphabetical; option values stay the stable type indices */
@@ -1338,12 +1349,12 @@ function setUniforms(entry, w, h){
   }
   updateGlitch();
   gl.uniform1f(L.uDepth, state.depth);
-  gl.uniform1f(L.uStep, Math.max(0.42, Math.min(0.94, state.step + (AR.step||0))));
-  gl.uniform1f(L.uTwist, (state.twist + (AR.twist||0)) * Math.PI/180);
+  gl.uniform1f(L.uStep, state.step);
+  gl.uniform1f(L.uTwist, state.twist * Math.PI/180);
   gl.uniform1f(L.uFlip, state.flip);
   gl.uniform2f(L.uCenter, state.cx + 0.05*state.sway*Math.sin(swayPh), state.cy + 0.05*state.sway*Math.cos(swayPh*0.9));
   gl.uniform2f(L.uShift, state.shiftX + gJx, state.shiftY + gJy);
-  gl.uniform1f(L.uZoom, state.zoom * (1.0 + 0.15*state.pulse*Math.sin(pulsePh)) + (AR.zoom||0));
+  gl.uniform1f(L.uZoom, state.zoom * (1.0 + 0.15*state.pulse*Math.sin(pulsePh)));
   gl.uniform1f(L.uFrame, state.frame);
   gl.uniform1f(L.uFrameW, state.frameW);
   const t = hexToRgb(state.tint);
@@ -1352,9 +1363,9 @@ function setUniforms(entry, w, h){
   gl.uniform1f(L.uHueK, state.hue * Math.PI/180);
   gl.uniform1f(L.uChroma, state.chroma);
   gl.uniform1f(L.uRipple, state.ripple);
-  gl.uniform1f(L.uVign, Math.max(0, Math.min(1, state.vign + (AR.vign||0))));
+  gl.uniform1f(L.uVign, state.vign);
   gl.uniform1f(L.uGrain, state.grain);
-  gl.uniform1f(L.uExposure, Math.max(0.1, state.exposure + (AR.exposure||0)));
+  gl.uniform1f(L.uExposure, state.exposure);
   gl.uniform1f(L.uContrast, state.contrast);
   gl.uniform1f(L.uSat, state.sat);
   gl.uniform1f(L.uWarm, state.warm);
@@ -1373,7 +1384,7 @@ function setUniforms(entry, w, h){
   gl.uniform1f(L.uWobble, state.wobble);
   gl.uniform1f(L.uSeed, state.seed);
   gl.uniform1i(L.uPrev, 1);
-  gl.uniform1f(L.uFbAmt, Math.max(0, Math.min(0.98, state.fbAmt + (AR.fbAmt||0))));
+  gl.uniform1f(L.uFbAmt, state.fbAmt);
   gl.uniform1f(L.uMosh, state.mosh);
   gl.uniform1f(L.uRD, state.rd);
   gl.uniform1f(L.uRDColorPass, 0.0);
@@ -1511,9 +1522,44 @@ let AR = {};        // per-target additive offsets, recomputed each frame
 let arBurst = 0;    // audio glitch-burst, added to gBurst consumers
 const AR_BANDS = ['bass','mid','treble','level','beat'];
 const AR_BLABEL = { bass:'Bass', mid:'Mid', treble:'Treble', level:'Level', beat:'Beat' };
-const AR_TARGETS = ['zoom','fbAmt','twist','exposure','vign','step','driftRate','spinRate','hueRate','burst'];
-const AR_TLABEL = { zoom:'Zoom', fbAmt:'Feedback', twist:'Twist', exposure:'Exposure', vign:'Vignette', step:'Step / RD Feed', driftRate:'Drift speed', spinRate:'Spin speed', hueRate:'Hue shift', burst:'Glitch burst' };
-const AR_TSCALE = { zoom:0.6, fbAmt:0.4, twist:90, exposure:0.6, vign:0.5, step:0.25, driftRate:3, spinRate:3, hueRate:2.5, burst:1 };
+// direct targets: temporarily offset state[key] around the live render (clamped), so every push site (incl. feedback/grade) reacts
+const AR_DIRECT = {
+  zoom:    {k:'zoom',     s:0.6, label:'Zoom'},
+  twist:   {k:'twist',    s:90,  label:'Twist'},
+  rotate:  {k:'rot',      s:60,  label:'Rotate'},
+  shiftX:  {k:'shiftX',   s:0.5, label:'Pan X'},
+  shiftY:  {k:'shiftY',   s:0.5, label:'Pan Y'},
+  depth:   {k:'depth',    s:12,  min:1,   max:40,  label:'Depth'},
+  step:    {k:'step',     s:0.25, min:0.42, max:0.94, label:'Step / RD Feed'},
+  fbAmt:   {k:'fbAmt',    s:0.4, min:0,   max:0.98, label:'Feedback'},
+  ripple:  {k:'ripple',   s:0.6, min:0,   label:'Ripple'},
+  chroma:  {k:'chroma',   s:0.6, min:0,   label:'Chroma'},
+  wobble:  {k:'wobble',   s:1.5, min:0,   label:'Wobble'},
+  exposure:{k:'exposure', s:0.6, min:0.1, label:'Exposure'},
+  contrast:{k:'contrast', s:0.8, min:0.1, label:'Contrast'},
+  sat:     {k:'sat',      s:1.0, min:0,   label:'Saturation'},
+  grain:   {k:'grain',    s:0.4, min:0,   max:1,   label:'Grain'},
+  vign:    {k:'vign',     s:0.5, min:0,   max:1,   label:'Vignette'},
+};
+const AR_RATE = { driftRate:{s:3,label:'Drift speed'}, spinRate:{s:3,label:'Spin speed'}, wobbleRate:{s:2.5,label:'Wobble speed'}, hueRate:{s:2.5,label:'Hue shift'} };
+const AR_SPECIAL = { burst:{s:1,label:'Glitch burst'} };
+const AR_TARGETS = ['zoom','twist','rotate','shiftX','shiftY','depth','step','fbAmt','ripple','chroma','wobble','exposure','contrast','sat','grain','vign','driftRate','spinRate','wobbleRate','hueRate','burst'];
+const AR_TLABEL = {}, AR_SCALE = {};
+[AR_DIRECT, AR_RATE, AR_SPECIAL].forEach(mp=>{ for(const t in mp){ AR_TLABEL[t] = mp[t].label; AR_SCALE[t] = mp[t].s; } });
+let _arSaved = null;
+function applyAR(){
+  _arSaved = {};
+  for(const t in AR_DIRECT){
+    const off = AR[t]; if(!off) continue;
+    const d = AR_DIRECT[t], key = d.k;
+    if(!(key in _arSaved)) _arSaved[key] = state[key];
+    let v = state[key] + off;
+    if(d.min !== undefined) v = Math.max(d.min, v);
+    if(d.max !== undefined) v = Math.min(d.max, v);
+    state[key] = v;
+  }
+}
+function restoreAR(){ if(_arSaved){ for(const k in _arSaved) state[k] = _arSaved[k]; _arSaved = null; } }
 
 async function audioEnable(on){
   state.audioOn = on ? 1 : 0;
@@ -1586,7 +1632,7 @@ function audioRoutes(){
   if(state.audioOn && AUD.ctx){
     for(const r of state.aroutes){
       const v = r.band==='bass'?AUD.bass : r.band==='mid'?AUD.mid : r.band==='treble'?AUD.treble : r.band==='beat'?AUD.beat : AUD.level;
-      o[r.target] = (o[r.target]||0) + v * r.amt * (AR_TSCALE[r.target]||1);
+      o[r.target] = (o[r.target]||0) + v * r.amt * (AR_SCALE[r.target]||1);
     }
   }
   return o;
@@ -1594,6 +1640,18 @@ function audioRoutes(){
 function updateMeter(){
   const set=(id,v)=>{ const el=$(id); if(el) el.style.width = Math.round(Math.min(1,v)*100) + '%'; };
   set('audMBass', AUD.bass); set('audMMid', AUD.mid); set('audMTreble', AUD.treble); set('audMLevel', AUD.level);
+}
+let _seeking = false;
+function fmtTime(t){ t = Math.max(0, t|0); const mm = (t/60)|0, ss = t%60; return mm + ':' + (ss<10?'0':'') + ss; }
+function updateAudTransport(){
+  const tr = $('audTransport'); if(!tr) return;
+  const show = !!(AUD.mediaEl && state.audioMode === 'file');
+  tr.style.display = show ? 'flex' : 'none';
+  if(!show) return;
+  const pb = $('audPlay'); if(pb) pb.innerHTML = AUD.mediaEl.paused ? '&#9654;' : '&#10074;&#10074;';
+  const d = AUD.mediaEl.duration || 0, c = AUD.mediaEl.currentTime || 0;
+  if(!_seeking){ const sk = $('audSeek'); if(sk) sk.value = d ? Math.round(c / d * 1000) : 0; }
+  const tt = $('audTime'); if(tt) tt.textContent = fmtTime(c) + ' / ' + fmtTime(d);
 }
 function renderRoutes(){
   const host = $('aroutes'); if(!host) return;
@@ -1623,11 +1681,11 @@ function renderRoutes(){
 function frame(now){
   const dt = Math.min(0.05, (now - lastT)/1000); lastT = now;
   if(exporting){ requestAnimationFrame(frame); return; }
-  audioSample(dt); AR = audioRoutes(); arBurst = AR.burst || 0; updateMeter();
+  audioSample(dt); AR = audioRoutes(); arBurst = AR.burst || 0; updateMeter(); updateAudTransport();
   if(!reduced && !paused){
     phase  += dt * (state.drift + (AR.driftRate||0)) * 0.6;
     spinA  += dt * (state.spin + (AR.spinRate||0)) * 0.5;
-    wavePh += dt * state.wobble * 1.5;
+    wavePh += dt * (state.wobble * 1.5 + (AR.wobbleRate||0));
     pulsePh += dt * 1.8;
     swayPh  += dt * 1.3;
     hueRotPh += dt * (state.hueCycle * 0.7 + (AR.hueRate||0));
@@ -1646,7 +1704,8 @@ function frame(now){
   if(camActive && camVideo && camVideo.readyState >= 2 && camVideo.videoWidth){
     setImage(camVideo, camVideo.videoWidth, camVideo.videoHeight);
   }
-  renderScene(w, h);
+  applyAR();
+  try { renderScene(w, h); } finally { restoreAR(); }
   requestAnimationFrame(frame);
 }
 applySource();
