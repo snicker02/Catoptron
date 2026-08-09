@@ -36,6 +36,8 @@ uniform float uDither;
 uniform float uNoiseG;
 uniform float uInterlace;
 uniform float uRD;
+uniform vec3 uTint;
+uniform float uTintA;
 float hash1(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)) + uSeed)*43758.5453); }
 vec3 hueShift(vec3 c, float a){ const vec3 k = vec3(0.57735027); return c*cos(a) + cross(k, c)*sin(a) + k*dot(k, c)*(1.0-cos(a)); }
 void main(){
@@ -44,7 +46,11 @@ void main(){
   vec3 col;
   if(uChanSplit > 0.001){ vec2 ds=vec2(uChanSplit*0.03,0.0); col=vec3(texture2D(uSrc,sv+ds).r, texture2D(uSrc,sv).g, texture2D(uSrc,sv-ds).b); }
   else col = texture2D(uSrc, sv).rgb;
-  if(uRD > 0.5){ col = vec3(smoothstep(0.03, 0.5, texture2D(uSrc, sv).g)); }
+  if(uRD > 0.5){
+    float _p = smoothstep(0.02, 0.5, texture2D(uSrc, sv).g);
+    vec3 _col = mix(uTint*0.10, uTint, _p) + (vec3(1.0)-uTint)*smoothstep(0.55, 1.0, _p)*0.5;
+    col = mix(vec3(_p), _col, clamp(uTintA*2.0, 0.0, 1.0));
+  }
   vec2 vq = vUv - 0.5;
   col *= 1.0 - uVign * smoothstep(0.35, 0.95, dot(vq, vq)*2.2);
   if(uGrain > 0.001){
@@ -104,7 +110,7 @@ gl.attachShader(postProg, compile(gl.FRAGMENT_SHADER, POSTFS));
 gl.linkProgram(postProg);
 if(!gl.getProgramParameter(postProg, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(postProg));
 const PU = {};
-['uSrc','uVign','uGrain','uWavePh','uSeed','uExposure','uContrast','uSat','uWarm','uPosterize','uScan','uHueRot','uChanSplit','uChanSwap','uDropout','uDither','uNoiseG','uInterlace','uRD'].forEach(n => PU[n] = gl.getUniformLocation(postProg, n));
+['uSrc','uVign','uGrain','uWavePh','uSeed','uExposure','uContrast','uSat','uWarm','uPosterize','uScan','uHueRot','uChanSplit','uChanSwap','uDropout','uDither','uNoiseG','uInterlace','uRD','uTint','uTintA'].forEach(n => PU[n] = gl.getUniformLocation(postProg, n));
 const postLoc = gl.getAttribLocation(postProg, 'aPos');
 
 /* ================= assembled-program cache ================= */
@@ -596,6 +602,7 @@ sliders.forEach(([id, vid, fmt])=>{
     });
   }
 });
+{ const _rdS = $('rd'); if(_rdS) _rdS.addEventListener('input', ()=> syncUI()); }
 $('tintC').addEventListener('input', e=> state.tint = e.target.value);
 $('ccMode').addEventListener('change', e=>{
   state.ccMode = +e.target.value;
@@ -1359,6 +1366,8 @@ function presentFeedback(w, h, srcTexIdx){
   gl.uniform1f(PU.uNoiseG, Math.min(1, state.noiseG + gBurst*0.5));
   gl.uniform1f(PU.uInterlace, state.interlace);
   gl.uniform1f(PU.uRD, state.rd);
+  { const _rt = hexToRgb(state.tint); gl.uniform3f(PU.uTint, _rt[0], _rt[1], _rt[2]); }
+  gl.uniform1f(PU.uTintA, state.tintA);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 
