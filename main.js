@@ -350,7 +350,7 @@ const state = {
   frame: 0.45, frameW: 0.035, tint: '#5d8f86', tintA: 0.30,
   hue: 0, chroma: 0, ripple: 0, vign: 0.35, grain: 0.06,
   drift: 0.15, spin: 0, wobble: 0, rot: 0,
-  audioOn: 0, audioMode: 'mic', audioGain: 1.6, audioResp: 0.5,
+  audioOn: 0, audioMode: 'mic', audioGain: 1.6, audioResp: 0.5, beatSens: 0.55,
   aroutes: [ {band:'bass',target:'zoom',amt:0.5}, {band:'bass',target:'fbAmt',amt:0.4}, {band:'treble',target:'burst',amt:0.6}, {band:'mid',target:'spinRate',amt:0.5}, {band:'level',target:'exposure',amt:0.3} ],
   exposure: 1, contrast: 1, sat: 1, warm: 0, posterize: 0, scan: 0,
   pulse: 0, sway: 0, hueCycle: 0,
@@ -481,6 +481,7 @@ const sliders = [
   ['depth','depthV',    v=>v.toFixed(0)],
   ['audioGain','audioGainV', v=>v.toFixed(2)],
   ['audioResp','audioRespV', v=>v.toFixed(2)],
+  ['beatSens','beatSensV', v=>v.toFixed(2)],
   ['fbAmt','fbAmtV',   v=>v.toFixed(3)],
   ['step','stepV',     v=>v.toFixed(3)],
   ['twist','twistV',    v=>v.toFixed(1)],
@@ -893,6 +894,7 @@ function applyPreset(val){
     if('aroutes' in d && Array.isArray(d.aroutes)) state.aroutes = JSON.parse(JSON.stringify(d.aroutes));
     if('audioGain' in d) state.audioGain = d.audioGain;
     if('audioResp' in d) state.audioResp = d.audioResp;
+    if('beatSens' in d) state.beatSens = d.beatSens;
     if('audioMode' in d) state.audioMode = d.audioMode;
     renderRoutes();
     if('chanSplit' in d) state.chanSplit = d.chanSplit;
@@ -1504,7 +1506,7 @@ window.addEventListener('keydown', e=>{
 });
 
 /* ================= audio reactivity ================= */
-const AUD = { ctx:null, analyser:null, freq:null, node:null, elNode:null, mediaEl:null, stream:null, bass:0, mid:0, treble:0, level:0, beat:0, _ba:0, _refr:0, recDest:null };
+const AUD = { ctx:null, analyser:null, freq:null, node:null, elNode:null, mediaEl:null, stream:null, bass:0, mid:0, treble:0, level:0, beat:0, _refr:0, _prevKick:0, hist:new Float32Array(43), hi:0, recDest:null };
 let AR = {};        // per-target additive offsets, recomputed each frame
 let arBurst = 0;    // audio glitch-burst, added to gBurst consumers
 const AR_BANDS = ['bass','mid','treble','level','beat'];
@@ -1563,11 +1565,21 @@ function audioSample(dt){
   const level = Math.min(1, (bass*0.5 + mid*0.35 + treble*0.25) * 1.2);
   const k = 0.12 + state.audioResp*0.75;
   AUD.bass += (bass-AUD.bass)*k; AUD.mid += (mid-AUD.mid)*k; AUD.treble += (treble-AUD.treble)*k; AUD.level += (level-AUD.level)*k;
-  AUD._ba += (bass - AUD._ba) * 0.10;                       // running avg of RAW (unsmoothed) bass
-  const onset = bass > AUD._ba * 1.35 + 0.04 && bass > 0.15;
-  if(onset && AUD._refr <= 0){ AUD.beat = 1; AUD._refr = 0.12; }
-  else { AUD.beat = Math.max(0, AUD.beat - dt * 5.0); }
+  // beat: adaptive onset on an ISOLATED kick band vs a rolling local average (robust across tracks)
+  const kick = Math.min(1, band(0.002, 0.025) * g);          // ~40-540Hz, isolates the kick transient
+  const H = AUD.hist, N = H.length;
+  let hs = 0; for(let i=0;i<N;i++) hs += H[i];
+  const havg = hs / N;
+  let hv = 0; for(let i=0;i<N;i++){ const d = H[i] - havg; hv += d*d; }
+  const hstd = Math.sqrt(hv / N);
+  const kk = 2.2 - state.beatSens * 1.8;                     // high sensitivity => low k => fires more easily
+  const thr = havg + kk * hstd + 0.015;
+  const rising = kick > AUD._prevKick + 0.004;
+  if(kick > thr && kick > 0.08 && rising && AUD._refr <= 0){ AUD.beat = 1; AUD._refr = 0.10; }
+  else AUD.beat = Math.max(0, AUD.beat - dt * 4.0);
   AUD._refr = Math.max(0, AUD._refr - dt);
+  AUD._prevKick = kick;
+  H[AUD.hi] = kick; AUD.hi = (AUD.hi + 1) % N;
 }
 function audioRoutes(){
   const o = {};
