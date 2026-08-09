@@ -343,7 +343,7 @@ const state = {
   exposure: 1, contrast: 1, sat: 1, warm: 0, posterize: 0, scan: 0,
   pulse: 0, sway: 0, hueCycle: 0,
   chanSplit: 0, chanSwap: 0, dropout: 0, dither: 0, noiseG: 0, interlace: 0,
-  stutter: 0, jitter: 0, burst: 0, mosh: 0,
+  stutter: 0, jitter: 0, burst: 0, mosh: 0, rd: 0,
   cx: 0.5, cy: 0.5, seed: 7.13, aspect: 'free', fbAmt: 0.9, src: 'orbs',
   ccMode: 0, ccTint: '#ff5d7a',
   srcScale: 1, srcHue: 0, srcVar: 0.5
@@ -360,7 +360,9 @@ const rendNotes = [
   'Wallpaper tiling: the plane repeats in a rectangular grid. Tile size sets the cell, twist spins each cell, mirrored flips alternate cells.',
   'Kaleidoscope: reflected into N radial wedges with mirrored rings. Segments = wedge count, zoom scales, spin rotates.',
   'Sphere: the image wraps onto a rotating ball. Ball size scales it, spin turns the globe, shift scrolls the surface.',
-  'Slit-scan: each column samples a different time slice, smearing motion diagonally across the frame. Time density = column rate, skew tilts the smear, drift/spin animate it.'
+  'Slit-scan: each column samples a different time slice, smearing motion diagonally across the frame. Time density = column rate, skew tilts the smear, drift/spin animate it.',
+  'Poincaré disk: the hyperbolic disk model — the image crowds infinitely toward the rim. Ring density sets the recession rate, rotate spins it, drift scrolls inward.',
+  'Hyperbolic tiling: a reflection group tessellates the disk (Escher “Circle Limit”). Sides sets the polygon order, rotate turns the pattern, drift drifts it.'
 ];
 
 /* ================= presets (lite set uses operator indices 0\u201314) ================= */
@@ -502,6 +504,7 @@ const sliders = [
   ['jitter','jitterV',v=>v.toFixed(2)],
   ['burst','burstV',v=>v.toFixed(2)],
   ['mosh','moshV',v=>v.toFixed(2)],
+  ['rd','rdV',v=>v.toFixed(0)],
   ['srcScale','srcScaleV',v=>v.toFixed(2)],
   ['srcHue','srcHueV',v=>v.toFixed(0)],
   ['srcVar','srcVarV',v=>v.toFixed(2)],
@@ -567,14 +570,16 @@ function syncUI(){
                             : (state.rend===5 ? 'Pull'
                             : (state.rend===6 ? 'Tile size'
                             : (state.rend===7 ? 'Zoom'
-                            : (state.rend===8 ? 'Ball size' : (state.rend===9 ? 'Time density' : 'Step scale'))))));
+                            : (state.rend===8 ? 'Ball size' : (state.rend===9 ? 'Time density' : (state.rend===10 ? 'Ring density' : (state.rend===11 ? 'Sides (p)' : 'Step scale'))))))));
   $('twistLbl').textContent = state.rend===1 ? 'Spiral'
                             : ((state.rend===2||state.rend===3) ? 'Roll'
                             : (state.rend===4 ? 'Skew'
                             : (state.rend===5 ? 'Rotate'
                             : (state.rend===6 ? 'Cell spin'
                             : (state.rend===7 ? 'Spin'
-                            : (state.rend===8 ? 'Ball spin' : (state.rend===9 ? 'Skew' : 'Twist')))))));
+                            : (state.rend===8 ? 'Ball spin' : (state.rend===9 ? 'Skew' : (state.rend===10 ? 'Rotate' : (state.rend===11 ? 'Rotate' : 'Twist')))))))));
+  { const rr=$('rdRow'); if(rr) rr.style.display = state.rend===5 ? '' : 'none'; }
+  if(state.rend===5 && state.rd){ $('stepLbl').textContent='Feed'; $('twistLbl').textContent='Kill'; }
   $('rendNote').textContent = rendNotes[state.rend];
   renderStack();
 }
@@ -871,6 +876,7 @@ function applyPreset(val){
     if('jitter' in d) state.jitter = d.jitter;
     if('burst' in d) state.burst = d.burst;
     if('mosh' in d) state.mosh = d.mosh;
+    if('rd' in d) state.rd = d.rd;
     if('tint'  in d) state.tint  = d.tint;
     if('tintA' in d) state.tintA = d.tintA;
     if('zoom'  in d) state.zoom  = d.zoom;
@@ -1318,6 +1324,7 @@ function setUniforms(entry, w, h){
   gl.uniform1i(L.uPrev, 1);
   gl.uniform1f(L.uFbAmt, state.fbAmt);
   gl.uniform1f(L.uMosh, state.mosh);
+  gl.uniform1f(L.uRD, state.rd);
   gl.uniform1f(L.uCcMode, state.ccMode);
   const ct = hexToRgb(state.ccTint);
   gl.uniform3f(L.uCcTint, ct[0], ct[1], ct[2]);
