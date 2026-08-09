@@ -38,11 +38,7 @@ uniform float uInterlace;
 uniform float uRD;
 uniform vec3 uTint;
 uniform float uTintA;
-uniform sampler2D uPhoto;
-uniform vec2 uPhC;
-uniform vec2 uPhI;
-vec2 _mir(vec2 p){ return 1.0 - abs(mod(p, 2.0) - 1.0); }
-vec2 _phUV(vec2 p){ float ca=uPhC.x/uPhC.y; float ia=uPhI.x/uPhI.y; vec2 sc=(ia>ca)?vec2(ca/ia,1.0):vec2(1.0,ia/ca); return (p-0.5)*sc+0.5; }
+uniform sampler2D uFx;
 float hash1(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)) + uSeed)*43758.5453); }
 vec3 hueShift(vec3 c, float a){ const vec3 k = vec3(0.57735027); return c*cos(a) + cross(k, c)*sin(a) + k*dot(k, c)*(1.0-cos(a)); }
 void main(){
@@ -53,7 +49,7 @@ void main(){
   else col = texture2D(uSrc, sv).rgb;
   if(uRD > 0.5){
     float _p = smoothstep(0.02, 0.5, texture2D(uSrc, sv).g);
-    vec3 _pc = texture2D(uPhoto, _mir(_phUV(vUv))).rgb;
+    vec3 _pc = texture2D(uFx, vUv).rgb;
     vec3 _imgC = mix(_pc*0.06, _pc, _p) + smoothstep(0.62, 1.0, _p)*0.35;
     col = mix(vec3(_p), _imgC, clamp(uTintA*2.0, 0.0, 1.0));
   }
@@ -116,7 +112,7 @@ gl.attachShader(postProg, compile(gl.FRAGMENT_SHADER, POSTFS));
 gl.linkProgram(postProg);
 if(!gl.getProgramParameter(postProg, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(postProg));
 const PU = {};
-['uSrc','uVign','uGrain','uWavePh','uSeed','uExposure','uContrast','uSat','uWarm','uPosterize','uScan','uHueRot','uChanSplit','uChanSwap','uDropout','uDither','uNoiseG','uInterlace','uRD','uTint','uTintA','uPhoto','uPhC','uPhI'].forEach(n => PU[n] = gl.getUniformLocation(postProg, n));
+['uSrc','uVign','uGrain','uWavePh','uSeed','uExposure','uContrast','uSat','uWarm','uPosterize','uScan','uHueRot','uChanSplit','uChanSwap','uDropout','uDither','uNoiseG','uInterlace','uRD','uTint','uTintA','uFx'].forEach(n => PU[n] = gl.getUniformLocation(postProg, n));
 const postLoc = gl.getAttribLocation(postProg, 'aPos');
 
 /* ================= assembled-program cache ================= */
@@ -1256,6 +1252,7 @@ $('aspectSel').addEventListener('change', e=>{
 
 /* feedback ping-pong framebuffers */
 let fbTex = [], fbFbo = [], fbW = 0, fbH = 0, fbRead = 0;
+let fxTex = null, fxFbo = null, fxW = 0, fxH = 0;
 function ensureFB(w, h){
   if(fbW === w && fbH === h && fbTex.length === 2) return;
   fbTex.forEach(t => gl.deleteTexture(t));
@@ -1278,6 +1275,25 @@ function ensureFB(w, h){
   }
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   fbW = w; fbH = h; fbRead = 0;
+}
+
+/* folded-image colour buffer (RD only): the folds + tint rendered to a texture the display samples */
+function ensureFx(w, h){
+  if(fxW === w && fxH === h && fxTex) return;
+  if(fxTex) gl.deleteTexture(fxTex);
+  if(fxFbo) gl.deleteFramebuffer(fxFbo);
+  fxTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, fxTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  fxFbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fxFbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fxTex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  fxW = w; fxH = h;
 }
 
 /* upload the full uniform set to the current assembled program (its own locations) */
@@ -1341,6 +1357,7 @@ function setUniforms(entry, w, h){
   gl.uniform1f(L.uFbAmt, state.fbAmt);
   gl.uniform1f(L.uMosh, state.mosh);
   gl.uniform1f(L.uRD, state.rd);
+  gl.uniform1f(L.uRDColorPass, 0.0);
   gl.uniform1f(L.uCcMode, state.ccMode);
   const ct = hexToRgb(state.ccTint);
   gl.uniform3f(L.uCcTint, ct[0], ct[1], ct[2]);
@@ -1375,9 +1392,7 @@ function presentFeedback(w, h, srcTexIdx){
   gl.uniform1f(PU.uRD, state.rd);
   { const _rt = hexToRgb(state.tint); gl.uniform3f(PU.uTint, _rt[0], _rt[1], _rt[2]); }
   gl.uniform1f(PU.uTintA, state.tintA);
-  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(PU.uPhoto, 1);
-  gl.uniform2f(PU.uPhC, w, h);
-  gl.uniform2f(PU.uPhI, imgW, imgH);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, fxTex); gl.uniform1i(PU.uFx, 1);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 
@@ -1417,6 +1432,17 @@ function renderScene(w, h){
       gl.bindTexture(gl.TEXTURE_2D, fbTex[rdi]);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       rdi = write;
+    }
+    if(rdOn){
+      /* colour pass: render the folded + tinted image so folds/tint drive RD colour */
+      ensureFx(w, h);
+      gl.uniform1f(entry.locs.uRDColorPass, 1.0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fxFbo);
+      gl.viewport(0, 0, w, h);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.uniform1f(entry.locs.uRDColorPass, 0.0);
     }
     /* present (upscales the capped RD buffer to the canvas) */
     presentFeedback(w, h, rdi);
