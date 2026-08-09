@@ -87,7 +87,7 @@ Shared renderer controls:
 - **mirrored** — flip alternating tiles for seamless mirror symmetry.
 - **Feedback** (Feedback renderer only) — how much of the last frame persists (trail length).
 - **Mosh** (Feedback renderer only) — datamosh: block-displaces the previous frame before it re-enters, for chunky motion-smear corruption.
-- **Reaction-diffusion** (Feedback renderer only) — a Gray-Scott mode that grows organic Turing patterns (spots, mazes, coral) seeded and continuously fed by the image. In this mode the Pull / Rotate knobs become **Feed / Kill**, which select the pattern type.
+- **Reaction-diffusion** (Feedback renderer only) — a Gray-Scott mode that grows organic Turing patterns (spots, mazes, coral) from the image. The Pull / Rotate knobs become **Feed / Kill** (which select the pattern type), and the Feedback slider becomes **Image drive** — how strongly the photo shapes the pattern (0 = free-running patterns, 1 = the image's tones dominate, mapping brightness to pattern density).
 
 ---
 
