@@ -350,6 +350,8 @@ const state = {
   frame: 0.45, frameW: 0.035, tint: '#5d8f86', tintA: 0.30,
   hue: 0, chroma: 0, ripple: 0, vign: 0.35, grain: 0.06,
   drift: 0.15, spin: 0, wobble: 0, rot: 0,
+  audioOn: 0, audioMode: 'mic', audioGain: 1.6, audioResp: 0.5,
+  aroutes: [ {band:'bass',target:'zoom',amt:0.5}, {band:'bass',target:'fbAmt',amt:0.4}, {band:'treble',target:'burst',amt:0.6}, {band:'mid',target:'spinRate',amt:0.5}, {band:'level',target:'exposure',amt:0.3} ],
   exposure: 1, contrast: 1, sat: 1, warm: 0, posterize: 0, scan: 0,
   pulse: 0, sway: 0, hueCycle: 0,
   chanSplit: 0, chanSwap: 0, dropout: 0, dither: 0, noiseG: 0, interlace: 0,
@@ -477,6 +479,8 @@ let customPresets = [];
 const $ = id => document.getElementById(id);
 const sliders = [
   ['depth','depthV',    v=>v.toFixed(0)],
+  ['audioGain','audioGainV', v=>v.toFixed(2)],
+  ['audioResp','audioRespV', v=>v.toFixed(2)],
   ['fbAmt','fbAmtV',   v=>v.toFixed(3)],
   ['step','stepV',     v=>v.toFixed(3)],
   ['twist','twistV',    v=>v.toFixed(1)],
@@ -591,6 +595,9 @@ function syncUI(){
   { const rr=$('rdRow'); if(rr) rr.style.display = state.rend===5 ? '' : 'none'; }
   if(state.rend===5 && state.rd){ $('stepLbl').textContent='Feed'; $('twistLbl').textContent='Kill'; }
   { const fl=$('fbLbl'); if(fl) fl.textContent = (state.rend===5 && state.rd) ? 'Image drive' : 'Feedback'; }
+  { const ao=$('audioOn'); if(ao){ ao.classList.toggle('on', !!state.audioOn); ao.textContent = state.audioOn ? 'on' : 'enable'; }
+    const am=$('audioMic'); if(am) am.classList.toggle('on', state.audioMode==='mic');
+    const af=$('audioFileBtn'); if(af) af.classList.toggle('on', state.audioMode==='file'); }
   $('rendNote').textContent = rendNotes[state.rend];
   renderStack();
 }
@@ -633,6 +640,11 @@ document.querySelectorAll('button.mode').forEach(b=>{
   b.addEventListener('click', ()=>{ state.rend = +b.dataset.rend; syncUI(); });
 });
 $('flip').addEventListener('click', ()=>{ state.flip = state.flip?0:1; syncUI(); });
+$('audioOn').addEventListener('click', ()=>{ audioEnable(!state.audioOn); });
+$('audioMic').addEventListener('click', ()=>{ state.audioMode='mic'; if(state.audioOn) audioSetMode('mic'); syncUI(); });
+$('audioFileBtn').addEventListener('click', ()=>{ $('audioFile').click(); });
+$('audioFile').addEventListener('change', e=>{ const f = e.target.files && e.target.files[0]; if(f) audioLoadFile(f); });
+$('addRoute').addEventListener('click', ()=>{ state.aroutes.push({band:'level', target:'zoom', amt:0.4}); renderRoutes(); });
 
 /* ---- fold stack UI ---- */
 /* display order is alphabetical; option values stay the stable type indices */
@@ -878,6 +890,11 @@ function applyPreset(val){
     if('pulse' in d) state.pulse = d.pulse;
     if('sway' in d) state.sway = d.sway;
     if('hueCycle' in d) state.hueCycle = d.hueCycle;
+    if('aroutes' in d && Array.isArray(d.aroutes)) state.aroutes = JSON.parse(JSON.stringify(d.aroutes));
+    if('audioGain' in d) state.audioGain = d.audioGain;
+    if('audioResp' in d) state.audioResp = d.audioResp;
+    if('audioMode' in d) state.audioMode = d.audioMode;
+    renderRoutes();
     if('chanSplit' in d) state.chanSplit = d.chanSplit;
     if('chanSwap' in d) state.chanSwap = d.chanSwap;
     if('dropout' in d) state.dropout = d.dropout;
@@ -1319,12 +1336,12 @@ function setUniforms(entry, w, h){
   }
   updateGlitch();
   gl.uniform1f(L.uDepth, state.depth);
-  gl.uniform1f(L.uStep, state.step);
-  gl.uniform1f(L.uTwist, state.twist * Math.PI/180);
+  gl.uniform1f(L.uStep, Math.max(0.42, Math.min(0.94, state.step + (AR.step||0))));
+  gl.uniform1f(L.uTwist, (state.twist + (AR.twist||0)) * Math.PI/180);
   gl.uniform1f(L.uFlip, state.flip);
   gl.uniform2f(L.uCenter, state.cx + 0.05*state.sway*Math.sin(swayPh), state.cy + 0.05*state.sway*Math.cos(swayPh*0.9));
   gl.uniform2f(L.uShift, state.shiftX + gJx, state.shiftY + gJy);
-  gl.uniform1f(L.uZoom, state.zoom * (1.0 + 0.15*state.pulse*Math.sin(pulsePh)));
+  gl.uniform1f(L.uZoom, state.zoom * (1.0 + 0.15*state.pulse*Math.sin(pulsePh)) + (AR.zoom||0));
   gl.uniform1f(L.uFrame, state.frame);
   gl.uniform1f(L.uFrameW, state.frameW);
   const t = hexToRgb(state.tint);
@@ -1333,20 +1350,20 @@ function setUniforms(entry, w, h){
   gl.uniform1f(L.uHueK, state.hue * Math.PI/180);
   gl.uniform1f(L.uChroma, state.chroma);
   gl.uniform1f(L.uRipple, state.ripple);
-  gl.uniform1f(L.uVign, state.vign);
+  gl.uniform1f(L.uVign, Math.max(0, Math.min(1, state.vign + (AR.vign||0))));
   gl.uniform1f(L.uGrain, state.grain);
-  gl.uniform1f(L.uExposure, state.exposure);
+  gl.uniform1f(L.uExposure, Math.max(0.1, state.exposure + (AR.exposure||0)));
   gl.uniform1f(L.uContrast, state.contrast);
   gl.uniform1f(L.uSat, state.sat);
   gl.uniform1f(L.uWarm, state.warm);
   gl.uniform1f(L.uPosterize, state.posterize);
   gl.uniform1f(L.uScan, state.scan);
   gl.uniform1f(L.uHueRot, hueRotPh);
-  gl.uniform1f(L.uChanSplit, Math.min(1, state.chanSplit + gBurst*0.6));
+  gl.uniform1f(L.uChanSplit, Math.min(1, state.chanSplit + (gBurst+arBurst)*0.6));
   gl.uniform1f(L.uChanSwap, state.chanSwap);
-  gl.uniform1f(L.uDropout, Math.min(1, state.dropout + gBurst*0.4));
+  gl.uniform1f(L.uDropout, Math.min(1, state.dropout + (gBurst+arBurst)*0.4));
   gl.uniform1f(L.uDither, state.dither);
-  gl.uniform1f(L.uNoiseG, Math.min(1, state.noiseG + gBurst*0.5));
+  gl.uniform1f(L.uNoiseG, Math.min(1, state.noiseG + (gBurst+arBurst)*0.5));
   gl.uniform1f(L.uInterlace, state.interlace);
   gl.uniform1f(L.uPhase, gStQ(phase));
   gl.uniform1f(L.uSpinA, gStQ(spinA + gJr) + (state.rot || 0) * Math.PI / 180);
@@ -1354,7 +1371,7 @@ function setUniforms(entry, w, h){
   gl.uniform1f(L.uWobble, state.wobble);
   gl.uniform1f(L.uSeed, state.seed);
   gl.uniform1i(L.uPrev, 1);
-  gl.uniform1f(L.uFbAmt, state.fbAmt);
+  gl.uniform1f(L.uFbAmt, Math.max(0, Math.min(0.98, state.fbAmt + (AR.fbAmt||0))));
   gl.uniform1f(L.uMosh, state.mosh);
   gl.uniform1f(L.uRD, state.rd);
   gl.uniform1f(L.uRDColorPass, 0.0);
@@ -1383,11 +1400,11 @@ function presentFeedback(w, h, srcTexIdx){
   gl.uniform1f(PU.uPosterize, state.posterize);
   gl.uniform1f(PU.uScan, state.scan);
   gl.uniform1f(PU.uHueRot, hueRotPh);
-  gl.uniform1f(PU.uChanSplit, Math.min(1, state.chanSplit + gBurst*0.6));
+  gl.uniform1f(PU.uChanSplit, Math.min(1, state.chanSplit + (gBurst+arBurst)*0.6));
   gl.uniform1f(PU.uChanSwap, state.chanSwap);
-  gl.uniform1f(PU.uDropout, Math.min(1, state.dropout + gBurst*0.4));
+  gl.uniform1f(PU.uDropout, Math.min(1, state.dropout + (gBurst+arBurst)*0.4));
   gl.uniform1f(PU.uDither, state.dither);
-  gl.uniform1f(PU.uNoiseG, Math.min(1, state.noiseG + gBurst*0.5));
+  gl.uniform1f(PU.uNoiseG, Math.min(1, state.noiseG + (gBurst+arBurst)*0.5));
   gl.uniform1f(PU.uInterlace, state.interlace);
   gl.uniform1f(PU.uRD, state.rd);
   { const _rt = hexToRgb(state.tint); gl.uniform3f(PU.uTint, _rt[0], _rt[1], _rt[2]); }
@@ -1486,16 +1503,116 @@ window.addEventListener('keydown', e=>{
   }
 });
 
+/* ================= audio reactivity ================= */
+const AUD = { ctx:null, analyser:null, freq:null, node:null, elNode:null, mediaEl:null, stream:null, bass:0, mid:0, treble:0, level:0, beat:0, _ba:0 };
+let AR = {};        // per-target additive offsets, recomputed each frame
+let arBurst = 0;    // audio glitch-burst, added to gBurst consumers
+const AR_BANDS = ['bass','mid','treble','level','beat'];
+const AR_BLABEL = { bass:'Bass', mid:'Mid', treble:'Treble', level:'Level', beat:'Beat' };
+const AR_TARGETS = ['zoom','fbAmt','twist','exposure','vign','step','driftRate','spinRate','hueRate','burst'];
+const AR_TLABEL = { zoom:'Zoom', fbAmt:'Feedback', twist:'Twist', exposure:'Exposure', vign:'Vignette', step:'Step / RD Feed', driftRate:'Drift speed', spinRate:'Spin speed', hueRate:'Hue shift', burst:'Glitch burst' };
+const AR_TSCALE = { zoom:0.6, fbAmt:0.4, twist:90, exposure:0.6, vign:0.5, step:0.25, driftRate:3, spinRate:3, hueRate:2.5, burst:1 };
+
+async function audioEnable(on){
+  state.audioOn = on ? 1 : 0;
+  if(on){
+    try {
+      if(!AUD.ctx) AUD.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if(AUD.ctx.state === 'suspended') await AUD.ctx.resume();
+      if(!AUD.analyser){ AUD.analyser = AUD.ctx.createAnalyser(); AUD.analyser.fftSize = 1024; AUD.analyser.smoothingTimeConstant = 0.6; AUD.freq = new Uint8Array(AUD.analyser.frequencyBinCount); }
+      await audioSetMode(state.audioMode);
+    } catch(e){ toast('Audio: ' + (e && e.message ? e.message : e)); state.audioOn = 0; }
+  } else {
+    if(AUD.mediaEl){ try{ AUD.mediaEl.pause(); }catch(_){} }
+  }
+  syncUI();
+}
+async function audioSetMode(mode){
+  state.audioMode = mode;
+  if(!AUD.ctx || !AUD.analyser) return;
+  try { if(AUD.node) AUD.node.disconnect(AUD.analyser); } catch(_){}
+  try { AUD.analyser.disconnect(); } catch(_){}
+  if(AUD.stream){ AUD.stream.getTracks().forEach(t=>t.stop()); AUD.stream = null; }
+  if(mode === 'mic'){
+    AUD.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation:false, autoGainControl:false, noiseSuppression:false } });
+    AUD.node = AUD.ctx.createMediaStreamSource(AUD.stream);
+    AUD.node.connect(AUD.analyser);   // analyser only (no speaker => no feedback)
+  } else {
+    if(!AUD.mediaEl){ toast('Load an audio file first'); return; }
+    if(!AUD.elNode) AUD.elNode = AUD.ctx.createMediaElementSource(AUD.mediaEl);  // once per element
+    AUD.node = AUD.elNode;
+    AUD.node.connect(AUD.analyser);
+    AUD.analyser.connect(AUD.ctx.destination);   // route file to speakers
+    AUD.mediaEl.play().catch(()=>{});
+  }
+}
+function audioLoadFile(file){
+  if(!file) return;
+  if(!AUD.mediaEl){ AUD.mediaEl = new Audio(); AUD.mediaEl.loop = true; }
+  try{ if(AUD.mediaEl.src) URL.revokeObjectURL(AUD.mediaEl.src); }catch(_){}
+  AUD.mediaEl.src = URL.createObjectURL(file);
+  state.audioMode = 'file';
+  if(state.audioOn) audioSetMode('file'); else audioEnable(true);
+}
+function audioSample(dt){
+  if(!state.audioOn || !AUD.analyser){ AUD.bass=AUD.mid=AUD.treble=AUD.level=0; AUD.beat=Math.max(0,AUD.beat-dt*3.5); return; }
+  AUD.analyser.getByteFrequencyData(AUD.freq);
+  const nb = AUD.freq.length, g = state.audioGain;
+  const band = (a,b)=>{ let s=0,c=0; const i0=Math.floor(a*nb), i1=Math.floor(b*nb); for(let i=i0;i<i1;i++){ s+=AUD.freq[i]; c++; } return c ? (s/c)/255 : 0; };
+  const bass = Math.min(1, band(0.00,0.04)*g), mid = Math.min(1, band(0.04,0.18)*g), treble = Math.min(1, band(0.18,0.50)*g);
+  const level = Math.min(1, (bass*0.5 + mid*0.35 + treble*0.25) * 1.2);
+  const k = 0.12 + state.audioResp*0.75;
+  AUD.bass += (bass-AUD.bass)*k; AUD.mid += (mid-AUD.mid)*k; AUD.treble += (treble-AUD.treble)*k; AUD.level += (level-AUD.level)*k;
+  AUD._ba += (AUD.bass - AUD._ba)*0.06;
+  if(AUD.bass > AUD._ba*1.3 && AUD.bass > 0.22) AUD.beat = 1; else AUD.beat = Math.max(0, AUD.beat - dt*3.5);
+}
+function audioRoutes(){
+  const o = {};
+  if(state.audioOn && AUD.ctx){
+    for(const r of state.aroutes){
+      const v = r.band==='bass'?AUD.bass : r.band==='mid'?AUD.mid : r.band==='treble'?AUD.treble : r.band==='beat'?AUD.beat : AUD.level;
+      o[r.target] = (o[r.target]||0) + v * r.amt * (AR_TSCALE[r.target]||1);
+    }
+  }
+  return o;
+}
+function updateMeter(){
+  const set=(id,v)=>{ const el=$(id); if(el) el.style.width = Math.round(Math.min(1,v)*100) + '%'; };
+  set('audMBass', AUD.bass); set('audMMid', AUD.mid); set('audMTreble', AUD.treble); set('audMLevel', AUD.level);
+}
+function renderRoutes(){
+  const host = $('aroutes'); if(!host) return;
+  host.innerHTML = '';
+  state.aroutes.forEach((r, i)=>{
+    const row = document.createElement('div'); row.className = 'aroute';
+    const bandSel = document.createElement('select');
+    AR_BANDS.forEach(b=>{ const o=document.createElement('option'); o.value=b; o.textContent=AR_BLABEL[b]; if(b===r.band) o.selected=true; bandSel.appendChild(o); });
+    bandSel.addEventListener('change', ()=>{ r.band = bandSel.value; });
+    const arrow = document.createElement('span'); arrow.textContent = '\u2192'; arrow.style.opacity = '0.5';
+    const tgtSel = document.createElement('select');
+    AR_TARGETS.forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=AR_TLABEL[t]; if(t===r.target) o.selected=true; tgtSel.appendChild(o); });
+    tgtSel.addEventListener('change', ()=>{ r.target = tgtSel.value; });
+    const amt = document.createElement('input'); amt.type='range'; amt.min='-1'; amt.max='1'; amt.step='0.01'; amt.value = r.amt;
+    const amtv = document.createElement('span'); amtv.className='amtv'; amtv.textContent = (+r.amt).toFixed(2);
+    amt.addEventListener('input', ()=>{ r.amt = +amt.value; amtv.textContent = (+amt.value).toFixed(2); });
+    const rx = document.createElement('span'); rx.className='rx'; rx.textContent='\u00d7'; rx.title='remove';
+    rx.addEventListener('click', ()=>{ state.aroutes.splice(i,1); renderRoutes(); });
+    row.append(bandSel, arrow, tgtSel, amt, amtv, rx);
+    host.appendChild(row);
+  });
+}
+
 function frame(now){
   const dt = Math.min(0.05, (now - lastT)/1000); lastT = now;
   if(exporting){ requestAnimationFrame(frame); return; }
+  audioSample(dt); AR = audioRoutes(); arBurst = AR.burst || 0; updateMeter();
   if(!reduced && !paused){
-    phase  += dt * state.drift * 0.6;
-    spinA  += dt * state.spin * 0.5;
+    phase  += dt * (state.drift + (AR.driftRate||0)) * 0.6;
+    spinA  += dt * (state.spin + (AR.spinRate||0)) * 0.5;
     wavePh += dt * state.wobble * 1.5;
     pulsePh += dt * 1.8;
     swayPh  += dt * 1.3;
-    hueRotPh += dt * state.hueCycle * 0.7;
+    hueRotPh += dt * (state.hueCycle * 0.7 + (AR.hueRate||0));
     glitchClock += dt;
   }
   if(kfPlaying && !paused) kfTick(dt);
@@ -1516,6 +1633,7 @@ function frame(now){
 }
 applySource();
 requestAnimationFrame(frame);
+renderRoutes();
 syncUI();
 
 /* ================= record animation ================= */
