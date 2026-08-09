@@ -95,6 +95,24 @@ const RENDERERS = {
     float dk = clamp(abs(s), 0.0, 48.0);
     col = shade(p, dk, e);`,
   5: `
+    if(uRD > 0.5){
+      vec2 tx = 1.0 / uCanvas;
+      vec4 sp = texture2D(uPrev, uv);
+      float U = sp.r, V = sp.g;
+      float seedL = dot(shade(uv, 0.0, 999.0), vec3(0.299,0.587,0.114));
+      if(U + V < 0.02){ U = 1.0; V = smoothstep(0.5, 0.8, seedL) * 0.4; }
+      float lU = texture2D(uPrev, uv+vec2(tx.x,0.0)).r + texture2D(uPrev, uv-vec2(tx.x,0.0)).r
+               + texture2D(uPrev, uv+vec2(0.0,tx.y)).r + texture2D(uPrev, uv-vec2(0.0,tx.y)).r - 4.0*U;
+      float lV = texture2D(uPrev, uv+vec2(tx.x,0.0)).g + texture2D(uPrev, uv-vec2(tx.x,0.0)).g
+               + texture2D(uPrev, uv+vec2(0.0,tx.y)).g + texture2D(uPrev, uv-vec2(0.0,tx.y)).g - 4.0*V;
+      float feed = mix(0.022, 0.058, clamp((uStep-0.42)/0.52, 0.0, 1.0));
+      float kill = mix(0.051, 0.063, clamp((uTwist+1.5708)/3.1416, 0.0, 1.0));
+      float uvv = U*V*V;
+      U += (0.16*lU - uvv + feed*(1.0-U));
+      V += (0.08*lV + uvv - (feed+kill)*V);
+      V += seedL * 0.02 * uFbAmt;
+      col = vec3(clamp(U,0.0,1.0), clamp(V,0.0,1.0), clamp(V,0.0,1.0));
+    } else {
     vec2 p = uv;
     float t = (uStep - 0.42) / 0.52;
     float fz = mix(0.90, 1.02, t);
@@ -124,7 +142,8 @@ const RENDERERS = {
     fb *= pow(glass, vec3(0.35));
     if(abs(uHueK) > 0.0001) fb = hueShift(fb, uHueK * 0.35);
     vec3 src = shade(p, 0.0, 999.0);
-    col = mix(src, fb, uFbAmt);`,
+    col = mix(src, fb, uFbAmt);
+    }`,
   6: `
     vec2 d = (uv - c) * vec2(ca, 1.0);
     float tile = mix(0.15, 1.2, (uStep - 0.42) / 0.52);
@@ -181,6 +200,38 @@ const RENDERERS = {
     if(uFlip > 0.5) p.x = 2.0*c.x - p.x;
     float e = clamp(0.6 - abs(fract(d.y + march) - 0.5), 0.0, 999.0);
     col = shade(p, 0.0, e);`,
+  10: `
+    vec2 d = (uv - c) * vec2(ca, 1.0);
+    d = rot(uTwist * 0.5) * d;
+    float R = length(d);
+    float ang = atan(d.y, d.x);
+    float dens = mix(1.0, 6.0, (uStep - 0.42) / 0.52);
+    float hr = 0.5 * log((1.0 + R) / (1.0 - min(R, 0.999)));
+    vec2 p = vec2(ang * 0.15915 + 0.5, hr * dens - ph * 0.25) + uShift;
+    if(uFlip > 0.5) p.x = 1.0 - p.x;
+    float dk = clamp((R - 0.85) / 0.15, 0.0, 1.0) * 6.0;
+    float e = clamp(1.0 - max(R - 1.0, 0.0) * 40.0, 0.0, 999.0);
+    col = shade(p, dk, e);`,
+  11: `
+    vec2 z = (uv - c) * vec2(ca, 1.0);
+    z = rot(uTwist * 0.5) * z;
+    float P = floor(mix(3.0, 8.0, (uStep - 0.42) / 0.52) + 0.5);
+    float ang0 = 3.14159265 / P;
+    float dcen = 1.0 / sin(ang0);
+    float rcir = sqrt(dcen*dcen - 1.0);
+    for(int i = 0; i < 16; i++){
+      float aa = atan(z.y, z.x);
+      float seg = TAU / P;
+      aa = abs(mod(aa, seg) - seg*0.5);
+      float rr = length(z);
+      z = rr * vec2(cos(aa), sin(aa));
+      vec2 dz = z - vec2(dcen, 0.0);
+      float d2 = dot(dz, dz);
+      if(d2 < rcir*rcir){ z = vec2(dcen, 0.0) + (rcir*rcir)*dz/d2; }
+      else { break; }
+    }
+    vec2 p = z * 0.5 + c + uShift + vec2(ph*0.05, 0.0);
+    col = shade(p, 0.0, 999.0);`,
 };
 
 // transitive closure of helper deps, emitted in dependency order
