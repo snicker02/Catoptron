@@ -407,7 +407,7 @@ const state = {
   hue: 0, chroma: 0, ripple: 0, vign: 0.35, grain: 0.06,
   drift: 0.15, spin: 0, wobble: 0, rot: 0,
   audioOn: 0, audioMode: 'mic', audioGain: 1.6, audioResp: 0.5, beatSens: 0.55,
-  aroutes: [ {band:'bass',target:'zoom',amt:0.5}, {band:'bass',target:'fbAmt',amt:0.4}, {band:'treble',target:'burst',amt:0.6}, {band:'mid',target:'spinRate',amt:0.5}, {band:'level',target:'exposure',amt:0.3} ],
+  aroutes: [ {band:'bass',target:'zoom',amt:0.5}, {band:'treble',target:'twist',amt:0.5} ],
   exposure: 1, contrast: 1, sat: 1, warm: 0, posterize: 0, scan: 0,
   pulse: 0, sway: 0, hueCycle: 0,
   chanSplit: 0, chanSwap: 0, dropout: 0, dither: 0, noiseG: 0, interlace: 0,
