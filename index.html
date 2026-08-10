@@ -515,7 +515,8 @@ input[type=file]{display:none}
       <div class="row"><label>Stutter</label><input type="range" id="stutter" min="0" max="1" step="0.01" value="0"><span class="val" id="stutterV"></span></div>
       <div class="row"><label>Jitter</label><input type="range" id="jitter" min="0" max="1" step="0.01" value="0"><span class="val" id="jitterV"></span></div>
       <div class="row"><label>Glitch burst</label><input type="range" id="burst" min="0" max="1" step="0.01" value="0"><span class="val" id="burstV"></span></div>
-      <div class="note">Drift falls through the reflections, spin rotates everything, wobble undulates the whole pattern. Pulse breathes the zoom, sway drifts the framing, hue cycle rotates colours over time. Stutter quantises the clock into steps, jitter shakes the framing per frame, and glitch burst spikes channel-split/noise/dropout on a beat (0 = still).</div>
+      <div class="row"><label title="Temporal blur: blends recent frames so motion smears; static areas stay sharp">Motion blur</label><input type="range" id="mblur" min="0" max="0.95" step="0.01" value="0"><span class="val" id="mblurV"></span></div>
+      <div class="note">Drift falls through the reflections, spin rotates everything, wobble undulates the whole pattern. Pulse breathes the zoom, sway drifts the framing, hue cycle rotates colours over time. Stutter quantises the clock into steps, jitter shakes the framing per frame, and glitch burst spikes channel-split/noise/dropout on a beat (0 = still). Motion blur smears moving areas by blending recent frames (static areas stay sharp) &mdash; it blurs all motion, including audio-driven moves.</div>
     </div>
 
     <div class="group">
