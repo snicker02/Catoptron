@@ -115,6 +115,62 @@ const PU = {};
 ['uSrc','uVign','uGrain','uWavePh','uSeed','uExposure','uContrast','uSat','uWarm','uPosterize','uScan','uHueRot','uChanSplit','uChanSwap','uDropout','uDither','uNoiseG','uInterlace','uRD','uTint','uTintA','uFx'].forEach(n => PU[n] = gl.getUniformLocation(postProg, n));
 const postLoc = gl.getAttribLocation(postProg, 'aPos');
 
+// ---- motion blur: temporal accumulation of the final canvas ----
+const MBFS = `precision highp float; varying vec2 vUv; uniform sampler2D uCur; uniform sampler2D uPrev; uniform float uBlur; void main(){ vec3 c=texture2D(uCur,vUv).rgb; vec3 p=texture2D(uPrev,vUv).rgb; gl_FragColor=vec4(mix(c,p,uBlur),1.0); }`;
+const mbProg = gl.createProgram();
+gl.attachShader(mbProg, compile(gl.VERTEX_SHADER, VS));
+gl.attachShader(mbProg, compile(gl.FRAGMENT_SHADER, MBFS));
+gl.linkProgram(mbProg);
+if(!gl.getProgramParameter(mbProg, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(mbProg));
+const MBU = {}; ['uCur','uPrev','uBlur'].forEach(k => MBU[k] = gl.getUniformLocation(mbProg, k));
+const mbLoc = gl.getAttribLocation(mbProg, 'aPos');
+let mbCur = null, mbAccum = [], mbFbo = [], mbW = 0, mbH = 0, mbRead = 0, mbInit = false;
+function mbTex(w, h){
+  const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  return t;
+}
+function ensureMB(w, h){
+  if(mbW === w && mbH === h && mbCur) return;
+  if(mbCur) gl.deleteTexture(mbCur);
+  mbAccum.forEach(t => gl.deleteTexture(t)); mbFbo.forEach(f => gl.deleteFramebuffer(f));
+  mbAccum = []; mbFbo = [];
+  mbCur = mbTex(w, h);
+  for(let i = 0; i < 2; i++){
+    const t = mbTex(w, h);
+    const f = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+    mbAccum.push(t); mbFbo.push(f);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  mbW = w; mbH = h; mbRead = 0; mbInit = false;
+}
+// runs AFTER the frame is drawn to the canvas; blends it into a persistent buffer
+function motionBlurPass(w, h, amount){
+  ensureMB(w, h);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.bindTexture(gl.TEXTURE_2D, mbCur);
+  gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, w, h);   // grab the fresh frame
+  const blur = mbInit ? Math.max(0, Math.min(0.97, amount)) : 0.0;
+  const write = 1 - mbRead;
+  gl.useProgram(mbProg); bindQuad(mbLoc);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, mbFbo[write]); gl.viewport(0, 0, w, h);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, mbCur); gl.uniform1i(MBU.uCur, 0);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, mbAccum[mbRead]); gl.uniform1i(MBU.uPrev, 1);
+  gl.uniform1f(MBU.uBlur, blur);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, w, h);   // blit result to canvas
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, mbAccum[write]); gl.uniform1i(MBU.uCur, 0);
+  gl.uniform1f(MBU.uBlur, 0.0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  mbRead = write; mbInit = true;
+}
+
 /* ================= assembled-program cache ================= */
 /* the fold shader is assembled per stack+renderer; each program has its own uniform locations,
    discovered automatically by the cache, so operators declare as many param banks as they need */
@@ -355,7 +411,7 @@ const state = {
   exposure: 1, contrast: 1, sat: 1, warm: 0, posterize: 0, scan: 0,
   pulse: 0, sway: 0, hueCycle: 0,
   chanSplit: 0, chanSwap: 0, dropout: 0, dither: 0, noiseG: 0, interlace: 0,
-  stutter: 0, jitter: 0, burst: 0, mosh: 0, rd: 0,
+  stutter: 0, jitter: 0, burst: 0, mosh: 0, rd: 0, mblur: 0,
   cx: 0.5, cy: 0.5, seed: 7.13, aspect: 'free', fbAmt: 0.9, src: 'orbs',
   ccMode: 0, ccTint: '#ff5d7a',
   srcScale: 1, srcHue: 0, srcVar: 0.5
@@ -519,6 +575,7 @@ const sliders = [
   ['jitter','jitterV',v=>v.toFixed(2)],
   ['burst','burstV',v=>v.toFixed(2)],
   ['mosh','moshV',v=>v.toFixed(2)],
+  ['mblur','mblurV',v=>v.toFixed(2)],
   ['rd','rdV',v=>v.toFixed(0)],
   ['srcScale','srcScaleV',v=>v.toFixed(2)],
   ['srcHue','srcHueV',v=>v.toFixed(0)],
@@ -921,6 +978,7 @@ function applyPreset(val){
     if('jitter' in d) state.jitter = d.jitter;
     if('burst' in d) state.burst = d.burst;
     if('mosh' in d) state.mosh = d.mosh;
+    if('mblur' in d) state.mblur = d.mblur;
     if('rd' in d) state.rd = d.rd;
     if('tint'  in d) state.tint  = d.tint;
     if('tintA' in d) state.tintA = d.tintA;
@@ -1526,7 +1584,7 @@ let arBurst = 0;    // audio glitch-burst, added to gBurst consumers
 const AR_BANDS = ['bass','mid','treble','level','beat'];
 const AR_BLABEL = { bass:'Bass', mid:'Mid', treble:'Treble', level:'Level', beat:'Beat' };
 // AR targets are auto-derived from every sensible slider: real range -> scale + clamp, so all params react
-const AR_LABEL = { zoom:'Zoom', twist:'Twist', rot:'Rotate', shiftX:'Pan X', shiftY:'Pan Y', depth:'Depth', step:'Step / RD Feed', ripple:'Ripple', chroma:'Chroma', wobble:'Wobble', fbAmt:'Feedback', exposure:'Exposure', contrast:'Contrast', sat:'Saturation', warm:'Warmth', hue:'Hue', tintA:'Tint amount', vign:'Vignette', grain:'Grain', posterize:'Posterize', scan:'Scanlines', chanSplit:'Channel split', chanSwap:'Channel swap', dropout:'Dropout', dither:'Dither', noiseG:'Noise', interlace:'Interlace', stutter:'Stutter', jitter:'Jitter', burst:'Glitch burst', mosh:'Datamosh', driftRate:'Drift speed', spinRate:'Spin speed', hueRate:'Hue-cycle speed', frame:'Frame', frameW:'Frame width', srcScale:'Source scale', srcHue:'Source hue', srcVar:'Source variance', pulse:'Pulse', sway:'Sway' };
+const AR_LABEL = { zoom:'Zoom', twist:'Twist', rot:'Rotate', shiftX:'Pan X', shiftY:'Pan Y', depth:'Depth', step:'Step / RD Feed', ripple:'Ripple', chroma:'Chroma', wobble:'Wobble', fbAmt:'Feedback', exposure:'Exposure', contrast:'Contrast', sat:'Saturation', warm:'Warmth', hue:'Hue', tintA:'Tint amount', vign:'Vignette', grain:'Grain', posterize:'Posterize', scan:'Scanlines', chanSplit:'Channel split', chanSwap:'Channel swap', dropout:'Dropout', dither:'Dither', noiseG:'Noise', interlace:'Interlace', stutter:'Stutter', jitter:'Jitter', burst:'Glitch burst', mosh:'Datamosh', driftRate:'Drift speed', spinRate:'Spin speed', hueRate:'Hue-cycle speed', frame:'Frame', frameW:'Frame width', srcScale:'Source scale', srcHue:'Source hue', srcVar:'Source variance', pulse:'Pulse', sway:'Sway', mblur:'Motion blur' };
 const AR_TUNE = { ripple:{mult:3.0,max:4}, chroma:{mult:1.2}, depth:{mult:0.5}, twist:{mult:0.5}, rot:{mult:0.35}, hue:{mult:0.5}, srcHue:{mult:0.4}, posterize:{mult:0.5}, dither:{mult:0.5}, zoom:{mult:0.4} };
 const AR_MOTION = { drift:'driftRate', spin:'spinRate', hueCycle:'hueRate' };   // rate targets (added to accumulators)
 const AR_RATE_META = { driftRate:{s:3}, spinRate:{s:3}, hueRate:{s:2.5} };
@@ -1537,7 +1595,7 @@ const AR_GROUPS = [
   ['Feedback', ['fbAmt']],
   ['Grade', ['exposure','contrast','sat','warm','hue','tintA','vign','grain','posterize','scan']],
   ['Glitch', ['chanSplit','chanSwap','dropout','dither','noiseG','interlace','stutter','jitter','burst','mosh']],
-  ['Motion', ['driftRate','spinRate','hueRate','pulse','sway']],
+  ['Motion', ['driftRate','spinRate','hueRate','pulse','sway','mblur']],
   ['Frame / source', ['frame','frameW','srcScale','srcHue','srcVar']],
 ];
 const AR_DIRECT = {}, AR_TLABEL = {}, AR_SCALE = {};
@@ -1772,6 +1830,7 @@ function frame(now){
   }
   applyAR();
   try { renderScene(w, h); } finally { restoreAR(); }
+  { const mb = state.mblur + (AR.mblur||0); if(mb > 0.001) motionBlurPass(w, h, mb); else mbInit = false; }
   requestAnimationFrame(frame);
 }
 applySource();
@@ -2091,12 +2150,14 @@ hqBtn.addEventListener('click', async ()=>{
   const breathe = ()=> new Promise(r => requestAnimationFrame(r));
 
   try{
+    mbInit = false;
     /* feedback: rebuild causal history at export resolution */
     if(state.rend === 5){
       ensureFB(ew, eh);
       const warm = Math.min(600, Math.max(60, Math.round(6 / (1 - state.fbAmt + 0.001))));
       for(let i = 0; i < warm && !hqAbort; i++){
         renderScene(ew, eh);
+        if(state.mblur > 0.001) motionBlurPass(ew, eh, state.mblur);
         step();
         if(i % 15 === 0){ hqBtn.textContent = `warmup ${i}/${warm}`; await breathe(); }
       }
@@ -2106,6 +2167,7 @@ hqBtn.addEventListener('click', async ()=>{
     for(let n = 0; n < frames && !hqAbort && !encErr; n++){
       if(kfBase) kfApply(kfExportU(n, frames));
       renderScene(ew, eh);
+      if(state.mblur > 0.001) motionBlurPass(ew, eh, state.mblur);
       const vf = new VideoFrame(canvas, {
         timestamp: Math.round(n * 1e6 / fps),
         duration:  Math.round(1e6 / fps)
