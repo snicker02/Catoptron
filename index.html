@@ -564,7 +564,8 @@ input[type=file]{display:none}
         </select>
         <button id="hqBtn" class="rec" style="flex:1.2">HQ Video</button>
       </div>
-      <div class="note">Record captures the live canvas in realtime. HQ Video renders offline frame-by-frame via WebCodecs &mdash; loops close exactly, and Feedback history is rebuilt at export resolution.</div>
+      <label class="row" style="gap:6px;font-size:11px;margin-top:5px;cursor:pointer;margin-bottom:0"><input type="checkbox" id="hqSyncAudio" checked style="flex:0 0 auto;width:auto;margin:0"> sync audio into MP4 (file source)</label>
+      <div class="note">Record captures the live canvas in realtime. HQ Video renders offline frame-by-frame via WebCodecs &mdash; loops close exactly, and Feedback history is rebuilt at export resolution. With an audio <b>file</b> loaded and <b>MP4</b> selected, HQ Video re-analyses the track offline so the reactivity stays frame-synced and muxes the audio into the file.</div>
     </div>
 
   </div>
