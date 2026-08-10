@@ -1581,6 +1581,41 @@ window.addEventListener('keydown', e=>{
 const AUD = { ctx:null, analyser:null, freq:null, node:null, elNode:null, mediaEl:null, stream:null, bass:0, mid:0, treble:0, level:0, beat:0, _refr:0, _prevKick:0, hist:new Float32Array(43), hi:0, recDest:null };
 let AR = {};        // per-target additive offsets, recomputed each frame
 let arBurst = 0;    // audio glitch-burst, added to gBurst consumers
+// --- offline FFT audio analysis (for synced HQ export; mirrors the live analyser) ---
+function _fft(re, im){
+  const n = re.length;
+  for(let i=1,j=0;i<n;i++){ let bit=n>>1; for(;j&bit;bit>>=1) j^=bit; j^=bit; if(i<j){ const tr=re[i];re[i]=re[j];re[j]=tr; const ti=im[i];im[i]=im[j];im[j]=ti; } }
+  for(let len=2;len<=n;len<<=1){ const ang=-2*Math.PI/len, wr=Math.cos(ang), wi=Math.sin(ang);
+    for(let i=0;i<n;i+=len){ let cwr=1,cwi=0;
+      for(let k=0;k<len/2;k++){ const ur=re[i+k],ui=im[i+k]; const br=re[i+k+len/2],bi=im[i+k+len/2];
+        const vr=br*cwr-bi*cwi, vi=br*cwi+bi*cwr;
+        re[i+k]=ur+vr; im[i+k]=ui+vi; re[i+k+len/2]=ur-vr; im[i+k+len/2]=ui-vi;
+        const nwr=cwr*wr-cwi*wi; cwi=cwr*wi+cwi*wr; cwr=nwr; } } }
+}
+function makeOfflineAudio(chL, chR, sampleRate, fps){
+  const N=2048, half=N/2; const re=new Float32Array(N), im=new Float32Array(N);
+  const win=new Float32Array(N); for(let i=0;i<N;i++) win[i]=0.5-0.5*Math.cos(2*Math.PI*i/(N-1));
+  const smoothMag=new Float32Array(half); const minDb=-100,maxDb=-30,smoothC=0.6;
+  const A={bass:0,mid:0,treble:0,level:0,beat:0,_refr:0,_prevKick:0,hist:new Float32Array(43),hi:0}; const dt=1/fps;
+  return function(fn){
+    const center=Math.floor((fn/fps)*sampleRate);
+    for(let i=0;i<N;i++){ const s=center-N+i+1; let v=0; if(s>=0&&s<chL.length) v=(chL[s]+chR[s])*0.5; re[i]=v*win[i]; im[i]=0; }
+    _fft(re,im);
+    for(let k=0;k<half;k++){ const mag=Math.sqrt(re[k]*re[k]+im[k]*im[k])/N; smoothMag[k]=smoothC*smoothMag[k]+(1-smoothC)*mag; }
+    const g=state.audioGain;
+    const band=(a,b)=>{ let s=0,c=0; const i0=Math.floor(a*half),i1=Math.floor(b*half); for(let k=i0;k<i1;k++){ const db=20*Math.log10(smoothMag[k]||1e-9); const byte=Math.max(0,Math.min(255,255*(db-minDb)/(maxDb-minDb))); s+=byte;c++; } return c?(s/c)/255:0; };
+    const bass=Math.min(1,band(0,0.04)*g), mid=Math.min(1,band(0.04,0.18)*g), treble=Math.min(1,band(0.18,0.5)*g);
+    const level=Math.min(1,(bass*0.5+mid*0.35+treble*0.25)*1.2);
+    const k=0.12+state.audioResp*0.75;
+    A.bass+=(bass-A.bass)*k; A.mid+=(mid-A.mid)*k; A.treble+=(treble-A.treble)*k; A.level+=(level-A.level)*k;
+    const kick=Math.min(1,band(0.002,0.025)*g);
+    const H=A.hist,M=H.length; let hs=0; for(let i=0;i<M;i++)hs+=H[i]; const havg=hs/M; let hv=0; for(let i=0;i<M;i++){const d=H[i]-havg;hv+=d*d;} const hstd=Math.sqrt(hv/M);
+    const kk=2.2-state.beatSens*1.8; const thr=havg+kk*hstd+0.015; const rising=kick>A._prevKick+0.004;
+    if(kick>thr&&kick>0.08&&rising&&A._refr<=0){A.beat=1;A._refr=0.10;} else A.beat=Math.max(0,A.beat-dt*4.0);
+    A._refr=Math.max(0,A._refr-dt); A._prevKick=kick; H[A.hi]=kick; A.hi=(A.hi+1)%M;
+    return A;
+  };
+}
 const AR_BANDS = ['bass','mid','treble','level','beat'];
 const AR_BLABEL = { bass:'Bass', mid:'Mid', treble:'Treble', level:'Level', beat:'Beat' };
 // AR targets are auto-derived from every sensible slider: real range -> scale + clamp, so all params react
@@ -1707,6 +1742,7 @@ async function audioSetMode(mode){
 }
 function audioLoadFile(file){
   if(!file) return;
+  AUD.file = file;
   if(!AUD.mediaEl){ AUD.mediaEl = new Audio(); AUD.mediaEl.loop = true; }
   try{ if(AUD.mediaEl.src) URL.revokeObjectURL(AUD.mediaEl.src); }catch(_){}
   AUD.mediaEl.src = URL.createObjectURL(file);
@@ -2000,6 +2036,7 @@ let hqAbort = false;
 function MP4Muxer(width, height, fps){
   const chunks = [], samples = [];
   let avcC = null;
+  const aChunks = [], aSizes = []; let asc = null, aSR = 0, aCh = 2;
   const u16 = n => [(n>>>8)&255, n&255];
   const u32 = n => [(n>>>24)&255,(n>>>16)&255,(n>>>8)&255,n&255];
   const s4  = s => [s.charCodeAt(0),s.charCodeAt(1),s.charCodeAt(2),s.charCodeAt(3)];
@@ -2007,6 +2044,7 @@ function MP4Muxer(width, height, fps){
   const cat = arrs => { let o=[]; for(const a of arrs) o = o.concat(a); return o; };
   const box = (t, ...p) => { const b = cat(p); return cat([u32(b.length+8), s4(t), b]); };
   const fbox= (t, v, f, ...p) => box(t, cat([[v],[(f>>>16)&255,(f>>>8)&255,f&255]]), ...p);
+  const desclen = n => { const b=[]; do { let x=n & 0x7f; n>>=7; if(b.length) x|=0x80; b.unshift(x); } while(n>0); return b; };
   const MATRIX = cat([u32(0x00010000),u32(0),u32(0), u32(0),u32(0x00010000),u32(0), u32(0),u32(0),u32(0x40000000)]);
   return {
     add(chunk, meta){
@@ -2015,14 +2053,24 @@ function MP4Muxer(width, height, fps){
       const b = new Uint8Array(chunk.byteLength); chunk.copyTo(b);
       chunks.push(b); samples.push({ size: b.byteLength, key: chunk.type === 'key' });
     },
+    setAudio(sr, ch){ aSR = sr; aCh = ch || 2; },
+    addAudio(chunk, meta){
+      if(!asc && meta && meta.decoderConfig && meta.decoderConfig.description) asc = new Uint8Array(meta.decoderConfig.description);
+      const b = new Uint8Array(chunk.byteLength); chunk.copyTo(b); aChunks.push(b); aSizes.push(b.byteLength);
+    },
     finish(){
       const N = samples.length;
       if(!avcC) avcC = new Uint8Array([1,66,0,31,255,225,0,0,1,0,0]);
+      const hasAudio = aChunks.length > 0 && asc && aSR > 0;
       const ftyp = box('ftyp', s4('isom'), u32(512), s4('isom'), s4('iso2'), s4('avc1'), s4('mp41'));
-      let mb = 0; for(const s of samples) mb += s.size;
-      const mdatH = cat([u32(mb + 8), s4('mdat')]);
+      let vBytes = 0; for(const s of samples) vBytes += s.size;
+      let aBytes = 0; for(const s of aSizes) aBytes += s;
+      const mdatH = cat([u32(vBytes + aBytes + 8), s4('mdat')]);
       const keys = []; samples.forEach((s,i)=>{ if(s.key) keys.push(i+1); });
-      const buildMoov = (dataOffset)=>{
+      const AF = aSizes.length, aSamplesTotal = AF * 1024;
+      const aDurMovie = hasAudio ? Math.round(aSamplesTotal / aSR * fps) : 0;
+      const movieDur = Math.max(N, aDurMovie);
+      const videoTrak = (dataOffset)=>{
         const stts = fbox('stts',0,0, u32(1), u32(N), u32(1));
         const stss = fbox('stss',0,0, u32(keys.length), cat(keys.map(u32)));
         const stsc = fbox('stsc',0,0, u32(1), u32(1), u32(N), u32(1));
@@ -2037,17 +2085,46 @@ function MP4Muxer(width, height, fps){
         const mdia = box('mdia',
           fbox('mdhd',0,0, u32(0),u32(0), u32(fps), u32(N), u16(0x55C4), u16(0)),
           fbox('hdlr',0,0, u32(0), s4('vide'), cat([u32(0),u32(0),u32(0)]), cstr('VideoHandler')), minf);
-        const trak = box('trak',
+        return box('trak',
           fbox('tkhd',0,7, u32(0),u32(0), u32(1), u32(0), u32(N), u32(0),u32(0), u16(0),u16(0), u16(0),u16(0),
             MATRIX, u32(width*65536), u32(height*65536)), mdia);
-        return box('moov',
-          fbox('mvhd',0,0, u32(0),u32(0), u32(fps), u32(N), u32(0x00010000), u16(0x0100), u16(0),
-            cat([u32(0),u32(0)]), MATRIX, cat([u32(0),u32(0),u32(0),u32(0),u32(0),u32(0)]), u32(2)), trak);
       };
-      const moov0 = buildMoov(0);
-      const dataOffset = ftyp.length + moov0.length + mdatH.length;   // faststart: ftyp, moov, mdat
-      const moov = buildMoov(dataOffset);
-      return new Blob([Uint8Array.from(ftyp), Uint8Array.from(moov), Uint8Array.from(mdatH), ...chunks], {type:'video/mp4'});
+      const audioTrak = (aOffset)=>{
+        const dsi = cat([[0x05], desclen(asc.length), [...asc]]);
+        const dcdBody = cat([[0x40], [0x15], [0,0,0], u32(128000), u32(128000), dsi]);
+        const dcd = cat([[0x04], desclen(dcdBody.length), dcdBody]);
+        const slc = cat([[0x06], desclen(1), [0x02]]);
+        const esBody = cat([u16(0), [0], dcd, slc]);
+        const esDesc = cat([[0x03], desclen(esBody.length), esBody]);
+        const esdsBox = fbox('esds', 0, 0, esDesc);
+        const mp4a = box('mp4a', [0,0,0,0,0,0], u16(1), u32(0), u32(0), u16(aCh), u16(16), u16(0), u16(0), u32((aSR*65536)>>>0), esdsBox);
+        const stts = fbox('stts',0,0, u32(1), u32(AF), u32(1024));
+        const stsc = fbox('stsc',0,0, u32(1), u32(1), u32(AF), u32(1));
+        const stsz = fbox('stsz',0,0, u32(0), u32(AF), cat(aSizes.map(u32)));
+        const stco = fbox('stco',0,0, u32(1), u32(aOffset));
+        const stbl = box('stbl', fbox('stsd',0,0, u32(1), mp4a), stts, stsc, stsz, stco);
+        const minf = box('minf', fbox('smhd',0,0, u16(0), u16(0)),
+          box('dinf', fbox('dref',0,0, u32(1), fbox('url ',0,1))), stbl);
+        const mdia = box('mdia',
+          fbox('mdhd',0,0, u32(0),u32(0), u32(aSR), u32(aSamplesTotal), u16(0x55C4), u16(0)),
+          fbox('hdlr',0,0, u32(0), s4('soun'), cat([u32(0),u32(0),u32(0)]), cstr('SoundHandler')), minf);
+        return box('trak',
+          fbox('tkhd',0,7, u32(0),u32(0), u32(2), u32(0), u32(aDurMovie), u32(0),u32(0), u16(0),u16(0), u16(0x0100),u16(0),
+            MATRIX, u32(0), u32(0)), mdia);
+      };
+      const buildMoov = (vOffset, aOffset)=>{
+        const traks = [videoTrak(vOffset)];
+        if(hasAudio) traks.push(audioTrak(aOffset));
+        return box('moov',
+          fbox('mvhd',0,0, u32(0),u32(0), u32(fps), u32(movieDur), u32(0x00010000), u16(0x0100), u16(0),
+            cat([u32(0),u32(0)]), MATRIX, cat([u32(0),u32(0),u32(0),u32(0),u32(0),u32(0)]), u32(hasAudio?3:2)),
+          ...traks);
+      };
+      const moov0 = buildMoov(0, 0);
+      const vOffset = ftyp.length + moov0.length + mdatH.length;
+      const aOffset = vOffset + vBytes;
+      const moov = buildMoov(vOffset, aOffset);
+      return new Blob([Uint8Array.from(ftyp), Uint8Array.from(moov), Uint8Array.from(mdatH), ...chunks, ...aChunks], {type:'video/mp4'});
     }
   };
 }
@@ -2128,7 +2205,32 @@ hqBtn.addEventListener('click', async ()=>{
     mux = new WebMMuxer(ew, eh, codecId); ext = 'webm';
     cfg = {codec, width:ew, height:eh, bitrate:mbps*1e6, framerate:fps};
   }
+  // --- synced audio: decode the file + AAC encoder (MP4 + file source only; any failure => silent video) ---
+  let audioEncoder = null, offlineSampler = null, syncAudio = false, audioBuffer = null, audioCh = 2;
+  const wantAudio = fmt === 'mp4' && state.audioOn && state.audioMode === 'file' && AUD.file
+    && $('hqSyncAudio') && $('hqSyncAudio').checked
+    && typeof AudioEncoder !== 'undefined' && typeof AudioData !== 'undefined';
   let encErr = null;
+  if(wantAudio){
+    try {
+      const abuf = await AUD.file.arrayBuffer();
+      const dctx = new (window.AudioContext || window.webkitAudioContext)();
+      audioBuffer = await dctx.decodeAudioData(abuf.slice(0));
+      try { dctx.close(); } catch(_){}
+      audioCh = Math.min(2, audioBuffer.numberOfChannels);
+      const asr = audioBuffer.sampleRate;
+      const sup = await AudioEncoder.isConfigSupported({ codec:'mp4a.40.2', sampleRate:asr, numberOfChannels:audioCh, bitrate:128000 });
+      if(sup && sup.supported){
+        mux.setAudio(asr, audioCh);
+        audioEncoder = new AudioEncoder({ output:(c,meta)=>mux.addAudio(c,meta), error:e=>{ encErr = e; } });
+        audioEncoder.configure({ codec:'mp4a.40.2', sampleRate:asr, numberOfChannels:audioCh, bitrate:128000 });
+        const L = audioBuffer.getChannelData(0);
+        const R = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : L;
+        offlineSampler = makeOfflineAudio(L, R, asr, fps);
+        syncAudio = true;
+      }
+    } catch(e){ syncAudio = false; audioEncoder = null; }
+  }
   const encoder = new VideoEncoder({
     output: (chunk, meta) => mux.add(chunk, meta),
     error:  e => { encErr = e; }
@@ -2142,9 +2244,14 @@ hqBtn.addEventListener('click', async ()=>{
   canvas.width = ew; canvas.height = eh;
   if(lenSel === 'loop1' || lenSel === 'loop2') phase = 0;
 
+  const isLoop = (lenSel === 'loop1' || lenSel === 'loop2');
   const step = ()=>{
-    phase += phaseStep; spinA += spinStep; wavePh += waveStep;
-    pulsePh += (1/fps) * 1.8; swayPh += (1/fps) * 1.3; hueRotPh += (1/fps) * state.hueCycle * 0.7; glitchClock += (1/fps);
+    phase += phaseStep + (isLoop ? 0 : (1/fps) * (AR.driftRate||0) * 0.6);
+    spinA += spinStep + (isLoop ? 0 : (1/fps) * (AR.spinRate||0) * 0.5);
+    wavePh += waveStep + (1/fps) * (AR.wobble||0) * 1.5;
+    pulsePh += (1/fps) * 1.8; swayPh += (1/fps) * 1.3;
+    hueRotPh += (1/fps) * (state.hueCycle * 0.7 + (isLoop ? 0 : (AR.hueRate||0)));
+    glitchClock += (1/fps);
     phase = ((phase % period) + period) % period;
   };
   const breathe = ()=> new Promise(r => requestAnimationFrame(r));
@@ -2166,8 +2273,13 @@ hqBtn.addEventListener('click', async ()=>{
 
     for(let n = 0; n < frames && !hqAbort && !encErr; n++){
       if(kfBase) kfApply(kfExportU(n, frames));
+      if(syncAudio){ const A = offlineSampler(n); AUD.bass=A.bass; AUD.mid=A.mid; AUD.treble=A.treble; AUD.level=A.level; AUD.beat=A.beat; AR = audioRoutes(); } else { AR = {}; }
+      arBurst = AR.burst || 0;
+      if(syncAudio) applyAR();
       renderScene(ew, eh);
-      if(state.mblur > 0.001) motionBlurPass(ew, eh, state.mblur);
+      const mbAmt = state.mblur;
+      if(syncAudio) restoreAR();
+      if(mbAmt > 0.001) motionBlurPass(ew, eh, mbAmt);
       const vf = new VideoFrame(canvas, {
         timestamp: Math.round(n * 1e6 / fps),
         duration:  Math.round(1e6 / fps)
@@ -2186,13 +2298,30 @@ hqBtn.addEventListener('click', async ()=>{
       hqBtn.textContent = 'encoding\u2026';
       await encoder.flush();
       encoder.close();
+      if(syncAudio && audioEncoder && !encErr){
+        hqBtn.textContent = 'audio\u2026';
+        const asr = audioBuffer.sampleRate;
+        const L = audioBuffer.getChannelData(0);
+        const R = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : L;
+        const total = Math.min(L.length, Math.ceil(dur * asr));
+        const FR = 1024;
+        for(let off = 0; off < total && !encErr; off += FR){
+          const cnt = Math.min(FR, total - off);
+          const data = new Float32Array(cnt * audioCh);
+          for(let i = 0; i < cnt; i++){ data[i] = L[off+i] || 0; if(audioCh > 1) data[cnt + i] = R[off+i] || 0; }
+          const ad = new AudioData({ format:'f32-planar', sampleRate:asr, numberOfFrames:cnt, numberOfChannels:audioCh, timestamp: Math.round(off / asr * 1e6), data });
+          audioEncoder.encode(ad); ad.close();
+          if((off / FR) % 64 === 0) await breathe();
+        }
+        await audioEncoder.flush(); audioEncoder.close();
+      }
       const blob = mux.finish();
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `catoptron-hq-${Date.now()}.${ext}`;
       a.click();
       setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
-      toast(`HQ export: ${ew}\u00d7${eh}, ${frames} frames, ${ext.toUpperCase()}`);
+      toast(`HQ export: ${ew}\u00d7${eh}, ${frames} frames, ${ext.toUpperCase()}${syncAudio ? ' + audio' : ''}`);
     } else {
       try{ encoder.close(); }catch(_){}
       toast(encErr ? 'encoder error \u2014 try a lower resolution' : 'HQ export cancelled');
@@ -2201,6 +2330,7 @@ hqBtn.addEventListener('click', async ()=>{
     try{ encoder.close(); }catch(_){}
     toast('HQ export failed');
   } finally {
+    restoreAR();
     canvas.width = save.cw; canvas.height = save.ch;
     phase = save.phase; spinA = save.spinA; wavePh = save.wavePh;
     pulsePh = save.pulsePh; swayPh = save.swayPh; hueRotPh = save.hueRotPh; glitchClock = save.glitchClock;
