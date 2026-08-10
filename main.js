@@ -676,6 +676,7 @@ $('addOp').addEventListener('click', ()=>{
 function renderStack(){
   const list = $('stackList');
   list.innerHTML = '';
+  state.stack.forEach(s => { if(s.id == null) s.id = nextOpId++; else if(s.id >= nextOpId) nextOpId = s.id + 1; });
   state.stack.forEach((slot, idx)=>{
     const opDef = OPS[slot.t];
     const div = document.createElement('div');
@@ -769,6 +770,7 @@ function renderStack(){
         // a non-named selector (rare) re-filters on release, never mid-drag
         if (selIdxs.has(pi)) rng.addEventListener('change', ()=> renderStack());
         row.appendChild(rng); row.appendChild(val);
+        row.appendChild(arBtn('fold:' + slot.id + ':' + pi));
       }
       div.appendChild(row);
     });
@@ -787,6 +789,7 @@ function renderStack(){
     arng.addEventListener('input', ()=>{ slot.rot = +arng.value; aval.value = Math.round(slot.rot); });
     aval.addEventListener('input', ()=>{ let v = parseFloat(aval.value); if(!isNaN(v)){ v = Math.max(-180, Math.min(180, v)); slot.rot = v; arng.value = v; } });
     arow.appendChild(arng); arow.appendChild(aval);
+    arow.appendChild(arBtn('fold:' + slot.id + ':rot'));
     div.appendChild(arow);
 
     slot.o = slot.o || [0, 0];
@@ -1553,20 +1556,63 @@ function buildAR(){
   for(const t in AR_RATE_META){ AR_TLABEL[t] = AR_LABEL[t] || t; AR_SCALE[t] = AR_RATE_META[t].s; }
   for(const t in AR_SPECIAL){ AR_TLABEL[t] = AR_LABEL[t] || t; AR_SCALE[t] = AR_SPECIAL[t].s; }
 }
+let nextOpId = 1;
+function bandVal(b){ return b==='bass'?AUD.bass : b==='mid'?AUD.mid : b==='treble'?AUD.treble : b==='beat'?AUD.beat : AUD.level; }
+// resolve a "fold:<id>:<pi|rot>" target to the live slot + clamp range, or null if the fold is gone
+function foldMeta(target){
+  const parts = target.split(':'); const id = +parts[1], key = parts[2];
+  const slot = state.stack.find(s => s.id === id); if(!slot) return null;
+  if(key === 'rot') return { slot, key:'rot', min:-180, max:180 };
+  const pi = +key, pr = OPS[slot.t].params[pi]; if(!pr) return null;
+  return { slot, key:pi, min:pr[1], max:pr[2] };
+}
 let _arSaved = null;
 function applyAR(){
-  _arSaved = {};
-  for(const t in AR_DIRECT){
+  _arSaved = { s:{}, f:[] };
+  for(const t in AR){
     const off = AR[t]; if(!off) continue;
-    const d = AR_DIRECT[t], key = d.k;
-    if(!(key in _arSaved)) _arSaved[key] = state[key];
-    let v = state[key] + off;
-    if(d.min !== undefined) v = Math.max(d.min, v);
-    if(d.max !== undefined) v = Math.min(d.max, v);
-    state[key] = v;
+    if(t.indexOf('fold:') === 0){
+      const fm = foldMeta(t); if(!fm) continue;
+      const cur = fm.key === 'rot' ? fm.slot.rot : fm.slot.p[fm.key];
+      _arSaved.f.push({ fm, v:cur });
+      const nv = Math.max(fm.min, Math.min(fm.max, cur + off));
+      if(fm.key === 'rot') fm.slot.rot = nv; else fm.slot.p[fm.key] = nv;
+    } else if(AR_DIRECT[t]){
+      const d = AR_DIRECT[t], key = d.k;
+      if(!(key in _arSaved.s)) _arSaved.s[key] = state[key];
+      let v = state[key] + off;
+      if(d.min !== undefined) v = Math.max(d.min, v);
+      if(d.max !== undefined) v = Math.min(d.max, v);
+      state[key] = v;
+    }
   }
 }
-function restoreAR(){ if(_arSaved){ for(const k in _arSaved) state[k] = _arSaved[k]; _arSaved = null; } }
+function restoreAR(){ if(_arSaved){ for(const k in _arSaved.s) state[k] = _arSaved.s[k]; for(const e of _arSaved.f){ if(e.fm.key==='rot') e.fm.slot.rot = e.v; else e.fm.slot.p[e.fm.key] = e.v; } _arSaved = null; } }
+// --- per-control AR toggle buttons ---
+function arHasRoute(target){ return state.aroutes.some(r => r.target === target); }
+function arToggle(target){
+  if(arHasRoute(target)) state.aroutes = state.aroutes.filter(r => r.target !== target);
+  else state.aroutes.push({ band:'level', target, amt:0.6 });
+  renderRoutes(); syncARButtons();
+}
+function arBtn(target){
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'arbtn'; b.textContent = '\u266a'; b.title = 'React to audio'; b.dataset.art = target;
+  b.classList.toggle('on', arHasRoute(target));
+  b.addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); arToggle(target); });
+  return b;
+}
+function syncARButtons(){ document.querySelectorAll('.arbtn').forEach(b => b.classList.toggle('on', arHasRoute(b.dataset.art))); }
+function injectARButtons(){
+  for(const s of sliders){ const id = s[0];
+    const target = (id in AR_MOTION) ? AR_MOTION[id] : (AR_TLABEL[id] ? id : null);
+    if(!target) continue;
+    const el = $(id); if(!el || !el.closest) continue;
+    const row = el.closest('.row'); if(!row || row.querySelector('.arbtn')) continue;
+    row.appendChild(arBtn(target));
+  }
+  syncARButtons();
+}
 
 async function audioEnable(on){
   state.audioOn = on ? 1 : 0;
@@ -1638,8 +1684,11 @@ function audioRoutes(){
   const o = {};
   if(state.audioOn && AUD.ctx){
     for(const r of state.aroutes){
-      const v = r.band==='bass'?AUD.bass : r.band==='mid'?AUD.mid : r.band==='treble'?AUD.treble : r.band==='beat'?AUD.beat : AUD.level;
-      o[r.target] = (o[r.target]||0) + v * r.amt * (AR_SCALE[r.target]||1);
+      const v = bandVal(r.band);
+      let scale;
+      if(r.target.indexOf('fold:') === 0){ const fm = foldMeta(r.target); if(!fm) continue; scale = (fm.max - fm.min) * 0.55; }
+      else scale = AR_SCALE[r.target] || 1;
+      o[r.target] = (o[r.target]||0) + v * r.amt * scale;
     }
   }
   return o;
@@ -1669,20 +1718,30 @@ function renderRoutes(){
     AR_BANDS.forEach(b=>{ const o=document.createElement('option'); o.value=b; o.textContent=AR_BLABEL[b]; if(b===r.band) o.selected=true; bandSel.appendChild(o); });
     bandSel.addEventListener('change', ()=>{ r.band = bandSel.value; });
     const arrow = document.createElement('span'); arrow.textContent = '\u2192'; arrow.style.opacity = '0.5';
-    const tgtSel = document.createElement('select');
-    AR_GROUPS.forEach(g=>{ const og=document.createElement('optgroup'); og.label=g[0]; g[1].forEach(t=>{ if(!(t in AR_TLABEL)) return; const o=document.createElement('option'); o.value=t; o.textContent=AR_TLABEL[t]; if(t===r.target) o.selected=true; og.appendChild(o); }); if(og.children.length) tgtSel.appendChild(og); });
-    tgtSel.addEventListener('change', ()=>{ r.target = tgtSel.value; });
+    let tgtEl;
+    if(r.target.indexOf('fold:') === 0){
+      tgtEl = document.createElement('span'); tgtEl.className = 'foldtgt';
+      const fm = foldMeta(r.target);
+      if(fm){ const idx = state.stack.indexOf(fm.slot) + 1; const pl = fm.key === 'rot' ? 'Angle' : OPS[fm.slot.t].params[fm.key][0]; tgtEl.textContent = 'Fold ' + idx + ' \u00b7 ' + pl; }
+      else { tgtEl.textContent = 'Fold (removed)'; tgtEl.style.opacity = '0.5'; }
+    } else {
+      const tgtSel = document.createElement('select');
+      AR_GROUPS.forEach(g=>{ const og=document.createElement('optgroup'); og.label=g[0]; g[1].forEach(t=>{ if(!(t in AR_TLABEL)) return; const o=document.createElement('option'); o.value=t; o.textContent=AR_TLABEL[t]; if(t===r.target) o.selected=true; og.appendChild(o); }); if(og.children.length) tgtSel.appendChild(og); });
+      tgtSel.addEventListener('change', ()=>{ r.target = tgtSel.value; });
+      tgtEl = tgtSel;
+    }
     const amt = document.createElement('input'); amt.type='range'; amt.min='-1'; amt.max='1'; amt.step='0.01'; amt.value = r.amt;
     const amtv = document.createElement('span'); amtv.className='amtv'; amtv.textContent = (+r.amt).toFixed(2);
     amt.addEventListener('input', ()=>{ r.amt = +amt.value; amtv.textContent = (+amt.value).toFixed(2); });
     const rx = document.createElement('span'); rx.className='rx'; rx.textContent='\u00d7'; rx.title='remove';
-    rx.addEventListener('click', ()=>{ state.aroutes.splice(i,1); renderRoutes(); });
+    rx.addEventListener('click', ()=>{ state.aroutes.splice(i,1); renderRoutes(); syncARButtons(); });
     arrow.className = 'arw';
-    const top = document.createElement('div'); top.className = 'ar-top'; top.append(bandSel, arrow, tgtSel, rx);
+    const top = document.createElement('div'); top.className = 'ar-top'; top.append(bandSel, arrow, tgtEl, rx);
     const bot = document.createElement('div'); bot.className = 'ar-bot'; bot.append(amt, amtv);
     row.append(top, bot);
     host.appendChild(row);
   });
+  syncARButtons();
 }
 
 function frame(now){
@@ -1718,6 +1777,7 @@ function frame(now){
 applySource();
 requestAnimationFrame(frame);
 buildAR();
+injectARButtons();
 renderRoutes();
 syncUI();
 
