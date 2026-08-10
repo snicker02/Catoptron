@@ -1522,30 +1522,37 @@ let AR = {};        // per-target additive offsets, recomputed each frame
 let arBurst = 0;    // audio glitch-burst, added to gBurst consumers
 const AR_BANDS = ['bass','mid','treble','level','beat'];
 const AR_BLABEL = { bass:'Bass', mid:'Mid', treble:'Treble', level:'Level', beat:'Beat' };
-// direct targets: temporarily offset state[key] around the live render (clamped), so every push site (incl. feedback/grade) reacts
-const AR_DIRECT = {
-  zoom:    {k:'zoom',     s:0.6, label:'Zoom'},
-  twist:   {k:'twist',    s:90,  label:'Twist'},
-  rotate:  {k:'rot',      s:60,  label:'Rotate'},
-  shiftX:  {k:'shiftX',   s:0.5, label:'Pan X'},
-  shiftY:  {k:'shiftY',   s:0.5, label:'Pan Y'},
-  depth:   {k:'depth',    s:12,  min:1,   max:40,  label:'Depth'},
-  step:    {k:'step',     s:0.25, min:0.42, max:0.94, label:'Step / RD Feed'},
-  fbAmt:   {k:'fbAmt',    s:0.4, min:0,   max:0.98, label:'Feedback'},
-  ripple:  {k:'ripple',   s:0.6, min:0,   label:'Ripple'},
-  chroma:  {k:'chroma',   s:0.6, min:0,   label:'Chroma'},
-  wobble:  {k:'wobble',   s:1.5, min:0,   label:'Wobble'},
-  exposure:{k:'exposure', s:0.6, min:0.1, label:'Exposure'},
-  contrast:{k:'contrast', s:0.8, min:0.1, label:'Contrast'},
-  sat:     {k:'sat',      s:1.0, min:0,   label:'Saturation'},
-  grain:   {k:'grain',    s:0.4, min:0,   max:1,   label:'Grain'},
-  vign:    {k:'vign',     s:0.5, min:0,   max:1,   label:'Vignette'},
-};
-const AR_RATE = { driftRate:{s:3,label:'Drift speed'}, spinRate:{s:3,label:'Spin speed'}, wobbleRate:{s:2.5,label:'Wobble speed'}, hueRate:{s:2.5,label:'Hue shift'} };
-const AR_SPECIAL = { burst:{s:1,label:'Glitch burst'} };
-const AR_TARGETS = ['zoom','twist','rotate','shiftX','shiftY','depth','step','fbAmt','ripple','chroma','wobble','exposure','contrast','sat','grain','vign','driftRate','spinRate','wobbleRate','hueRate','burst'];
-const AR_TLABEL = {}, AR_SCALE = {};
-[AR_DIRECT, AR_RATE, AR_SPECIAL].forEach(mp=>{ for(const t in mp){ AR_TLABEL[t] = mp[t].label; AR_SCALE[t] = mp[t].s; } });
+// AR targets are auto-derived from every sensible slider: real range -> scale + clamp, so all params react
+const AR_LABEL = { zoom:'Zoom', twist:'Twist', rot:'Rotate', shiftX:'Pan X', shiftY:'Pan Y', depth:'Depth', step:'Step / RD Feed', ripple:'Ripple', chroma:'Chroma', wobble:'Wobble', fbAmt:'Feedback', exposure:'Exposure', contrast:'Contrast', sat:'Saturation', warm:'Warmth', hue:'Hue', tintA:'Tint amount', vign:'Vignette', grain:'Grain', posterize:'Posterize', scan:'Scanlines', chanSplit:'Channel split', chanSwap:'Channel swap', dropout:'Dropout', dither:'Dither', noiseG:'Noise', interlace:'Interlace', stutter:'Stutter', jitter:'Jitter', burst:'Glitch burst', mosh:'Datamosh', driftRate:'Drift speed', spinRate:'Spin speed', hueRate:'Hue-cycle speed', frame:'Frame', frameW:'Frame width', srcScale:'Source scale', srcHue:'Source hue', srcVar:'Source variance', pulse:'Pulse', sway:'Sway' };
+const AR_TUNE = { ripple:{mult:3.0,max:4}, chroma:{mult:1.2}, depth:{mult:0.5}, twist:{mult:0.5}, rot:{mult:0.35}, hue:{mult:0.5}, srcHue:{mult:0.4}, posterize:{mult:0.5}, dither:{mult:0.5}, zoom:{mult:0.4} };
+const AR_MOTION = { drift:'driftRate', spin:'spinRate', hueCycle:'hueRate' };   // rate targets (added to accumulators)
+const AR_RATE_META = { driftRate:{s:3}, spinRate:{s:3}, hueRate:{s:2.5} };
+const AR_SPECIAL = { burst:{s:1} };
+const AR_EXCLUDE = new Set(['audioGain','audioResp','beatSens','rd','burst']);
+const AR_GROUPS = [
+  ['Geometry', ['zoom','twist','rot','shiftX','shiftY','depth','step','ripple','chroma','wobble']],
+  ['Feedback', ['fbAmt']],
+  ['Grade', ['exposure','contrast','sat','warm','hue','tintA','vign','grain','posterize','scan']],
+  ['Glitch', ['chanSplit','chanSwap','dropout','dither','noiseG','interlace','stutter','jitter','burst','mosh']],
+  ['Motion', ['driftRate','spinRate','hueRate','pulse','sway']],
+  ['Frame / source', ['frame','frameW','srcScale','srcHue','srcVar']],
+];
+const AR_DIRECT = {}, AR_TLABEL = {}, AR_SCALE = {};
+function buildAR(){
+  for(const s of sliders){
+    const id = s[0];
+    if(AR_EXCLUDE.has(id) || (id in AR_MOTION)) continue;
+    const el = $(id); if(!el || el.tagName !== 'INPUT') continue;
+    const mn = +el.min, mx = +el.max;
+    if(!isFinite(mn) || !isFinite(mx) || mx <= mn) continue;
+    const tune = AR_TUNE[id] || {};
+    const mult = (tune.mult != null) ? tune.mult : 0.55;
+    AR_DIRECT[id] = { k:id, s:(mx-mn)*mult, min:mn, max:(tune.max != null ? tune.max : mx) };
+  }
+  for(const t in AR_DIRECT){ AR_TLABEL[t] = AR_LABEL[t] || t; AR_SCALE[t] = AR_DIRECT[t].s; }
+  for(const t in AR_RATE_META){ AR_TLABEL[t] = AR_LABEL[t] || t; AR_SCALE[t] = AR_RATE_META[t].s; }
+  for(const t in AR_SPECIAL){ AR_TLABEL[t] = AR_LABEL[t] || t; AR_SCALE[t] = AR_SPECIAL[t].s; }
+}
 let _arSaved = null;
 function applyAR(){
   _arSaved = {};
@@ -1663,7 +1670,7 @@ function renderRoutes(){
     bandSel.addEventListener('change', ()=>{ r.band = bandSel.value; });
     const arrow = document.createElement('span'); arrow.textContent = '\u2192'; arrow.style.opacity = '0.5';
     const tgtSel = document.createElement('select');
-    AR_TARGETS.forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=AR_TLABEL[t]; if(t===r.target) o.selected=true; tgtSel.appendChild(o); });
+    AR_GROUPS.forEach(g=>{ const og=document.createElement('optgroup'); og.label=g[0]; g[1].forEach(t=>{ if(!(t in AR_TLABEL)) return; const o=document.createElement('option'); o.value=t; o.textContent=AR_TLABEL[t]; if(t===r.target) o.selected=true; og.appendChild(o); }); if(og.children.length) tgtSel.appendChild(og); });
     tgtSel.addEventListener('change', ()=>{ r.target = tgtSel.value; });
     const amt = document.createElement('input'); amt.type='range'; amt.min='-1'; amt.max='1'; amt.step='0.01'; amt.value = r.amt;
     const amtv = document.createElement('span'); amtv.className='amtv'; amtv.textContent = (+r.amt).toFixed(2);
@@ -1685,7 +1692,7 @@ function frame(now){
   if(!reduced && !paused){
     phase  += dt * (state.drift + (AR.driftRate||0)) * 0.6;
     spinA  += dt * (state.spin + (AR.spinRate||0)) * 0.5;
-    wavePh += dt * (state.wobble * 1.5 + (AR.wobbleRate||0));
+    wavePh += dt * (state.wobble * 1.5 + (AR.wobble||0) * 1.5);
     pulsePh += dt * 1.8;
     swayPh  += dt * 1.3;
     hueRotPh += dt * (state.hueCycle * 0.7 + (AR.hueRate||0));
@@ -1710,6 +1717,7 @@ function frame(now){
 }
 applySource();
 requestAnimationFrame(frame);
+buildAR();
 renderRoutes();
 syncUI();
 
