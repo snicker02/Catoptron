@@ -352,7 +352,46 @@ Animation loops are built to close seamlessly when exported as HQ Video.
 
 ---
 
-## 9. Presets
+## 9. Audio reactivity
+
+Drive almost any parameter — renderer, colour, glitch, motion, **and individual fold parameters** — from live sound. Everything is off until you switch it on, and audio only ever *adds* to your base values, so turning it off returns the image exactly to where you left it.
+
+**Turn it on**
+
+- **enable** — starts listening (your browser will ask once for permission if you use the mic).
+- **mic / file** — react to the microphone, or to an audio file. Choosing **file** opens a picker; the track loops.
+- **Scrubber** (file only) — play/pause, drag the bar to any point in the track, and see the elapsed / total time. Handy for parking on a drop while you tune routes.
+
+**Shape the response**
+
+- **Sensitivity** — input gain. Turn up for quiet material, down if everything is maxing out.
+- **Response** — how snappy vs. smooth the reaction is. Low = fluid and laggy, high = tight and twitchy.
+- **Beat sens.** — how eagerly the beat detector fires. Up for compressed or quiet kicks, down if it double-triggers on a busy mix.
+- The **B / M / T / L meter** shows Bass, Mid, Treble and overall Level so you can confirm it's hearing the music.
+
+**Two ways to route sound → parameters**
+
+1. **The ♪ buttons.** Every reactive control has a small ♪ beside it (fold parameters too — Fold, Amount, Angle on each fold). Click it to make that control react; it glows teal when active. This adds a route that follows overall **Level** at a moderate amount — a one-click way to make anything pulse.
+2. **The routing matrix.** Each route maps a **band** onto a **target** with a bipolar **amount**. Use this to pick a specific band, dial the amount, or stack several routes on one parameter. The ♪ buttons and the matrix stay in sync — toggling one updates the other. Use **+ add route** to build routes from scratch, or **×** to remove.
+
+**Bands** — *Bass*, *Mid*, *Treble*, *Level* (overall loudness), and *Beat* (a sharp pulse on each kick, great for punchy per-hit moves).
+
+**Amount** is bipolar: positive pushes the parameter up with the sound, negative pushes it down (e.g. a negative Bass→Zoom *punches in* on the beat).
+
+**Targets** cover essentially the whole program, grouped in the dropdown: Geometry (zoom, twist, rotate, pan, depth, step, ripple, chroma, wobble), Feedback, Grade (exposure, contrast, saturation, warmth, hue, tint, vignette, grain, posterize, scanlines), Glitch (channel split/swap, dropout, dither, noise, interlace, stutter, jitter, burst, datamosh), Motion speeds (drift, spin, hue), and Frame / source. Fold routes appear as *Fold N · Amount* and scale to that parameter's own range.
+
+**Recording with sound** — the real-time **Record** button captures the audio into the video (pick MP4; it falls back to WebM with audio if your browser can't record MP4). The **HQ Video** export renders offline frame-by-frame and is silent.
+
+**A few to try**
+
+- **Bass → Feedback** and **Level → Saturation** — the whole image breathes with the mix.
+- **Beat → Depth** or **Beat → a fold's Angle** — punchy per-hit kicks in the structure itself.
+- **Treble → Ripple** with **Mid → Pan X** — shimmer on top, framing that sways with the track.
+- Load a track, hit **enable → file**, scrub to the section you care about, then light up ♪ buttons until it moves the way you want.
+
+---
+
+## 10. Presets
 
 - **Load** a factory preset from the dropdown (93 included, from clean kaleidoscopes to the Wave,
   Lazy, and Loonie families) to see complete recipes.
@@ -365,7 +404,7 @@ re-save presets after big updates.
 
 ---
 
-## 10. Export & recording
+## 11. Export & recording
 
 - **Export PNG** — save a super-sampled still; the size dropdown offers **×1 / ×2 / ×4** of the live view, or a **fixed height** (1080 / 1440 / 2160 / 2880 px).
 - **Record (WebM)** — captures the live canvas in real time; set FPS, quality, and length.
@@ -375,7 +414,7 @@ re-save presets after big updates.
 
 ---
 
-## 11. Recipes to try
+## 12. Recipes to try
 
 - **Kaleidoscope portrait**: Polar fold (6–12 segments) → Swirl (small) → Panes, add a Tint.
 - **Infinite vortex**: Spiral → Droste renderer, raise Step scale and Twist.
