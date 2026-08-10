@@ -407,9 +407,10 @@ re-save presets after big updates.
 ## 11. Export & recording
 
 - **Export PNG** — save a super-sampled still; the size dropdown offers **×1 / ×2 / ×4** of the live view, or a **fixed height** (1080 / 1440 / 2160 / 2880 px).
-- **Record (WebM)** — captures the live canvas in real time; set FPS, quality, and length.
+- **Record (WebM/MP4)** — captures the live canvas in real time; set FPS, quality, and length. If audio is enabled and playing, the recording includes the sound.
 - **HQ Video** — renders **offline, frame by frame** via WebCodecs at export resolution, so loops
   close exactly and Feedback trails are rebuilt cleanly. Slower than real time but crisp.
+- **Synced audio in HQ export** — with an audio **file** loaded (§9), **MP4** selected, and *sync audio* checked, HQ Video re-analyses the track offline so the reactivity is frame-perfect (not tied to real-time playback), and muxes the AAC audio into the MP4. This is the way to produce a finished, track-synced piece. It falls back to silent video if anything about the audio can't be set up, so the render always succeeds. (Mic source can't be muxed — there's nothing to re-decode.)
 - **Aspect** — lock the composition to any common ratio before exporting.
 
 ---
