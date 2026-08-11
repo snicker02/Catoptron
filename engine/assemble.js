@@ -286,7 +286,13 @@ void main(){
   float crack = 1.0;
   float par = 0.0;
   float ccOp = 0.0;
+  vec2 _ifsC = vec2(uIFScx, uIFScy);
+  int _ifsN = (uIFSon > 0.5) ? int(uIFSn + 0.5) : 1;
+  for(int _k = 0; _k < 12; _k++){
+    if(_k >= _ifsN) break;
 ${folds}
+    if(uIFSon > 0.5){ q = rot(uIFSrot) * ((q - _ifsC) * uIFSscale) + _ifsC; }
+  }
   uv = q / vec2(ca, 1.0) + c;
   vec3 col = vec3(0.0);
   float period = (uFlip > 0.5) ? 2.0 : 1.0;
