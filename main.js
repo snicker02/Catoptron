@@ -2277,6 +2277,7 @@ hqBtn.addEventListener('click', async ()=>{
       if(lenSel === 'loop1' || lenSel === 'loop2') phase = 0;
     }
 
+    let rendered = 0;
     for(let n = 0; n < frames && !hqAbort && !encErr; n++){
       if(kfBase) kfApply(kfExportU(n, frames));
       if(syncAudio){ const A = offlineSampler(n); AUD.bass=A.bass; AUD.mid=A.mid; AUD.treble=A.treble; AUD.level=A.level; AUD.beat=A.beat; AR = audioRoutes(); } else { AR = {}; }
@@ -2292,15 +2293,16 @@ hqBtn.addEventListener('click', async ()=>{
       });
       encoder.encode(vf, { keyFrame: n % (fps * 2) === 0 });
       vf.close();
+      rendered = n + 1;
       step();
       while(encoder.encodeQueueSize > 4) await new Promise(r => setTimeout(r, 1));
       if(n % 5 === 0){
-        hqBtn.textContent = `\u25cf ${n}/${frames} \u2014 tap to cancel`;
+        hqBtn.textContent = `\u25cf ${n}/${frames} \u2014 tap to stop`;
         await breathe();
       }
     }
 
-    if(!hqAbort && !encErr){
+    if(rendered > 0 && !encErr){
       hqBtn.textContent = 'encoding\u2026';
       await encoder.flush();
       encoder.close();
@@ -2310,7 +2312,8 @@ hqBtn.addEventListener('click', async ()=>{
         const L = audioBuffer.getChannelData(0);
         const R = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : L;
         const startSample = Math.floor(startTime * asr);
-        const total = Math.max(0, Math.min(L.length - startSample, Math.ceil(dur * asr)));
+        const outDur = Math.min(dur, rendered / fps);
+        const total = Math.max(0, Math.min(L.length - startSample, Math.ceil(outDur * asr)));
         const FR = 1024;
         for(let off = 0; off < total && !encErr; off += FR){
           const cnt = Math.min(FR, total - off);
@@ -2329,10 +2332,10 @@ hqBtn.addEventListener('click', async ()=>{
       a.download = `catoptron-hq-${Date.now()}.${ext}`;
       a.click();
       setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
-      toast(`HQ export: ${ew}\u00d7${eh}, ${frames} frames, ${ext.toUpperCase()}${syncAudio ? ' + audio' : ''}`);
+      toast(`HQ export: ${ew}\u00d7${eh}, ${rendered} frames${hqAbort ? ' (stopped early)' : ''}, ${ext.toUpperCase()}${syncAudio ? ' + audio' : ''}`);
     } else {
       try{ encoder.close(); }catch(_){}
-      toast(encErr ? 'encoder error \u2014 try a lower resolution' : 'HQ export cancelled');
+      toast(encErr ? 'encoder error \u2014 try a lower resolution' : 'HQ export cancelled (no frames)');
     }
   } catch(err){
     try{ encoder.close(); }catch(_){}
