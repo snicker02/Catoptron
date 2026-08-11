@@ -1124,6 +1124,25 @@ $('reset').addEventListener('click', ()=>{
   state.seed = keep;
   syncUI(); toast('reset');
 });
+function newProject(){
+  if(!confirm('Start a new project from scratch?\n\nThis clears the loaded image, fold stack, renderer, glass, motion and audio routes.')) return;
+  const seed = Math.random() * 100;
+  Object.keys(state).forEach(k => { if(!(k in defaults)) delete state[k]; });   // drop any preset-added keys
+  Object.assign(state, JSON.parse(JSON.stringify(defaults)));
+  state.seed = seed;
+  try { if(AUD.mediaEl) AUD.mediaEl.pause(); } catch(_){}
+  state.audioOn = 0;
+  _undo.length = 0; _redo.length = 0; _histLast = '';
+  keyframes.length = 0; kfSel = -1; if(typeof kfRenderList === 'function') kfRenderList();
+  applySource();          // regenerate the default source (clears any uploaded photo)
+  renderStack();
+  renderRoutes();
+  syncARButtons();
+  syncUI();
+  pushHistory();          // fresh baseline
+  toast('new project');
+}
+$('newBtn').addEventListener('click', newProject);
 $('reseed').addEventListener('click', ()=>{
   state.seed = Math.random()*100;
   if(GENS[state.src] && GENS[state.src].seeded) applySource();
