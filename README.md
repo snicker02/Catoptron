@@ -109,6 +109,17 @@ This is where you compose the effect.
 A good mental model: the first fold acts on the raw image coordinates; each later fold acts on the
 result of the one above it.
 
+### IFS — self-similar fold recursion
+
+The **IFS** panel (below the fold stack) turns your *whole stack* into a fractal generator. Normally the stack runs once; with **IFS enabled** it runs repeatedly, and after each pass the coordinates **contract** toward a fixed point — so the folded pattern nests inside itself, recursively.
+
+- **Iterations** — how many times the stack recurses (2–12). More = deeper self-similarity (and more cost).
+- **Contraction** — how far each pass zooms toward the fixed point. Lower = tighter, faster-shrinking nesting; near 1 = gentle, sprawling recursion.
+- **Rotation** — an optional twist applied each pass, for spiral fractals. 0 = a clean nested zoom.
+- **Fixed X / Y** — moves the point everything contracts toward.
+
+The contraction is what makes *any* stack behave like an IFS — without it, most folds would just expand into noise when iterated. With no folds at all, IFS becomes a pure recursive zoom. All the IFS knobs are audio-reactive like everything else. Turn it off for a normal single pass.
+
 ---
 
 ## 6. Operator reference
