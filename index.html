@@ -302,6 +302,10 @@ input[type=file]{display:none}
 .arbtn:hover{opacity:0.85;border-color:rgba(255,255,255,0.3)}
 .arbtn.on{background:#2d6a54;border-color:#5fe0b0;color:#cffce9;opacity:1;box-shadow:0 0 5px rgba(95,224,176,0.45)}
 .foldtgt{flex:1 1 0;min-width:0;font-size:11px;padding:3px 5px;color:#bcd;background:rgba(255,255,255,0.04);border-radius:4px;border:1px solid rgba(255,255,255,0.08);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tintrow{gap:5px}
+.tintrow label{flex:0 0 38px}
+.tintrow input[type=color]{flex:0 0 26px}
+.tintrow .val{flex:0 0 36px}
 </style>
 </head>
 <body>
@@ -423,7 +427,7 @@ input[type=file]{display:none}
       <h2>Glass</h2>
       <div class="row"><label>Frame</label><input type="range" id="frame" min="0" max="1" step="0.01" value="0.45"><span class="val" id="frameV"></span></div>
       <div class="row"><label>Frame width</label><input type="range" id="frameW" min="0.004" max="0.15" step="0.001" value="0.035"><span class="val" id="frameWV"></span></div>
-      <div class="row"><label>Tint</label><input type="color" id="tintC" value="#5d8f86"><input type="range" id="tintA" min="0" max="1" step="0.01" value="0.30"><span class="val" id="tintAV"></span></div>
+      <div class="row tintrow"><label>Tint</label><input type="color" id="tintC" value="#5d8f86"><input type="range" id="tintA" min="0" max="1" step="0.01" value="0.30"><span class="val" id="tintAV"></span></div>
       <div class="row">
         <label title="What the Counterchange fold does to odd cells">Counterchange</label>
         <select id="ccMode" style="flex:1">
