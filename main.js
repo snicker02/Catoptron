@@ -1592,13 +1592,13 @@ function _fft(re, im){
         re[i+k]=ur+vr; im[i+k]=ui+vi; re[i+k+len/2]=ur-vr; im[i+k+len/2]=ui-vi;
         const nwr=cwr*wr-cwi*wi; cwi=cwr*wi+cwi*wr; cwr=nwr; } } }
 }
-function makeOfflineAudio(chL, chR, sampleRate, fps){
+function makeOfflineAudio(chL, chR, sampleRate, fps, startSec){
   const N=2048, half=N/2; const re=new Float32Array(N), im=new Float32Array(N);
   const win=new Float32Array(N); for(let i=0;i<N;i++) win[i]=0.5-0.5*Math.cos(2*Math.PI*i/(N-1));
   const smoothMag=new Float32Array(half); const minDb=-100,maxDb=-30,smoothC=0.6;
   const A={bass:0,mid:0,treble:0,level:0,beat:0,_refr:0,_prevKick:0,hist:new Float32Array(43),hi:0}; const dt=1/fps;
   return function(fn){
-    const center=Math.floor((fn/fps)*sampleRate);
+    const center=Math.floor(((startSec||0) + fn/fps)*sampleRate);
     for(let i=0;i<N;i++){ const s=center-N+i+1; let v=0; if(s>=0&&s<chL.length) v=(chL[s]+chR[s])*0.5; re[i]=v*win[i]; im[i]=0; }
     _fft(re,im);
     for(let k=0;k<half;k++){ const mag=Math.sqrt(re[k]*re[k]+im[k]*im[k])/N; smoothMag[k]=smoothC*smoothMag[k]+(1-smoothC)*mag; }
@@ -2164,10 +2164,19 @@ hqBtn.addEventListener('click', async ()=>{
   const fps  = +$('recFps').value;
   const mbps = +$('recQ').value;
   const lenSel = $('recLen').value;
-  if(lenSel === 'manual'){ toast('manual length is live-record only \u2014 pick a duration'); return; }
+  const fmt = $('recFmt') ? $('recFmt').value : 'webm';
+  // can we sync + mux the loaded audio file? if so, export starts at the scrubber position
+  const canSyncAudio = fmt === 'mp4' && state.audioOn && state.audioMode === 'file' && AUD.file
+    && $('hqSyncAudio') && $('hqSyncAudio').checked
+    && typeof AudioEncoder !== 'undefined' && typeof AudioData !== 'undefined'
+    && AUD.mediaEl && isFinite(AUD.mediaEl.duration);
+  const startTime = canSyncAudio ? Math.max(0, AUD.mediaEl.currentTime || 0) : 0;
   const period = state.flip ? 2 : 1;
   let dur;
-  if(lenSel === 'loop1' || lenSel === 'loop2'){
+  if(lenSel === 'manual'){
+    if(canSyncAudio){ dur = Math.max(0.2, AUD.mediaEl.duration - startTime); }   // scrub position -> end of track
+    else { toast('manual length is live-record only \u2014 pick a duration (or load an audio file + MP4 to export from the scrubber to the end of the track)'); return; }
+  } else if(lenSel === 'loop1' || lenSel === 'loop2'){
     const L = loopSeconds();
     if(!L){ toast('set a non-zero drift for loop export'); return; }
     dur = L * (lenSel === 'loop2' ? 2 : 1);
@@ -2191,7 +2200,6 @@ hqBtn.addEventListener('click', async ()=>{
   ew = Math.floor(ew * shrink / 2) * 2;
   eh = Math.floor(eh * shrink / 2) * 2;
 
-  const fmt = $('recFmt') ? $('recFmt').value : 'webm';
   let mux, codec, codecId, ext, cfg;
   if(fmt === 'mp4'){
     codec = await pickH264(ew, eh, mbps*1e6, fps);
@@ -2207,9 +2215,7 @@ hqBtn.addEventListener('click', async ()=>{
   }
   // --- synced audio: decode the file + AAC encoder (MP4 + file source only; any failure => silent video) ---
   let audioEncoder = null, offlineSampler = null, syncAudio = false, audioBuffer = null, audioCh = 2;
-  const wantAudio = fmt === 'mp4' && state.audioOn && state.audioMode === 'file' && AUD.file
-    && $('hqSyncAudio') && $('hqSyncAudio').checked
-    && typeof AudioEncoder !== 'undefined' && typeof AudioData !== 'undefined';
+  const wantAudio = canSyncAudio;
   let encErr = null;
   if(wantAudio){
     try {
@@ -2226,7 +2232,7 @@ hqBtn.addEventListener('click', async ()=>{
         audioEncoder.configure({ codec:'mp4a.40.2', sampleRate:asr, numberOfChannels:audioCh, bitrate:128000 });
         const L = audioBuffer.getChannelData(0);
         const R = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : L;
-        offlineSampler = makeOfflineAudio(L, R, asr, fps);
+        offlineSampler = makeOfflineAudio(L, R, asr, fps, startTime);
         syncAudio = true;
       }
     } catch(e){ syncAudio = false; audioEncoder = null; }
@@ -2303,12 +2309,14 @@ hqBtn.addEventListener('click', async ()=>{
         const asr = audioBuffer.sampleRate;
         const L = audioBuffer.getChannelData(0);
         const R = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : L;
-        const total = Math.min(L.length, Math.ceil(dur * asr));
+        const startSample = Math.floor(startTime * asr);
+        const total = Math.max(0, Math.min(L.length - startSample, Math.ceil(dur * asr)));
         const FR = 1024;
         for(let off = 0; off < total && !encErr; off += FR){
           const cnt = Math.min(FR, total - off);
+          const src = startSample + off;
           const data = new Float32Array(cnt * audioCh);
-          for(let i = 0; i < cnt; i++){ data[i] = L[off+i] || 0; if(audioCh > 1) data[cnt + i] = R[off+i] || 0; }
+          for(let i = 0; i < cnt; i++){ data[i] = L[src+i] || 0; if(audioCh > 1) data[cnt + i] = R[src+i] || 0; }
           const ad = new AudioData({ format:'f32-planar', sampleRate:asr, numberOfFrames:cnt, numberOfChannels:audioCh, timestamp: Math.round(off / asr * 1e6), data });
           audioEncoder.encode(ad); ad.close();
           if((off / FR) % 64 === 0) await breathe();
