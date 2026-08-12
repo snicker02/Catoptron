@@ -412,7 +412,7 @@ const state = {
   pulse: 0, sway: 0, hueCycle: 0,
   chanSplit: 0, chanSwap: 0, dropout: 0, dither: 0, noiseG: 0, interlace: 0,
   stutter: 0, jitter: 0, burst: 0, mosh: 0, rd: 0, mblur: 0,
-  ifsOn: 0, ifsN: 5, ifsScale: 0.6, ifsRot: 0, ifsCx: 0, ifsCy: 0,
+  ifsOn: 0, ifsN: 5, ifsScale: 0.6, ifsRot: 0, ifsCx: 0, ifsCy: 0, ifsZ: 0,
   cx: 0.5, cy: 0.5, seed: 7.13, aspect: 'free', fbAmt: 0.9, src: 'orbs',
   ccMode: 0, ccTint: '#ff5d7a',
   srcScale: 1, srcHue: 0, srcVar: 0.5
@@ -582,6 +582,7 @@ const sliders = [
   ['ifsRot','ifsRotV', v=>v.toFixed(0)],
   ['ifsCx','ifsCxV', v=>v.toFixed(2)],
   ['ifsCy','ifsCyV', v=>v.toFixed(2)],
+  ['ifsZ','ifsZV', v=>v.toFixed(3)],
   ['rd','rdV',v=>v.toFixed(0)],
   ['srcScale','srcScaleV',v=>v.toFixed(2)],
   ['srcHue','srcHueV',v=>v.toFixed(0)],
@@ -993,6 +994,7 @@ function applyPreset(val){
     if('ifsRot' in d) state.ifsRot = d.ifsRot;
     if('ifsCx' in d) state.ifsCx = d.ifsCx;
     if('ifsCy' in d) state.ifsCy = d.ifsCy;
+    if('ifsZ' in d) state.ifsZ = d.ifsZ;
     if('rd' in d) state.rd = d.rd;
     if('tint'  in d) state.tint  = d.tint;
     if('tintA' in d) state.tintA = d.tintA;
@@ -1488,6 +1490,7 @@ function setUniforms(entry, w, h){
   gl.uniform1f(L.uIFSrot, state.ifsRot * Math.PI/180);
   gl.uniform1f(L.uIFScx, state.ifsCx);
   gl.uniform1f(L.uIFScy, state.ifsCy);
+  gl.uniform1f(L.uIFSz, state.ifsZ);
   gl.uniform1f(L.uCcMode, state.ccMode);
   const ct = hexToRgb(state.ccTint);
   gl.uniform3f(L.uCcTint, ct[0], ct[1], ct[2]);
@@ -1658,7 +1661,7 @@ function makeOfflineAudio(chL, chR, sampleRate, fps, startSec){
 const AR_BANDS = ['bass','mid','treble','level','beat'];
 const AR_BLABEL = { bass:'Bass', mid:'Mid', treble:'Treble', level:'Level', beat:'Beat' };
 // AR targets are auto-derived from every sensible slider: real range -> scale + clamp, so all params react
-const AR_LABEL = { zoom:'Zoom', twist:'Twist', rot:'Rotate', shiftX:'Pan X', shiftY:'Pan Y', depth:'Depth', step:'Step / RD Feed', ripple:'Ripple', chroma:'Chroma', wobble:'Wobble', fbAmt:'Feedback', exposure:'Exposure', contrast:'Contrast', sat:'Saturation', warm:'Warmth', hue:'Hue', tintA:'Tint amount', vign:'Vignette', grain:'Grain', posterize:'Posterize', scan:'Scanlines', chanSplit:'Channel split', chanSwap:'Channel swap', dropout:'Dropout', dither:'Dither', noiseG:'Noise', interlace:'Interlace', stutter:'Stutter', jitter:'Jitter', burst:'Glitch burst', mosh:'Datamosh', driftRate:'Drift speed', spinRate:'Spin speed', hueRate:'Hue-cycle speed', frame:'Frame', frameW:'Frame width', srcScale:'Source scale', srcHue:'Source hue', srcVar:'Source variance', pulse:'Pulse', sway:'Sway', mblur:'Motion blur', ifsN:'IFS iterations', ifsScale:'IFS contraction', ifsRot:'IFS rotation', ifsCx:'IFS fixed X', ifsCy:'IFS fixed Y' };
+const AR_LABEL = { zoom:'Zoom', twist:'Twist', rot:'Rotate', shiftX:'Pan X', shiftY:'Pan Y', depth:'Depth', step:'Step / RD Feed', ripple:'Ripple', chroma:'Chroma', wobble:'Wobble', fbAmt:'Feedback', exposure:'Exposure', contrast:'Contrast', sat:'Saturation', warm:'Warmth', hue:'Hue', tintA:'Tint amount', vign:'Vignette', grain:'Grain', posterize:'Posterize', scan:'Scanlines', chanSplit:'Channel split', chanSwap:'Channel swap', dropout:'Dropout', dither:'Dither', noiseG:'Noise', interlace:'Interlace', stutter:'Stutter', jitter:'Jitter', burst:'Glitch burst', mosh:'Datamosh', driftRate:'Drift speed', spinRate:'Spin speed', hueRate:'Hue-cycle speed', frame:'Frame', frameW:'Frame width', srcScale:'Source scale', srcHue:'Source hue', srcVar:'Source variance', pulse:'Pulse', sway:'Sway', mblur:'Motion blur', ifsN:'IFS iterations', ifsScale:'IFS contraction', ifsRot:'IFS rotation', ifsCx:'IFS fixed X', ifsCy:'IFS fixed Y', ifsZ:'IFS z-tunnel' };
 const AR_TUNE = { ripple:{mult:3.0,max:4}, chroma:{mult:1.2}, depth:{mult:0.5}, twist:{mult:0.5}, rot:{mult:0.35}, hue:{mult:0.5}, srcHue:{mult:0.4}, posterize:{mult:0.5}, dither:{mult:0.5}, zoom:{mult:0.4}, ifsRot:{mult:0.35}, ifsN:{mult:0.4} };
 const AR_MOTION = { drift:'driftRate', spin:'spinRate', hueCycle:'hueRate' };   // rate targets (added to accumulators)
 const AR_RATE_META = { driftRate:{s:3}, spinRate:{s:3}, hueRate:{s:2.5} };
@@ -1671,7 +1674,7 @@ const AR_GROUPS = [
   ['Glitch', ['chanSplit','chanSwap','dropout','dither','noiseG','interlace','stutter','jitter','burst','mosh']],
   ['Motion', ['driftRate','spinRate','hueRate','pulse','sway','mblur']],
   ['Frame / source', ['frame','frameW','srcScale','srcHue','srcVar']],
-  ['IFS', ['ifsScale','ifsRot','ifsN','ifsCx','ifsCy']],
+  ['IFS', ['ifsScale','ifsRot','ifsZ','ifsN','ifsCx','ifsCy']],
 ];
 const AR_DIRECT = {}, AR_TLABEL = {}, AR_SCALE = {};
 function buildAR(){
