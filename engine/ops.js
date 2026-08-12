@@ -2307,5 +2307,37 @@ const OPS = [
   }
   return mix(q, p, blend);
 }` },
+  { name:'3D kaleidoscope', fn:'opKal3D', deps:[],
+    params:[["Symmetry",0,2,1,0,["octahedral","tetrahedral","cubic"]],["Fold iters",1,8,1,4],["Dome",0,2,0.01,0.8],["Perspective",0,1,0.01,0.5],["Rotate X\u00b0",-180,180,1,0],["Rotate Y\u00b0",-180,180,1,0]],
+    glsl:`vec2 opKal3D(vec2 q, vec4 P0, vec4 P1){
+  float sym=P0.x, iters=P0.y, dome=P0.z, persp=P0.w;
+  float rx=P1.x*DEG + uPhase*0.5, ry=P1.y*DEG + uPhase*0.37;
+  float r2=dot(q,q);
+  vec3 p=vec3(q.x, q.y, dome*(1.0 - r2*0.5));    // lift onto a dome
+  // tumble the solid in 3D (explicit temps; swizzle-writes are unreliable on some GL)
+  float cx=cos(rx), sx=sin(rx), cy=cos(ry), sy=sin(ry), a, b;
+  a = cx*p.y - sx*p.z; b = sx*p.y + cx*p.z; p.y=a; p.z=b;   // rotate about X
+  a = cy*p.x - sy*p.z; b = sy*p.x + cy*p.z; p.x=a; p.z=b;   // rotate about Y
+  for(int i=0;i<8;i++){
+    if(float(i)>=iters) break;
+    float t;
+    if(sym<0.5){          // octahedral: |.| then sort descending
+      p=abs(p);
+      if(p.x<p.y){ t=p.x; p.x=p.y; p.y=t; }
+      if(p.x<p.z){ t=p.x; p.x=p.z; p.z=t; }
+      if(p.y<p.z){ t=p.y; p.y=p.z; p.z=t; }
+    } else if(sym<1.5){   // tetrahedral
+      if(p.x+p.y<0.0){ t=-p.y; p.y=-p.x; p.x=t; }
+      if(p.x+p.z<0.0){ t=-p.z; p.z=-p.x; p.x=t; }
+      if(p.y+p.z<0.0){ t=-p.z; p.z=-p.y; p.y=t; }
+    } else {              // cubic
+      p=abs(p);
+    }
+    a = 0.766*p.x - 0.643*p.z; b = 0.643*p.x + 0.766*p.z; p.x=a; p.z=b;  // twist between folds
+  }
+  float z=p.z+2.2;
+  float d=mix(1.0, 2.2/max(z,0.25), persp);      // ortho .. perspective
+  return vec2(p.x, p.y)*d;
+}` },
 ];
 export { OPS };
