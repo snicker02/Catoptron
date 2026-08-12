@@ -116,6 +116,7 @@ The **IFS** panel (below the fold stack) turns your *whole stack* into a fractal
 - **Iterations** — how many times the stack recurses (2–12). More = deeper self-similarity (and more cost).
 - **Contraction** — how far each pass zooms toward the fixed point. Lower = tighter, faster-shrinking nesting; near 1 = gentle, sprawling recursion.
 - **Rotation** — an optional twist applied each pass, for spiral fractals. 0 = a clean nested zoom.
+- **Z-tunnel** — adds perspective foreshortening to each pass so the recursion tunnels *into* the screen (positive) or bulges *out* (negative) instead of a flat zoom — a 3D Droste. 0 = flat.
 - **Fixed X / Y** — moves the point everything contracts toward.
 
 The contraction is what makes *any* stack behave like an IFS — without it, most folds would just expand into noise when iterated. With no folds at all, IFS becomes a pure recursive zoom. All the IFS knobs are audio-reactive like everything else. Turn it off for a normal single pass.
