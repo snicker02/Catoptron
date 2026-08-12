@@ -482,9 +482,10 @@ input[type=file]{display:none}
       <div class="row"><label>Iterations</label><input type="range" id="ifsN" min="2" max="12" step="1" value="5"><span class="val" id="ifsNV"></span></div>
       <div class="row"><label>Contraction</label><input type="range" id="ifsScale" min="0.3" max="0.98" step="0.005" value="0.6"><span class="val" id="ifsScaleV"></span></div>
       <div class="row"><label>Rotation</label><input type="range" id="ifsRot" min="-180" max="180" step="1" value="0"><span class="val" id="ifsRotV"></span></div>
+      <div class="row"><label>Z-tunnel</label><input type="range" id="ifsZ" min="-0.6" max="0.6" step="0.005" value="0"><span class="val" id="ifsZV"></span></div>
       <div class="row"><label>Fixed X</label><input type="range" id="ifsCx" min="-1" max="1" step="0.01" value="0"><span class="val" id="ifsCxV"></span></div>
       <div class="row"><label>Fixed Y</label><input type="range" id="ifsCy" min="-1" max="1" step="0.01" value="0"><span class="val" id="ifsCyV"></span></div>
-      <div class="note">Wraps the whole fold stack in a self-similar loop: each pass runs your folds, then contracts toward the fixed point (with optional rotation), turning the stack into a fractal generator. More iterations = deeper recursion; lower contraction = tighter nesting. Off = a single normal pass.</div>
+      <div class="note">Wraps the whole fold stack in a self-similar loop: each pass runs your folds, then contracts toward the fixed point (with optional rotation), turning the stack into a fractal generator. More iterations = deeper recursion; lower contraction = tighter nesting. Z-tunnel adds perspective so the recursion tunnels into (+) or bulges out of (−) the screen — a 3D Droste. Off = a single normal pass.</div>
     </div>
 
     <div class="group">
