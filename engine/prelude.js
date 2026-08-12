@@ -44,6 +44,7 @@ uniform float uIFSscale;
 uniform float uIFSrot;
 uniform float uIFScx;
 uniform float uIFScy;
+uniform float uIFSz;
 uniform float uPhase;
 uniform float uSpinA;
 uniform float uWavePh;
