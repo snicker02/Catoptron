@@ -2308,16 +2308,17 @@ const OPS = [
   return mix(q, p, blend);
 }` },
   { name:'3D kaleidoscope', fn:'opKal3D', deps:[],
-    params:[["Symmetry",0,2,1,0,["octahedral","tetrahedral","cubic"]],["Fold iters",1,8,1,4],["Dome",0,2,0.01,0.8],["Perspective",0,1,0.01,0.5],["Rotate X\u00b0",-180,180,1,0],["Rotate Y\u00b0",-180,180,1,0]],
+    params:[["Symmetry",0,2,1,0,["octahedral","tetrahedral","cubic"]],["Fold iters",1,8,1,4],["Dome",0,2,0.01,0.8],["Perspective",0,1,0.01,0.5],["Rotate X\u00b0",-180,180,1,0],["Rotate Y\u00b0",-180,180,1,0],["Rotate Z\u00b0",-180,180,1,0]],
     glsl:`vec2 opKal3D(vec2 q, vec4 P0, vec4 P1){
   float sym=P0.x, iters=P0.y, dome=P0.z, persp=P0.w;
-  float rx=P1.x*DEG + uPhase*0.5, ry=P1.y*DEG + uPhase*0.37;
+  float rx=P1.x*DEG + uPhase*0.5, ry=P1.y*DEG + uPhase*0.37, rz=P1.z*DEG + uPhase*0.23;
   float r2=dot(q,q);
   vec3 p=vec3(q.x, q.y, dome*(1.0 - r2*0.5));    // lift onto a dome
   // tumble the solid in 3D (explicit temps; swizzle-writes are unreliable on some GL)
-  float cx=cos(rx), sx=sin(rx), cy=cos(ry), sy=sin(ry), a, b;
+  float cx=cos(rx), sx=sin(rx), cy=cos(ry), sy=sin(ry), cz=cos(rz), sz=sin(rz), a, b;
   a = cx*p.y - sx*p.z; b = sx*p.y + cx*p.z; p.y=a; p.z=b;   // rotate about X
   a = cy*p.x - sy*p.z; b = sy*p.x + cy*p.z; p.x=a; p.z=b;   // rotate about Y
+  a = cz*p.x - sz*p.y; b = sz*p.x + cz*p.y; p.x=a; p.y=b;   // rotate about Z
   for(int i=0;i<8;i++){
     if(float(i)>=iters) break;
     float t;
