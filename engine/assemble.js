@@ -291,7 +291,7 @@ void main(){
   for(int _k = 0; _k < 12; _k++){
     if(_k >= _ifsN) break;
 ${folds}
-    if(uIFSon > 0.5){ q = rot(uIFSrot) * ((q - _ifsC) * uIFSscale) + _ifsC; }
+    if(uIFSon > 0.5){ vec2 _d = rot(uIFSrot) * ((q - _ifsC) * uIFSscale); _d /= (1.0 + uIFSz * dot(_d, _d)); q = _d + _ifsC; }
   }
   uv = q / vec2(ca, 1.0) + c;
   vec3 col = vec3(0.0);
