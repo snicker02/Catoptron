@@ -143,6 +143,7 @@ reveal the rest once you pick a mode.
 | **Rosette Cn** | Rotational (Cn) symmetry **without** mirroring — pinwheels | Segments, Offset° |
 | **Triangle fold** | Folds through a triangle (triangular kaleidoscope) | Scale |
 | **Mirror line** | Reflects across a line; keep side A or B | Angle°, Side |
+| **3D kaleidoscope** | Lifts the image onto a 3D dome, tumbles it, and folds it across a polyhedron’s mirror planes (octahedral / tetrahedral / cubic), then projects back — a 2.5D kaleidoscope that turns in space. Auto-tumbles with Drift; Rotate X/Y are animatable/audio-reactive. | Symmetry, Fold iters, Dome, Perspective, Rotate X/Y/Z |
 | **Mirror tile** | Tiles X×Y with mirror or repeat | Tiles X, Tiles Y, Mode |
 | **Abs fold** | Box fold — reflects anything past ±fold back inward | Fold |
 | **Brick** | Brick-wall tiling, offset alternating rows | Scale X, Scale Y |
