@@ -726,14 +726,42 @@ $('audSeek').addEventListener('change', ()=>{ _seeking = false; });
 
 /* ---- fold stack UI ---- */
 /* display order is alphabetical; option values stay the stable type indices */
-const OPS_ALPHA = OPS.map((op, i)=>[op.name, i]).sort((a, b)=> a[0].localeCompare(b[0]));
+const FOLD_CAT_ORDER = ["Basic transforms","Kaleidoscope & symmetry","Swirls, spirals & waves","Lenses, rings & bubbles","Conformal & complex maps","Physics fields","Fractal folds","Glitch folds","Image-driven folds","The big multi-mode banks","Recolor"];
+const FOLD_CAT = {"Rotate":0,"Scale":0,"Shift":0,"Shear":0,"Mosaic":0,"Polar fold":1,"Rosette Cn":1,"Triangle fold":1,"Mirror line":1,"3D kaleidoscope":1,"Mirror tile":1,"Abs fold":1,"Brick":1,"Bravais":1,"Chainmail":1,"Hexagonal":1,"Honeycomb":1,"Wallpaper":1,"Frieze":1,"Hyperbolic":1,"Polyhedral":1,"Aperiodic":1,"Quasicrystal":1,"Penrose fold":1,"Shape warp":1,"Tessellated":1,"Tri lattice":1,"Truchet2":1,"Weave":1,"Swirl":2,"Spiral":2,"Log spiral":2,"Wave warp":2,"Lens bank":2,"Curl noise":2,"Chladni":2,"Fault":2,"Jet stream":2,"Karman vortex":2,"PDJ":2,"Popcorn2":2,"Superposition":2,"Satin":2,"Stwin":2,"Screw":2,"Maelstrom":2,"Oscilloscope":2,"Mitosis":2,"Mushroom":2,"Wave bank":2,"Pleat":2,"Petal":2,"Wedge":2,"Whorl":2,"Tidal lock":2,"Wood grain":2,"Target":2,"Target sp":2,"Spherical":3,"Lens":3,"Ring fold":3,"Fresnel":3,"Gear teeth":3,"Hammer":3,"Mercator":3,"Perspective":3,"Stereographic plane":3,"Supernova":3,"Projective":3,"Quadrupole":3,"Rainbow arc":3,"Klein":3,"Membrane":3,"Moebius strip":3,"Ouroboros":3,"Bubbles":3,"Circle mirror":3,"Radial pow":3,"Loonie":3,"Complex":4,"Complex sum":4,"Mobius":4,"Mobius abcd":4,"Foci":4,"Murl":4,"Mcarpet":4,"Mask":4,"Bipolar":4,"Elliptic":4,"Disc":4,"Zhukowski":4,"Gravitational lens":5,"Wave interference":5,"Caustics":5,"Electric field":5,"Aberration":5,"Flow advect":5,"KIFS":6,"Multi-fold IFS":6,"Koch fold":6,"DModulus":6,"Shatter":6,"Bedhead":6,"Ikeda":6,"Pickover":6,"Svensson":6,"Symmetric icon":6,"Kleinian":6,"Fuchsian":6,"Apollonian":6,"Inversive IFS":6,"Mandelbox fold":6,"Power IFS":6,"Flame IFS":6,"Juliascope":6,"Julian":6,"Worley":6,"Voronoi fold":6,"Block displace":7,"Row tear":7,"Bit crush":7,"Shear cascade":7,"DCT ring":7,"Block shuffle":7,"Luma displace":8,"Gradient displace":8,"Refract":8,"Flow march":8,"Edge shock":8,"Channel drive":8,"Value slide":8,"BusyBrad":9,"Lazy":9,"Counterchange":10};  // op name -> category index (Other = last)
+let foldSort = 'az';    // 'az' | 'type' | 'recent'  — how the fold pickers list operators
+let foldSearch = '';
+function foldCatIdx(i){ const c = FOLD_CAT[OPS[i].name]; return c === undefined ? FOLD_CAT_ORDER.length : c; }
+function fillFoldSelect(sel, currentIdx, useSearch){
+  sel.innerHTML = '';
+  const s = useSearch ? foldSearch.trim().toLowerCase() : '';
+  const match = i => (!s || OPS[i].name.toLowerCase().indexOf(s) >= 0 || i === currentIdx);
+  const mkOpt = (i, parent) => { const o = document.createElement('option'); o.value = i; o.textContent = OPS[i].name; if(i === currentIdx) o.selected = true; parent.appendChild(o); };
+  if(foldSort === 'type'){
+    const cats = FOLD_CAT_ORDER.concat(['Other']);
+    cats.forEach((cat, ci) => {
+      const idxs = [];
+      for(let i = 0; i < OPS.length; i++) if(foldCatIdx(i) === ci && match(i)) idxs.push(i);
+      idxs.sort((a, b) => OPS[a].name.localeCompare(OPS[b].name));
+      if(!idxs.length) return;
+      const og = document.createElement('optgroup'); og.label = cat;
+      idxs.forEach(i => mkOpt(i, og)); sel.appendChild(og);
+    });
+  } else {
+    const list = [];
+    for(let i = 0; i < OPS.length; i++) if(match(i)) list.push(i);
+    if(foldSort === 'az') list.sort((a, b) => OPS[a].name.localeCompare(OPS[b].name));
+    else if(foldSort === 'recent') list.sort((a, b) => b - a);
+    list.forEach(i => mkOpt(i, sel));
+  }
+  if(currentIdx >= 0) sel.value = currentIdx;
+}
 const opSel = $('addOpSel');
-OPS_ALPHA.forEach(([name, i])=>{
-  const o = document.createElement('option');
-  o.value = i; o.textContent = name;
-  opSel.appendChild(o);
-});
+fillFoldSelect(opSel, -1, true);
+{ const fs = $('foldSearch'), fo = $('foldSort');
+  if(fs) fs.addEventListener('input', e => { foldSearch = e.target.value; fillFoldSelect(opSel, -1, true); });
+  if(fo) fo.addEventListener('change', e => { foldSort = e.target.value; fillFoldSelect(opSel, -1, true); renderStack(); }); }
 $('addOp').addEventListener('click', ()=>{
+  if(!opSel.value || !opSel.options.length){ toast('no fold matches your search'); return; }
   if(state.stack.length >= MAX_OPS){ toast(`stack is full (${MAX_OPS} folds max)`); return; }
   state.stack.push(defaultOp(+opSel.value));
   pushHistory(); renderStack();
@@ -758,12 +786,7 @@ function renderStack(){
     muteBtn.addEventListener('click', ()=>{ slot.mute = !slot.mute; pushHistory(); renderStack(); });
     head.appendChild(muteBtn);
     const sel = document.createElement('select');
-    OPS_ALPHA.forEach(([name, i])=>{
-      const o = document.createElement('option');
-      o.value = i; o.textContent = name;
-      if(i === slot.t) o.selected = true;
-      sel.appendChild(o);
-    });
+    fillFoldSelect(sel, slot.t, false);
     sel.addEventListener('change', ()=>{
       state.stack[idx] = defaultOp(+sel.value);
       pushHistory(); renderStack();
