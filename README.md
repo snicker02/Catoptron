@@ -42,6 +42,9 @@ The single most useful habit: **add one fold, watch what it does, then add the n
 
 ---
 
+
+**Keyboard:** **W A S D** (or arrow keys) move the vanishing point, **Q / E** zoom out/in, hold **Shift** for fine control, **Space** pauses. If you’re placing a fold’s Origin (⊕), WASD nudges that origin instead.
+
 ## 3. The interface
 
 The left panel is grouped top to bottom:
