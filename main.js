@@ -87,7 +87,6 @@ void main(){
     col += (hno-0.5)*uNoiseG;
   }
   col = clamp(col, 0.0, 1.0);
-  if(uDyeMix > 0.001){ vec3 d = texture2D(uDye, vUv).rgb; col = mix(col, d, uDyeMix); }
   gl_FragColor = vec4(col, 1.0);
 }`;
 
@@ -164,6 +163,35 @@ function stepFluid(dt){
     srcTex: (state.fluidSrc === 'ws' && wsReady && wsTex) ? wsTex : tex,
   });
   fluidPtrV = [fluidPtrV[0] * 0.82, fluidPtrV[1] * 0.82];   // decay the stir impulse
+}
+
+// ---- dye composite: blend the fluid dye over the finished frame ----
+const DYEFS = `precision highp float; varying vec2 vUv; uniform sampler2D uBase; uniform sampler2D uDye; uniform float uMix;
+void main(){ vec3 b=texture2D(uBase,vUv).rgb; vec3 d=texture2D(uDye,vUv).rgb; gl_FragColor=vec4(mix(b,d,uMix),1.0); }`;
+const dyeProg = gl.createProgram();
+gl.attachShader(dyeProg, compile(gl.VERTEX_SHADER, VS));
+gl.attachShader(dyeProg, compile(gl.FRAGMENT_SHADER, DYEFS));
+gl.linkProgram(dyeProg);
+if(!gl.getProgramParameter(dyeProg, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(dyeProg));
+const DU = {}; ['uBase','uDye','uMix'].forEach(k => DU[k] = gl.getUniformLocation(dyeProg, k));
+const dyeLoc = gl.getAttribLocation(dyeProg, 'aPos');
+// Called right after the scene is drawn: snapshot the CLEAN render (so dye never
+// injects itself and decays to black), then composite the dye on top for display.
+function fluidPresent(w, h){
+  if(!state.fluidOn || !FLUID) return;
+  const mix = state.fluidDye;
+  const needCap = (state.fluidSrc === 'ws') || mix > 0.001;
+  if(!needCap) return;
+  captureWorkspace(w, h);
+  if(mix <= 0.001) return;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, w, h);
+  gl.useProgram(dyeProg); bindQuad(dyeLoc);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, wsTex); gl.uniform1i(DU.uBase, 0);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, FLUID.dyeTex()); gl.uniform1i(DU.uDye, 1);
+  gl.uniform1f(DU.uMix, mix);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.activeTexture(gl.TEXTURE0);
 }
 
 // ---- motion blur: temporal accumulation of the final canvas ----
@@ -1625,14 +1653,6 @@ function setUniforms(entry, w, h){
     gl.activeTexture(gl.TEXTURE0);
   }
   if(L.uFluidOn) gl.uniform1f(L.uFluidOn, (state.fluidOn && FLUID) ? 1 : 0);
-  { const dm = (state.fluidOn && FLUID) ? state.fluidDye : 0;
-    if(L.uDyeMix) gl.uniform1f(L.uDyeMix, dm);
-    if(L.uDye){
-      gl.activeTexture(gl.TEXTURE3);
-      gl.bindTexture(gl.TEXTURE_2D, dm > 0.001 ? FLUID.dyeTex() : tex);
-      gl.uniform1i(L.uDye, 3);
-      gl.activeTexture(gl.TEXTURE0);
-    } }
   gl.uniform1f(L.uFbAmt, state.fbAmt);
   gl.uniform1f(L.uMosh, state.mosh);
   gl.uniform1f(L.uRD, state.rd);
@@ -1679,9 +1699,6 @@ function presentFeedback(w, h, srcTexIdx){
   { const _rt = hexToRgb(state.tint); gl.uniform3f(PU.uTint, _rt[0], _rt[1], _rt[2]); }
   gl.uniform1f(PU.uTintA, state.tintA);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, fxTex); gl.uniform1i(PU.uFx, 1);
-  { const dm = (state.fluidOn && FLUID) ? state.fluidDye : 0;
-    gl.uniform1f(PU.uDyeMix, dm);
-    if(dm > 0.001){ gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, FLUID.dyeTex()); gl.uniform1i(PU.uDye, 2); } }
   gl.activeTexture(gl.TEXTURE0);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
@@ -2085,8 +2102,8 @@ function frame(now){
   }
   applyAR();
   try { renderScene(w, h); } finally { restoreAR(); }
+  fluidPresent(w, h);
   { const mb = state.mblur + (AR.mblur||0); if(mb > 0.001) motionBlurPass(w, h, mb); else mbInit = false; }
-  if(state.fluidOn && state.fluidSrc === 'ws') captureWorkspace(w, h);
   requestAnimationFrame(frame);
 }
 applySource();
@@ -2506,6 +2523,7 @@ hqBtn.addEventListener('click', async ()=>{
       renderScene(ew, eh);
       const mbAmt = state.mblur;
       if(syncAudio) restoreAR();
+      fluidPresent(ew, eh);
       if(mbAmt > 0.001) motionBlurPass(ew, eh, mbAmt);
       const vf = new VideoFrame(canvas, {
         timestamp: Math.round(n * 1e6 / fps),
