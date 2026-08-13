@@ -1599,6 +1599,14 @@ function setUniforms(entry, w, h){
     gl.activeTexture(gl.TEXTURE0);
   }
   if(L.uFluidOn) gl.uniform1f(L.uFluidOn, (state.fluidOn && FLUID) ? 1 : 0);
+  { const dm = (state.fluidOn && FLUID) ? state.fluidDye : 0;
+    if(L.uDyeMix) gl.uniform1f(L.uDyeMix, dm);
+    if(L.uDye){
+      gl.activeTexture(gl.TEXTURE3);
+      gl.bindTexture(gl.TEXTURE_2D, dm > 0.001 ? FLUID.dyeTex() : tex);
+      gl.uniform1i(L.uDye, 3);
+      gl.activeTexture(gl.TEXTURE0);
+    } }
   gl.uniform1f(L.uFbAmt, state.fbAmt);
   gl.uniform1f(L.uMosh, state.mosh);
   gl.uniform1f(L.uRD, state.rd);
