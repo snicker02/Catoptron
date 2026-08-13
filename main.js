@@ -1262,7 +1262,7 @@ function navStep(dt){
   for(const k in NAV_KEYS) if(heldKeys.has(k)){ vx += NAV_KEYS[k][0]; vy += NAV_KEYS[k][1]; }
   if(vx || vy){
     const len = Math.sqrt(vx*vx + vy*vy); vx /= len; vy /= len;
-    const sp = (fine ? 0.10 : 0.42) * dt;
+    const sp = (fine ? 0.22 : 0.90) * dt;
     if(pickOp >= 0 && state.stack[pickOp]){          // placing a fold origin? move that instead
       const slot = state.stack[pickOp];
       slot.o = [ Math.min(1, Math.max(-1, slot.o[0] + vx*sp*2)), Math.min(1, Math.max(-1, slot.o[1] + vy*sp*2)) ];
@@ -1276,8 +1276,8 @@ function navStep(dt){
   if(heldKeys.has('e')) z += 1;
   if(heldKeys.has('q')) z -= 1;
   if(z){
-    const rate = (fine ? 0.25 : 1.0) * dt;
-    state.zoom = Math.min(2.5, Math.max(0.02, state.zoom * Math.exp(z * rate)));
+    const rate = (fine ? 0.35 : 1.4) * dt;
+    state.zoom = Math.min(8, Math.max(0.02, state.zoom * Math.exp(z * rate)));
     syncUI(); _navDirty = true;
   }
 }
@@ -1295,7 +1295,7 @@ function _gMove(){
   const dist = Math.hypot(dx,dy) || 1, ang = Math.atan2(dy,dx);
   const mid = { x:(p[0].x+p[1].x)/2, y:(p[0].y+p[1].y)/2 };
   const r = canvas.getBoundingClientRect();
-  state.zoom = Math.min(6, Math.max(0.2, _gesture.z0 * (dist / _gesture.dist0)));   // pinch
+  state.zoom = Math.min(8, Math.max(0.02, _gesture.z0 * (dist / _gesture.dist0)));   // pinch
   state.rot  = _gesture.rot0 + (ang - _gesture.ang0) * 180 / Math.PI;                // twist
   const pf = 1.8 / state.zoom;                                                       // two-finger pan
   state.shiftX = _gesture.sx0 + ((mid.x - _gesture.mid0.x) / r.width)  * pf;
@@ -1735,7 +1735,7 @@ const AR_BANDS = ['bass','mid','treble','level','beat'];
 const AR_BLABEL = { bass:'Bass', mid:'Mid', treble:'Treble', level:'Level', beat:'Beat' };
 // AR targets are auto-derived from every sensible slider: real range -> scale + clamp, so all params react
 const AR_LABEL = { zoom:'Zoom', twist:'Twist', rot:'Rotate', shiftX:'Pan X', shiftY:'Pan Y', depth:'Depth', step:'Step / RD Feed', ripple:'Ripple', chroma:'Chroma', wobble:'Wobble', fbAmt:'Feedback', exposure:'Exposure', contrast:'Contrast', sat:'Saturation', warm:'Warmth', hue:'Hue', tintA:'Tint amount', vign:'Vignette', grain:'Grain', posterize:'Posterize', scan:'Scanlines', chanSplit:'Channel split', chanSwap:'Channel swap', dropout:'Dropout', dither:'Dither', noiseG:'Noise', interlace:'Interlace', stutter:'Stutter', jitter:'Jitter', burst:'Glitch burst', mosh:'Datamosh', driftRate:'Drift speed', spinRate:'Spin speed', hueRate:'Hue-cycle speed', frame:'Frame', frameW:'Frame width', srcScale:'Source scale', srcHue:'Source hue', srcVar:'Source variance', pulse:'Pulse', sway:'Sway', mblur:'Motion blur', ifsN:'IFS iterations', ifsScale:'IFS contraction', ifsRot:'IFS rotation', ifsCx:'IFS fixed X', ifsCy:'IFS fixed Y', ifsZ:'IFS z-tunnel' };
-const AR_TUNE = { ripple:{mult:3.0,max:4}, chroma:{mult:1.2}, depth:{mult:0.5}, twist:{mult:0.5}, rot:{mult:0.35}, hue:{mult:0.5}, srcHue:{mult:0.4}, posterize:{mult:0.5}, dither:{mult:0.5}, zoom:{mult:0.4}, ifsRot:{mult:0.35}, ifsN:{mult:0.4} };
+const AR_TUNE = { ripple:{mult:3.0,max:4}, chroma:{mult:1.2}, depth:{mult:0.5}, twist:{mult:0.5}, rot:{mult:0.35}, hue:{mult:0.5}, srcHue:{mult:0.4}, posterize:{mult:0.5}, dither:{mult:0.5}, zoom:{mult:0.125}, ifsRot:{mult:0.35}, ifsN:{mult:0.4} };
 const AR_MOTION = { drift:'driftRate', spin:'spinRate', hueCycle:'hueRate' };   // rate targets (added to accumulators)
 const AR_RATE_META = { driftRate:{s:3}, spinRate:{s:3}, hueRate:{s:2.5} };
 const AR_SPECIAL = { burst:{s:1} };
