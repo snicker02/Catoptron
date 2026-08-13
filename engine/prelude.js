@@ -51,6 +51,8 @@ uniform float uWavePh;
 uniform float uWobble;
 uniform float uSeed;
 uniform sampler2D uPrev;
+uniform sampler2D uFluidV;
+uniform float uFluidOn;
 uniform float uFbAmt;
 uniform float uCcMode;
 uniform vec3  uCcTint;
