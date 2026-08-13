@@ -2811,6 +2811,19 @@ function redo(){
   const u = document.getElementById('undoBtn'); if(u) u.addEventListener('click', undo);
   const r = document.getElementById('redoBtn'); if(r) r.addEventListener('click', redo);
   document.querySelectorAll('.group > h2').forEach(h2=> h2.addEventListener('click', ()=> h2.parentElement.classList.toggle('collapsed')));
+  { const pb = $('panelsBtn');
+    const togglePanels = ()=>{
+      const hidden = document.body.classList.toggle('panels-hidden');
+      if(pb) pb.classList.toggle('on', hidden);
+      window.dispatchEvent(new Event('resize'));      // let the canvas refit to the new width
+    };
+    if(pb) pb.addEventListener('click', togglePanels);
+    window.addEventListener('keydown', e=>{
+      if(e.ctrlKey || e.metaKey || e.altKey) return;
+      if(e.key.toLowerCase() !== 'h') return;
+      if(navTyping()) return;
+      e.preventDefault(); togglePanels();
+    }); }
   { const ts = $('themeSel');
     const applyTheme = t => { document.body.classList.remove('theme-grey','theme-light'); if(t !== 'dark') document.body.classList.add('theme-' + t); };
     let saved = 'dark';
