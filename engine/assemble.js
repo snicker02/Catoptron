@@ -339,7 +339,6 @@ ${RENDERERS[rend]}
     }
     col = clamp(col, 0.0, 1.0);
   }
-  if(uDyeMix > 0.001){ col = mix(col, texture2D(uDye, vUv).rgb, uDyeMix); }
   gl_FragColor = vec4(col, 1.0);
 }`;
 }
