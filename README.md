@@ -120,6 +120,23 @@ The **IFS** panel (below the fold stack) turns your *whole stack* into a fractal
 - **Contraction** — how far each pass zooms toward the fixed point. Lower = tighter, faster-shrinking nesting; near 1 = gentle, sprawling recursion.
 - **Rotation** — an optional twist applied each pass, for spiral fractals. 0 = a clean nested zoom.
 - **Z-tunnel** — adds perspective foreshortening to each pass so the recursion tunnels *into* the screen (positive) or bulges *out* (negative) instead of a flat zoom — a 3D Droste. 0 = flat.
+
+### Fluid — velocity + dye simulation
+
+The **Fluid** panel runs an actual fluid solver in the background (a Navier–Stokes-lite scheme: advection → forces → pressure projection), maintaining a **velocity** field and a **dye** field that persist and evolve frame to frame.
+
+- **Enable fluid / clear** — switch the sim on, or wipe it back to still.
+- **Resolution** — sim grid size. 128 is cheap, 512 is detailed but heavy. (The sim is square; it stretches to your canvas.)
+- **Damping** — how fast motion dies down (viscosity-ish). **Dye fade** — how fast the dye clears.
+- **Vorticity** — re-injects small swirls the solver naturally damps out; raises turbulent detail.
+- **Pressure** — pressure-solve iterations. Higher = more genuinely incompressible (proper fluid rolling) but slower.
+- **Stir** / **Stir scale** — a built-in curl-noise force that keeps the fluid moving on its own.
+- **Pointer** — move the mouse over the canvas to push the fluid around.
+- **Audio push** — transients shove the fluid outward from the centre.
+- **Inject** — how strongly your source image is fed into the dye.
+- **Dye mix** — blends the flowing dye over your render. 0 = invisible (but still available to the Fluid warp fold), 1 = pure fluid.
+
+Two ways to use it: turn up **Dye mix** to watch your image dissolve and flow as dye, or add the **Fluid warp** fold to keep your normal render but have the fold stack dragged around by the velocity field. Both at once works too.
 - **Fixed X / Y** — moves the point everything contracts toward.
 
 The contraction is what makes *any* stack behave like an IFS — without it, most folds would just expand into noise when iterated. With no folds at all, IFS becomes a pure recursive zoom. All the IFS knobs are audio-reactive like everything else. Turn it off for a normal single pass.
@@ -251,6 +268,7 @@ reveal the rest once you pick a mode.
 | **Electric field** | Places a ring of point charges and bends coordinates along the superposed inverse-square field. Alternating polarity gives dipoles/multipoles; Flow switches from along-field to perpendicular (equipotential) flow. | Strength, Charges, Ring radius, Falloff, Polarity, Flow |
 | **Aberration** | Relativistic aberration: a velocity vector bunches coordinates toward the direction of motion and streaks them forward (a warp-speed skew). Perpendicular axis contracts by 1/γ. (Coordinate warp only — no colour Doppler shift.) | Speed, Direction, Streak, Warp |
 | **Flow advect** | Advects the sampling coordinate along a curl-noise flow field. With Curl at 1 the field is divergence-free (incompressible) — and run through the **Feedback** renderer it smears the image into a proper flowing fluid over time. Animates with Drift. | Amount, Scale, Speed, Curl |
+| **Fluid warp** | Pushes coordinates along the velocity field of the live **Fluid** simulation (see §Fluid) — the fold stack itself gets dragged around by the flow. Swirl rotates the force 90° for vortex motion. Does nothing unless the Fluid sim is enabled. | Amount, Swirl, Scale |
 
 ### Fractal folds
 | Fold | What it does | Key params |
