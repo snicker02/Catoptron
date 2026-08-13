@@ -244,6 +244,10 @@ reveal the rest once you pick a mode.
 |---|---|---|
 | **Gravitational lens** | Bends the sampling coordinates around one or a ring of point masses (deflection ∝ 1/rᶠ), warping the image like light near a black hole — Einstein-ring arcs and all. Negative Strength repels (diverging lens); Frame-drag adds a tangential swirl for a rotating (Kerr) black hole. Place it with the fold Origin ⊕. | Strength, Softening, Masses, Ring radius, Falloff, Frame-drag |
 | **Wave interference** | Displaces the image along a wave field. **Chladni** gathers it onto standing-wave nodal lines (a vibrating-plate look); **Ripple tank** superposes circular waves from a ring of emitters; **Plane waves** crosses plane waves into moiré. Ripple/Plane animate with Drift and are naturally audio-reactive (drive Frequency with a band). | Mode, Frequency, Detune, Amount, Sources, Speed |
+| **Caustics** | Treats an animated water surface (and optionally the image's own luma) as a height field and refracts the sampling ray through it (Snell-style) — shimmering water / rippled-glass, with caustic-like concentration where rays converge. Ripples animate with Drift. | Index, Frequency, Speed, Image mix, Detail |
+| **Electric field** | Places a ring of point charges and bends coordinates along the superposed inverse-square field. Alternating polarity gives dipoles/multipoles; Flow switches from along-field to perpendicular (equipotential) flow. | Strength, Charges, Ring radius, Falloff, Polarity, Flow |
+| **Aberration** | Relativistic aberration: a velocity vector bunches coordinates toward the direction of motion and streaks them forward (a warp-speed skew). Perpendicular axis contracts by 1/γ. (Coordinate warp only — no colour Doppler shift.) | Speed, Direction, Streak, Warp |
+| **Flow advect** | Advects the sampling coordinate along a curl-noise flow field. With Curl at 1 the field is divergence-free (incompressible) — and run through the **Feedback** renderer it smears the image into a proper flowing fluid over time. Animates with Drift. | Amount, Scale, Speed, Curl |
 
 ### Fractal folds
 | Fold | What it does | Key params |
