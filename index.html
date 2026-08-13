@@ -468,6 +468,14 @@ input[type=file]{display:none}
   <div id="panelR">
     <div class="group">
       <h2>Fold stack</h2>
+      <div class="row" style="gap:6px;margin-bottom:8px">
+        <input type="text" id="foldSearch" placeholder="search folds…" style="flex:1;min-width:0">
+        <select id="foldSort" style="flex:0 0 auto" title="How the fold pickers are ordered">
+          <option value="az">A–Z</option>
+          <option value="type">By type</option>
+          <option value="recent">Recent</option>
+        </select>
+      </div>
       <div id="stackList"></div>
       <div class="btns">
         <select id="addOpSel" style="flex:1"></select>
