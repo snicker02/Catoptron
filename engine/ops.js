@@ -2447,5 +2447,18 @@ vec2 opFlow(vec2 q, vec4 P0){
   vec2 flow=mix(grad, vec2(-grad.y, grad.x), curl);
   return q + amt*0.08*flow;
 }` },
+  { name:'Fluid warp', fn:'opFluid', deps:[],
+    params:[["Amount",-4,4,0.01,1],["Swirl",0,1,0.01,0],["Scale",0.25,3,0.01,1]],
+    glsl:`vec2 opFluid(vec2 q, vec4 P0){
+  if(uFluidOn < 0.5) return q;
+  float amt=P0.x, swirl=P0.y, scl=P0.z;
+  float ca=uCanvas.x/uCanvas.y;
+  vec2 uv=(q/vec2(ca,1.0))*scl + uCenter;          // fold space -> sim space
+  vec4 t=texture2D(uFluidV, clamp(uv, 0.0, 1.0));
+  vec2 v=vec2((t.r*255.0*256.0 + t.g*255.0)/65535.0, (t.b*255.0*256.0 + t.a*255.0)/65535.0);
+  v=(v*2.0-1.0)*4.0;                                // decode 16-bit packed velocity
+  v=mix(v, vec2(-v.y, v.x), swirl);
+  return q + v*amt*0.08;
+}` },
 ];
 export { OPS };
