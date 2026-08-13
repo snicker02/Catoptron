@@ -2501,6 +2501,15 @@ hqBtn.addEventListener('click', async ()=>{
 
   try{
     mbInit = false;
+    /* fluid: build motion + dye at export resolution before frame 1 */
+    if(state.fluidOn){
+      ensureFluid();
+      const fwarm = Math.min(240, Math.round(fps * 1.5));
+      for(let i = 0; i < fwarm && !hqAbort; i++){
+        stepFluid(1 / fps);
+        if(i % 20 === 0){ hqBtn.textContent = `fluid warmup ${i}/${fwarm}`; await breathe(); }
+      }
+    }
     /* feedback: rebuild causal history at export resolution */
     if(state.rend === 5){
       ensureFB(ew, eh);
@@ -2520,6 +2529,7 @@ hqBtn.addEventListener('click', async ()=>{
       if(syncAudio){ const A = offlineSampler(n); AUD.bass=A.bass; AUD.mid=A.mid; AUD.treble=A.treble; AUD.level=A.level; AUD.beat=A.beat; AR = audioRoutes(); } else { AR = {}; }
       arBurst = AR.burst || 0;
       if(syncAudio) applyAR();
+      stepFluid(1 / fps);
       renderScene(ew, eh);
       const mbAmt = state.mblur;
       if(syncAudio) restoreAR();
@@ -2632,6 +2642,7 @@ $('exportBtn').addEventListener('click', async ()=>{
       }
     }
     renderScene(rw, rh);
+    fluidPresent(rw, rh);        /* dye is a composite pass now — include it in stills too */
 
     let blob;
     if(ss === 1){
