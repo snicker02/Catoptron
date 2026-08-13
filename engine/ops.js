@@ -2384,5 +2384,68 @@ const OPS = [
   }
   return q+disp;
 }` },
+  { name:'Caustics', fn:'opCaustics', deps:[],
+    params:[["Index",0,3,0.01,1.4],["Frequency",0.5,12,0.1,3],["Speed",0,4,0.01,1],["Image mix",0,1,0.01,0],["Detail",0.002,0.05,0.001,0.02]],
+    glsl:`float _causH(vec2 p, float t, float scale, float mixImg, float ca){
+  vec2 w=p*scale;
+  float h=(sin(w.x*1.3+t)+sin(w.y*1.7-t*0.9)+sin((w.x+w.y)*1.1+t*1.3)+sin(length(w)*2.1-t*1.6))*0.25;
+  if(mixImg>0.001){ vec2 uv=p/vec2(ca,1.0)+uCenter; float lum=dot(photo(uv),vec3(0.299,0.587,0.114)); h=mix(h,lum,mixImg); }
+  return h;
+}
+vec2 opCaustics(vec2 q, vec4 P0, vec4 P1){
+  float ior=P0.x, scale=P0.y, speed=P0.z, mixImg=P0.w, eps=max(P1.x,0.002);
+  float t=uPhase*speed, ca=uCanvas.x/uCanvas.y;
+  float hx1=_causH(q+vec2(eps,0.0),t,scale,mixImg,ca), hx0=_causH(q-vec2(eps,0.0),t,scale,mixImg,ca);
+  float hy1=_causH(q+vec2(0.0,eps),t,scale,mixImg,ca), hy0=_causH(q-vec2(0.0,eps),t,scale,mixImg,ca);
+  vec2 g=vec2(hx1-hx0, hy1-hy0)/(2.0*eps);
+  vec3 nrm=normalize(vec3(-g, 1.0));
+  return q + nrm.xy*(ior*0.15);
+}` },
+  { name:'Electric field', fn:'opField', deps:[],
+    params:[["Strength",-2,2,0.01,0.6],["Charges",1,8,1,3],["Ring radius",0,1.2,0.01,0.5],["Falloff",1,3,0.01,2],["Polarity",0,1,1,1,["all +","alternating"]],["Flow",0,1,0.01,0]],
+    glsl:`vec2 opField(vec2 q, vec4 P0, vec4 P1){
+  float strength=P0.x, count=P0.y, ringR=P0.z, falloff=P0.w, alt=P1.x, perp=P1.y;
+  int N=int(count+0.5); if(N<1) N=1;
+  vec2 E=vec2(0.0);
+  for(int i=0;i<8;i++){ if(i>=N) break;
+    float a=TAU*float(i)/float(N);
+    vec2 c=(N>1)?ringR*vec2(cos(a),sin(a)):vec2(0.0);
+    float sgn=(alt>0.5 && (i-(i/2)*2)==1)?-1.0:1.0;
+    vec2 d=q-c; float r=length(d)+1e-3;
+    E += sgn * d / pow(r, falloff+1.0);
+  }
+  vec2 flow=mix(E, vec2(-E.y, E.x), perp);
+  return q + strength*0.06*flow;
+}` },
+  { name:'Aberration', fn:'opDoppler', deps:[],
+    params:[["Speed",0,0.95,0.01,0.5],["Direction",-180,180,1,0],["Streak",0,2,0.01,0.4],["Warp",0,1,0.01,0.8]],
+    glsl:`vec2 opDoppler(vec2 q, vec4 P0){
+  float beta=P0.x, angle=P0.y*DEG, streak=P0.z, warp=P0.w;
+  vec2 v=vec2(cos(angle), sin(angle));
+  float s=dot(q, v); vec2 perp=q - s*v;
+  float g=sqrt(max(1.0-beta*beta, 0.001));
+  float s2=(s + beta)/(1.0 + beta*s);
+  s2=mix(s, s2, warp);
+  vec2 outp=perp*mix(1.0, g, warp) + v*s2;
+  outp += v * streak * beta * (s*0.5 + 0.5);
+  return outp;
+}` },
+  { name:'Flow advect', fn:'opFlow', deps:[],
+    params:[["Amount",0,3,0.01,1],["Scale",0.3,8,0.1,2],["Speed",0,4,0.01,0.6],["Curl",0,1,0.01,1]],
+    glsl:`float _fnoise(vec2 p){
+  vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+  float a=hash1(i), b=hash1(i+vec2(1.0,0.0)), c=hash1(i+vec2(0.0,1.0)), d=hash1(i+vec2(1.0,1.0));
+  return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
+}
+vec2 opFlow(vec2 q, vec4 P0){
+  float amt=P0.x, scale=P0.y, speed=P0.z, curl=P0.w;
+  float t=uPhase*speed; vec2 p=q*scale + t;
+  float e=0.08;
+  float gx=_fnoise(p+vec2(e,0.0)) - _fnoise(p-vec2(e,0.0));
+  float gy=_fnoise(p+vec2(0.0,e)) - _fnoise(p-vec2(0.0,e));
+  vec2 grad=vec2(gx,gy)/(2.0*e);
+  vec2 flow=mix(grad, vec2(-grad.y, grad.x), curl);
+  return q + amt*0.08*flow;
+}` },
 ];
 export { OPS };
