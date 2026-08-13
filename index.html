@@ -121,6 +121,7 @@ main{flex:1;display:flex;min-height:0}
   scrollbar-width:thin;scrollbar-color:var(--scroll) transparent;
 }
 #panelL{border-right:1px solid var(--edge)}
+body.panels-hidden #panelL,body.panels-hidden #panelR{display:none}
 #panelR{border-left:1px solid var(--edge)}
 /* ── bottom timeline ── */
 #timeline{
@@ -490,9 +491,10 @@ body.theme-light{
   <button id="kfSetBtn" title="Set keyframe — capture current look">&#9670; Key</button>
   <button id="undoBtn" title="Undo (Ctrl+Z)">&#8630;</button>
   <button id="redoBtn" title="Redo (Ctrl+Shift+Z)">&#8631;</button>
+  <button id="panelsBtn" title="Hide / show side panels (H)">&#9776; Panels</button>
   <button id="fsBtn" title="Fullscreen">&#9974;</button>
   <select id="themeSel" title="UI theme" style="flex:0 0 auto"><option value="dark">Dark</option><option value="grey">Grey</option><option value="light">Light</option></select>
-  <span class="hint">drop / paste an image &nbsp;&middot;&nbsp; drag canvas or <b>WASD</b> = vanishing point &nbsp;&middot;&nbsp; <b>Q/E</b> = zoom &nbsp;&middot;&nbsp; shift = fine &nbsp;&middot;&nbsp; dbl-click = recenter</span>
+  <span class="hint">drop / paste an image &nbsp;&middot;&nbsp; drag canvas or <b>WASD</b> = vanishing point &nbsp;&middot;&nbsp; <b>Q/E</b> = zoom &nbsp;&middot;&nbsp; <b>H</b> = hide panels &nbsp;&middot;&nbsp; shift = fine &nbsp;&middot;&nbsp; dbl-click = recenter</span>
 </header>
 <main>
   <div id="panelL">
