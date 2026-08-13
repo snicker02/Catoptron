@@ -672,6 +672,7 @@ body.theme-light{
       <h2>Fluid <span style="font-weight:400;opacity:0.45;font-size:10px">— velocity + dye sim</span></h2>
       <div class="btns"><button class="toggle" id="fluidOn" style="flex:1">Enable fluid</button><button id="fluidReset" style="flex:0 0 auto">clear</button></div>
       <div class="row"><label>Resolution</label><select id="fluidRes" style="flex:1"><option value="128">128 (fast)</option><option value="256" selected>256</option><option value="384">384</option><option value="512">512 (heavy)</option></select></div>
+      <div class="row"><label>Dye source</label><select id="fluidSrc" style="flex:1"><option value="ws" selected>Workspace (current render)</option><option value="img">Source image</option></select></div>
       <div class="row"><label>Damping</label><input type="range" id="fluidDamp" min="0" max="1" step="0.01" value="0.4"><span class="val" id="fluidDampV"></span></div>
       <div class="row"><label>Dye fade</label><input type="range" id="fluidFade" min="0" max="1" step="0.01" value="0.6"><span class="val" id="fluidFadeV"></span></div>
       <div class="row"><label>Vorticity</label><input type="range" id="fluidVort" min="0" max="1" step="0.01" value="0.3"><span class="val" id="fluidVortV"></span></div>
@@ -682,7 +683,7 @@ body.theme-light{
       <div class="row"><label>Audio push</label><input type="range" id="fluidAud" min="0" max="2" step="0.01" value="0"><span class="val" id="fluidAudV"></span></div>
       <div class="row"><label>Inject</label><input type="range" id="fluidInject" min="0" max="2" step="0.01" value="0.6"><span class="val" id="fluidInjectV"></span></div>
       <div class="row"><label>Dye mix</label><input type="range" id="fluidDye" min="0" max="1" step="0.01" value="0"><span class="val" id="fluidDyeV"></span></div>
-      <div class="note">A real fluid solver running in the background: velocity is advected, stirred, made incompressible by a pressure solve, and carries a dye field that the source image is injected into. <b>Dye mix</b> blends that flowing dye over your render (1 = pure fluid). Add the <b>Fluid warp</b> fold to push the fold stack around by the same velocity field instead. Move the pointer over the canvas to stir it. Higher Pressure = more incompressible (and slower); Vorticity re-injects swirl the solver damps out.</div>
+      <div class="note">A real fluid solver running in the background: velocity is advected, stirred, made incompressible by a pressure solve, and carries a dye field that the source image is injected into. <b>Dye mix</b> blends that flowing dye over your render (1 = pure fluid). Add the <b>Fluid warp</b> fold to push the fold stack around by the same velocity field instead. <b>Dye source</b> picks what gets injected: the current render (so the fluid carries your whole workspace — folds, IFS, colour) or the raw source image. Hold the <b>left mouse button</b> and drag on the canvas to stir it. Higher Pressure = more incompressible (and slower); Vorticity re-injects swirl the solver damps out.</div>
     </div>
 
     <div class="group">
