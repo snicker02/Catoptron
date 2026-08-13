@@ -2340,5 +2340,49 @@ const OPS = [
   float d=mix(1.0, 2.2/max(z,0.25), persp);      // ortho .. perspective
   return vec2(p.x, p.y)*d;
 }` },
+  { name:'Gravitational lens', fn:'opLens', deps:[],
+    params:[["Strength",-2,2,0.01,0.5],["Softening",0.01,1,0.005,0.12],["Masses",1,6,1,1],["Ring radius",0,1.2,0.01,0.5],["Falloff",0.5,2.5,0.01,1.0],["Frame-drag",-2,2,0.01,0]],
+    glsl:`vec2 opLens(vec2 q, vec4 P0, vec4 P1){
+  float strength=P0.x, soft=P0.y, count=P0.z, ringR=P0.w, falloff=P1.x, spin=P1.y;
+  int N=int(count+0.5); if(N<1) N=1;
+  vec2 disp=vec2(0.0);
+  for(int i=0;i<6;i++){ if(i>=N) break;
+    vec2 mc=vec2(0.0);
+    if(N>1){ float a=TAU*float(i)/float(N); mc=ringR*vec2(cos(a),sin(a)); }
+    vec2 d=q-mc; float r=length(d); float rd=r+1e-4;
+    float g=1.0/pow(r+soft, falloff);
+    disp -= (d/rd)*(strength*g);                 // radial deflection (lensing)
+    disp += vec2(-d.y, d.x)/rd*(spin*g);         // tangential (frame drag / Kerr)
+  }
+  return q+disp;
+}` },
+  { name:'Wave interference', fn:'opWave', deps:[],
+    params:[["Mode",0,2,1,0,["Chladni","Ripple tank","Plane waves"]],["Frequency",1,30,0.1,8],["Detune",1,30,0.1,5],["Amount",0,2,0.01,0.5],["Sources",1,8,1,4],["Speed",0,4,0.01,1]],
+    glsl:`vec2 opWave(vec2 q, vec4 P0, vec4 P1){
+  float mode=P0.x, n=P0.y, m=P0.z, amt=P0.w, src=P1.x, speed=P1.y;
+  float t=uPhase*speed; vec2 disp=vec2(0.0);
+  if(mode<0.5){                                  // Chladni: flow toward nodal lines
+    float C=sin(n*q.x)*sin(m*q.y)+sin(m*q.x)*sin(n*q.y);
+    float dCdx=n*cos(n*q.x)*sin(m*q.y)+m*cos(m*q.x)*sin(n*q.y);
+    float dCdy=m*sin(n*q.x)*cos(m*q.y)+n*sin(m*q.x)*cos(n*q.y);
+    disp=-amt*0.06*C*vec2(dCdx,dCdy);
+  } else if(mode<1.5){                           // ripple tank: circular emitters
+    int K=int(src+0.5); if(K<1) K=1; vec2 g=vec2(0.0);
+    for(int i=0;i<8;i++){ if(i>=K) break;
+      float a=TAU*float(i)/float(K); vec2 e=0.6*vec2(cos(a),sin(a));
+      vec2 d=q-e; float r=length(d)+1e-4;
+      g+=n*cos(n*r-t)*d/r;
+    }
+    disp=amt*0.12*g;
+  } else {                                       // crossed plane waves (moire)
+    int K=int(src+0.5); if(K<2) K=2; vec2 g=vec2(0.0);
+    for(int i=0;i<8;i++){ if(i>=K) break;
+      float a=3.14159265*float(i)/float(K)+t*0.2; vec2 k=n*vec2(cos(a),sin(a));
+      g+=k*cos(dot(q,k)-t);
+    }
+    disp=amt*0.08*g;
+  }
+  return q+disp;
+}` },
 ];
 export { OPS };
