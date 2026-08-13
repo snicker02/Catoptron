@@ -121,6 +121,26 @@ const postLoc = gl.getAttribLocation(postProg, 'aPos');
 
 // ---- fluid: Navier-Stokes-lite velocity + dye sim ----
 let FLUID = null, fluidPtr = [0.5, 0.5], fluidPtrV = [0, 0], fluidTime = 0;
+let fluidLMB = false;
+// snapshot of the rendered workspace, so the fluid can carry the *current render* as dye
+let wsTex = null, wsW = 0, wsH = 0, wsReady = false;
+function captureWorkspace(w, h){
+  if(!wsTex || wsW !== w || wsH !== h){
+    if(wsTex) gl.deleteTexture(wsTex);
+    wsTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, wsTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    wsW = w; wsH = h; wsReady = false;
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.bindTexture(gl.TEXTURE_2D, wsTex);
+  gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
+  wsReady = true;
+}
 function ensureFluid(){
   if(!FLUID){ try { FLUID = createFluid(gl, VS, compile, bindQuad); } catch(e){ console.warn('fluid init failed', e); FLUID = false; } }
   if(!FLUID) return null;
@@ -141,7 +161,7 @@ function stepFluid(dt){
     ptr: fluidPtr, ptrV: fluidPtrV, ptrForce: state.fluidPtr,
     audForce: state.fluidAud, aud: Math.max(AUD.beat, AUD.bass * 0.6),
     inject: state.fluidInject,
-    srcTex: tex,
+    srcTex: (state.fluidSrc === 'ws' && wsReady && wsTex) ? wsTex : tex,
   });
   fluidPtrV = [fluidPtrV[0] * 0.82, fluidPtrV[1] * 0.82];   // decay the stir impulse
 }
@@ -445,7 +465,7 @@ const state = {
   stutter: 0, jitter: 0, burst: 0, mosh: 0, rd: 0, mblur: 0,
   ifsOn: 0, ifsN: 5, ifsScale: 0.6, ifsRot: 0, ifsCx: 0, ifsCy: 0, ifsZ: 0,
   fluidOn: 0, fluidRes: 256, fluidDamp: 0.4, fluidFade: 0.6, fluidVort: 0.3, fluidIters: 20,
-  fluidStir: 1.0, fluidStirScale: 3, fluidPtr: 0.6, fluidAud: 0, fluidInject: 0.6, fluidDye: 0,
+  fluidStir: 1.0, fluidStirScale: 3, fluidPtr: 0.6, fluidAud: 0, fluidInject: 0.6, fluidDye: 0, fluidSrc: 'ws',
   cx: 0.5, cy: 0.5, seed: 7.13, aspect: 'free', fbAmt: 0.9, src: 'orbs',
   ccMode: 0, ccTint: '#ff5d7a',
   srcScale: 1, srcHue: 0, srcVar: 0.5
@@ -708,7 +728,8 @@ function syncUI(){
     const af=$('audioFileBtn'); if(af) af.classList.toggle('on', state.audioMode==='file'); }
   { const ib=$('ifsOn'); if(ib){ ib.classList.toggle('on', !!state.ifsOn); ib.textContent = state.ifsOn ? 'IFS on' : 'Enable IFS'; } }
   { const fb=$('fluidOn'); if(fb){ fb.classList.toggle('on', !!state.fluidOn); fb.textContent = state.fluidOn ? 'Fluid on' : 'Enable fluid'; }
-    const fr=$('fluidRes'); if(fr) fr.value = state.fluidRes; }
+    const fr=$('fluidRes'); if(fr) fr.value = state.fluidRes;
+    const fs2=$('fluidSrc'); if(fs2) fs2.value = state.fluidSrc; }
   $('rendNote').textContent = rendNotes[state.rend];
   renderStack();
 }
@@ -755,6 +776,7 @@ $('ifsOn').addEventListener('click', ()=>{ state.ifsOn = state.ifsOn?0:1; syncUI
 $('fluidOn').addEventListener('click', ()=>{ state.fluidOn = state.fluidOn?0:1; if(state.fluidOn) ensureFluid(); syncUI(); });
 $('fluidReset').addEventListener('click', ()=>{ if(FLUID) FLUID.reset(); toast('fluid cleared'); });
 $('fluidRes').addEventListener('change', ()=>{ state.fluidRes = +$('fluidRes').value; if(state.fluidOn) ensureFluid(); });
+$('fluidSrc').addEventListener('change', ()=>{ state.fluidSrc = $('fluidSrc').value; });
 $('audioOn').addEventListener('click', ()=>{ audioEnable(!state.audioOn); });
 $('audioMic').addEventListener('click', ()=>{ state.audioMode='mic'; if(state.audioOn) audioSetMode('mic'); syncUI(); });
 $('audioFileBtn').addEventListener('click', ()=>{ $('audioFile').click(); });
@@ -1066,7 +1088,7 @@ function applyPreset(val){
     if('ifsCx' in d) state.ifsCx = d.ifsCx;
     if('ifsCy' in d) state.ifsCy = d.ifsCy;
     if('ifsZ' in d) state.ifsZ = d.ifsZ;
-    ['fluidOn','fluidRes','fluidDamp','fluidFade','fluidVort','fluidIters','fluidStir','fluidStirScale','fluidPtr','fluidAud','fluidInject','fluidDye'].forEach(k=>{ if(k in d) state[k] = d[k]; });
+    ['fluidOn','fluidRes','fluidDamp','fluidFade','fluidVort','fluidIters','fluidStir','fluidStirScale','fluidPtr','fluidAud','fluidInject','fluidDye','fluidSrc'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     if('rd' in d) state.rd = d.rd;
     if('tint'  in d) state.tint  = d.tint;
     if('tintA' in d) state.tintA = d.tintA;
@@ -1384,9 +1406,13 @@ canvas.addEventListener('pointermove', e=>{
   if(!state.fluidOn) return;
   const r = canvas.getBoundingClientRect();
   const x = (e.clientX - r.left) / r.width, y = 1 - (e.clientY - r.top) / r.height;
-  fluidPtrV = [ (x - fluidPtr[0]) * 12, (y - fluidPtr[1]) * 12 ];
-  fluidPtr = [x, y];
+  const down = fluidLMB || (e.buttons & 1) === 1;
+  if(down) fluidPtrV = [ (x - fluidPtr[0]) * 12, (y - fluidPtr[1]) * 12 ];
+  fluidPtr = [x, y];      // track position always, so the first press pushes from the right spot
 });
+canvas.addEventListener('pointerdown', e=>{ if(e.button === 0) fluidLMB = true; });
+window.addEventListener('pointerup', e=>{ if(e.button === 0){ fluidLMB = false; fluidPtrV = [0, 0]; } });
+window.addEventListener('pointercancel', ()=>{ fluidLMB = false; fluidPtrV = [0, 0]; });
 canvas.addEventListener('dblclick',    ()=>{ state.cx = 0.5; state.cy = 0.5; toast('recentered'); });
 
 /* file loading */
@@ -2060,6 +2086,7 @@ function frame(now){
   applyAR();
   try { renderScene(w, h); } finally { restoreAR(); }
   { const mb = state.mblur + (AR.mblur||0); if(mb > 0.001) motionBlurPass(w, h, mb); else mbInit = false; }
+  if(state.fluidOn && state.fluidSrc === 'ws') captureWorkspace(w, h);
   requestAnimationFrame(frame);
 }
 applySource();
