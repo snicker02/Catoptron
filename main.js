@@ -1247,6 +1247,40 @@ function setOpOrigin(e){
     Math.min(1, Math.max(-1, (uy - state.cy)))
   ];
 }
+// ---- keyboard navigation: WASD / arrows pan, Q/E zoom (hold for continuous) ----
+const heldKeys = new Set();
+const NAV_KEYS = { w:[0,1], a:[-1,0], s:[0,-1], d:[1,0], arrowup:[0,1], arrowleft:[-1,0], arrowdown:[0,-1], arrowright:[1,0] };
+let _navDirty = false;
+function navTyping(){
+  const ae = document.activeElement, tag = ae && ae.tagName, ty = ae && ae.type;
+  return tag === 'TEXTAREA' || tag === 'SELECT' || (tag === 'INPUT' && ty !== 'range' && ty !== 'checkbox' && ty !== 'button');
+}
+function navStep(dt){
+  if(!heldKeys.size) return;
+  const fine = heldKeys.has('shift');
+  let vx = 0, vy = 0;
+  for(const k in NAV_KEYS) if(heldKeys.has(k)){ vx += NAV_KEYS[k][0]; vy += NAV_KEYS[k][1]; }
+  if(vx || vy){
+    const len = Math.sqrt(vx*vx + vy*vy); vx /= len; vy /= len;
+    const sp = (fine ? 0.10 : 0.42) * dt;
+    if(pickOp >= 0 && state.stack[pickOp]){          // placing a fold origin? move that instead
+      const slot = state.stack[pickOp];
+      slot.o = [ Math.min(1, Math.max(-1, slot.o[0] + vx*sp*2)), Math.min(1, Math.max(-1, slot.o[1] + vy*sp*2)) ];
+    } else {
+      state.cx = Math.min(1, Math.max(0, state.cx + vx*sp));
+      state.cy = Math.min(1, Math.max(0, state.cy + vy*sp));
+    }
+    _navDirty = true;
+  }
+  let z = 0;
+  if(heldKeys.has('e')) z += 1;
+  if(heldKeys.has('q')) z -= 1;
+  if(z){
+    const rate = (fine ? 0.25 : 1.0) * dt;
+    state.zoom = Math.min(2.5, Math.max(0.02, state.zoom * Math.exp(z * rate)));
+    syncUI(); _navDirty = true;
+  }
+}
 function _gStart(){
   const p = [..._ptrs.values()];
   const dx = p[1].x - p[0].x, dy = p[1].y - p[0].y;
@@ -1640,7 +1674,23 @@ window.addEventListener('keydown', e=>{
     e.preventDefault();
     togglePause();
   }
+  if(e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if(k === 'shift'){ heldKeys.add('shift'); return; }
+  if((k in NAV_KEYS) || k === 'q' || k === 'e'){
+    if(navTyping()) return;
+    e.preventDefault();
+    heldKeys.add(k);
+  }
 });
+window.addEventListener('keyup', e=>{
+  const k = e.key.toLowerCase();
+  heldKeys.delete(k);
+  if(!heldKeys.size || (heldKeys.size === 1 && heldKeys.has('shift'))){
+    if(_navDirty){ _navDirty = false; pushHistory(); }
+  }
+});
+window.addEventListener('blur', ()=>{ heldKeys.clear(); if(_navDirty){ _navDirty = false; pushHistory(); } });
 
 /* ================= audio reactivity ================= */
 const AUD = { ctx:null, analyser:null, freq:null, node:null, elNode:null, mediaEl:null, stream:null, bass:0, mid:0, treble:0, level:0, beat:0, _refr:0, _prevKick:0, hist:new Float32Array(43), hi:0, recDest:null };
@@ -1908,6 +1958,7 @@ function frame(now){
   const dt = Math.min(0.05, (now - lastT)/1000); lastT = now;
   if(exporting){ requestAnimationFrame(frame); return; }
   audioSample(dt); AR = audioRoutes(); arBurst = AR.burst || 0; updateMeter(); updateAudTransport();
+  navStep(dt);
   if(!reduced && !paused){
     phase  += dt * (state.drift + (AR.driftRate||0)) * 0.6;
     spinA  += dt * (state.spin + (AR.spinRate||0)) * 0.5;
