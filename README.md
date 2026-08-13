@@ -239,6 +239,12 @@ reveal the rest once you pick a mode.
 | **Disc** | Disc-family conformal maps (disc, idisc, wdisc, fdisc, edisc, spiral, squircle, tan, sech) | Mode, Amount, Twist, Petal |
 | **Zhukowski** | Joukowski airfoil conformal map | c |
 
+### Physics fields
+| Fold | What it does | Key params |
+|---|---|---|
+| **Gravitational lens** | Bends the sampling coordinates around one or a ring of point masses (deflection ∝ 1/rᶠ), warping the image like light near a black hole — Einstein-ring arcs and all. Negative Strength repels (diverging lens); Frame-drag adds a tangential swirl for a rotating (Kerr) black hole. Place it with the fold Origin ⊕. | Strength, Softening, Masses, Ring radius, Falloff, Frame-drag |
+| **Wave interference** | Displaces the image along a wave field. **Chladni** gathers it onto standing-wave nodal lines (a vibrating-plate look); **Ripple tank** superposes circular waves from a ring of emitters; **Plane waves** crosses plane waves into moiré. Ripple/Plane animate with Drift and are naturally audio-reactive (drive Frequency with a band). | Mode, Frequency, Detune, Amount, Sources, Speed |
+
 ### Fractal folds
 | Fold | What it does | Key params |
 |---|---|---|
