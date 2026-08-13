@@ -2657,6 +2657,19 @@ function redo(){
   const u = document.getElementById('undoBtn'); if(u) u.addEventListener('click', undo);
   const r = document.getElementById('redoBtn'); if(r) r.addEventListener('click', redo);
   document.querySelectorAll('.group > h2').forEach(h2=> h2.addEventListener('click', ()=> h2.parentElement.classList.toggle('collapsed')));
+  document.querySelectorAll('.group').forEach(g=>{
+    const note = g.querySelector('.note'); if(!note) return;
+    const h2 = g.querySelector('h2'); if(!h2 || h2.querySelector('.qbtn')) return;
+    const q = document.createElement('button');
+    q.type = 'button'; q.className = 'qbtn'; q.textContent = '?'; q.title = 'Show/hide info';
+    q.addEventListener('click', e => {
+      e.stopPropagation();
+      const show = !note.classList.contains('show');
+      g.querySelectorAll('.note').forEach(n => n.classList.toggle('show', show));
+      q.classList.toggle('on', show);
+    });
+    h2.appendChild(q);
+  });
   pushHistory();   // seed initial state
 })();
 
