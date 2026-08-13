@@ -2657,6 +2657,13 @@ function redo(){
   const u = document.getElementById('undoBtn'); if(u) u.addEventListener('click', undo);
   const r = document.getElementById('redoBtn'); if(r) r.addEventListener('click', redo);
   document.querySelectorAll('.group > h2').forEach(h2=> h2.addEventListener('click', ()=> h2.parentElement.classList.toggle('collapsed')));
+  { const ts = $('themeSel');
+    const applyTheme = t => { document.body.classList.remove('theme-grey','theme-light'); if(t !== 'dark') document.body.classList.add('theme-' + t); };
+    let saved = 'dark';
+    try { saved = localStorage.getItem('catoptronTheme') || 'dark'; } catch(_){}
+    if(ts) ts.value = saved;
+    applyTheme(saved);
+    if(ts) ts.addEventListener('change', ()=>{ applyTheme(ts.value); try { localStorage.setItem('catoptronTheme', ts.value); } catch(_){} }); }
   document.querySelectorAll('.group').forEach(g=>{
     const note = g.querySelector('.note'); if(!note) return;
     const h2 = g.querySelector('h2'); if(!h2 || h2.querySelector('.qbtn')) return;
