@@ -52,6 +52,8 @@ uniform float uWobble;
 uniform float uSeed;
 uniform sampler2D uPrev;
 uniform sampler2D uFluidV;
+uniform sampler2D uDye;
+uniform float uDyeMix;
 uniform float uFluidOn;
 uniform float uFbAmt;
 uniform float uCcMode;
