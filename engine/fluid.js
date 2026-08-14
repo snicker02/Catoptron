@@ -65,6 +65,7 @@ const FS_FORCES = PACK + `
 uniform sampler2D uVel;
 uniform float uDt, uStir, uStirScale, uTime, uVort, uPtrF, uAudF, uAud;
 uniform vec2 uPtr, uPtrV;
+uniform vec2 uWind;
 void main(){
   vec2 v = velAt(uVel, vUv);
   // curl-noise stir (divergence-free by construction)
@@ -86,6 +87,8 @@ void main(){
     float len = length(g) + 1e-5;
     v += vec2(g.y, -g.x) / len * c * uVort * uDt * 6.0;
   }
+  // uniform directional force (wind slider / device tilt)
+  v += uWind * uDt * 2.0;
   // pointer drag
   if(uPtrF > 0.0){
     float d = distance(vUv, uPtr);
@@ -241,6 +244,7 @@ export function createFluid(gl, VS, compile, bindQuad){
       for(const k in fu){ if(fp.locs[k]) gl.uniform1f(fp.locs[k], fu[k]); }
       if(fp.locs.uPtr)  gl.uniform2f(fp.locs.uPtr, o.ptr[0], o.ptr[1]);
       if(fp.locs.uPtrV) gl.uniform2f(fp.locs.uPtrV, o.ptrV[0], o.ptrV[1]);
+      if(fp.locs.uWind) gl.uniform2f(fp.locs.uWind, o.wind ? o.wind[0] : 0, o.wind ? o.wind[1] : 0);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, vel[vi]);
       gl.uniform1i(fp.locs.uVel, 0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
