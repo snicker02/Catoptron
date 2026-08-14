@@ -45,7 +45,24 @@ The single most useful habit: **add one fold, watch what it does, then add the n
 
 **Keyboard:** **W A S D** (or arrow keys) move the vanishing point, **Q / E** zoom out/in, hold **Shift** for fine control, **Space** pauses. If you’re placing a fold’s Origin (⊕), WASD nudges that origin instead.
 
-## 3. The interface
+## 3. Draw — spline strokes as a source
+
+Catoptron can use **your own drawing** as the source image, so everything downstream — the fold stack, IFS, fluid, renderers, grade, audio — acts on your lines.
+
+- Turn on **Draw mode** (it switches the Source to *drawing* for you) and drag on the canvas.
+- **Ink / Bg** set the stroke and background colours; **Width** and **Opacity** shape the line. **guide** dims the backdrop while you draw so your strokes read clearly.
+- **undo stroke** removes the last line (Ctrl+Z works too); **clear** wipes the drawing.
+- Switch Draw mode **off** to see the folded result.
+
+Strokes are stored as **splines, not pixels**: raw pointer samples are decimated to kill hand jitter, then a Catmull-Rom curve is fitted through the surviving points — so the line passes exactly through where you drew while staying perfectly smooth. Because they are vectors, they re-rasterise crisply at HQ export resolution instead of pixelating, and they save inside presets as compact data.
+
+While Draw mode is on you draw in the **square source area** shown 1:1 (letterboxed in the canvas). That is deliberate: folds are many-to-one, so a stroke under your cursor could not be mapped back through a kaleidoscope. Draw flat, then switch off to see it mirrored and multiplied.
+
+A nice pairing: with the **Fluid** sim running and Dye source set to Workspace, your drawn strokes get picked up as dye and smear into the flow.
+
+---
+
+## 4. The interface
 
 The left panel is grouped top to bottom:
 
@@ -61,7 +78,7 @@ The left panel is grouped top to bottom:
 
 ---
 
-## 4. Renderers
+## 5. Renderers
 
 The renderer decides how the folded plane is reflected and repeated. Same stack, different
 renderer = very different image, so try switching.
@@ -95,7 +112,7 @@ Shared renderer controls:
 
 ---
 
-## 5. The fold stack
+## 6. The fold stack
 
 This is where you compose the effect.
 
@@ -146,7 +163,7 @@ The contraction is what makes *any* stack behave like an IFS — without it, mos
 
 ---
 
-## 6. Operator reference
+## 7. Operator reference
 
 All 127 folds, grouped by what they do. Parameters listed are the main ones; multi-mode folds
 reveal the rest once you pick a mode.
@@ -363,7 +380,7 @@ These read the **photo itself** — sampling brightness, colour, or the local gr
 
 ---
 
-## 7. Glass — color & framing
+## 8. Glass — color & framing
 
 - **Frame / Frame width** — draw a border vignette-frame around the piece.
 - **Tint** — pick a color and blend amount to wash the image.
@@ -380,7 +397,7 @@ These read the **photo itself** — sampling brightness, colour, or the local gr
 
 ---
 
-## 8. Motion — animation
+## 9. Motion — animation
 
 Turn these up to animate for video export:
 
@@ -399,7 +416,7 @@ Animation loops are built to close seamlessly when exported as HQ Video.
 
 ---
 
-## 9. Audio reactivity
+## 10. Audio reactivity
 
 Drive almost any parameter — renderer, colour, glitch, motion, **and individual fold parameters** — from live sound. Everything is off until you switch it on, and audio only ever *adds* to your base values, so turning it off returns the image exactly to where you left it.
 
@@ -438,7 +455,7 @@ Drive almost any parameter — renderer, colour, glitch, motion, **and individua
 
 ---
 
-## 10. Presets
+## 11. Presets
 
 - **Load** a factory preset from the dropdown (93 included, from clean kaleidoscopes to the Wave,
   Lazy, and Loonie families) to see complete recipes.
@@ -451,7 +468,7 @@ re-save presets after big updates.
 
 ---
 
-## 11. Export & recording
+## 12. Export & recording
 
 - **Export PNG** — save a super-sampled still; the size dropdown offers **×1 / ×2 / ×4** of the live view, or a **fixed height** (1080 / 1440 / 2160 / 2880 px).
 - **Record (WebM/MP4)** — captures the live canvas in real time; set FPS, quality, and length. If audio is enabled and playing, the recording includes the sound.
@@ -462,7 +479,7 @@ re-save presets after big updates.
 
 ---
 
-## 12. Recipes to try
+## 13. Recipes to try
 
 - **Kaleidoscope portrait**: Polar fold (6–12 segments) → Swirl (small) → Panes, add a Tint.
 - **Infinite vortex**: Spiral → Droste renderer, raise Step scale and Twist.
