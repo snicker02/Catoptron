@@ -55,6 +55,7 @@ uniform sampler2D uFluidV;
 uniform sampler2D uDye;
 uniform float uDyeMix;
 uniform float uFluidOn;
+uniform float uFluidTexel;
 uniform float uFbAmt;
 uniform float uCcMode;
 uniform vec3  uCcTint;
