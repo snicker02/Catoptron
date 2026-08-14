@@ -523,6 +523,7 @@ body.theme-light{
         <label style="flex:0 0 60px">Source</label>
         <select id="srcSel" style="flex:1" title="Load a photo or pick a built-in probe pattern">
           <option value="user">user image</option>
+          <option value="draw">drawing</option>
           <option value="camera">camera (live)</option>
           <option value="orbs" selected>orbs</option>
           <option value="plasma">plasma</option>
@@ -638,10 +639,22 @@ body.theme-light{
   </div>
   <div id="stage">
     <canvas id="glc"></canvas>
+      <canvas id="drawOverlay" style="display:none;position:absolute;pointer-events:none;z-index:5"></canvas>
     <div id="toast"></div>
   </div>
   <div id="panelR">
-    <div class="group">
+        <div class="group">
+      <h2>Draw <span style="font-weight:400;opacity:0.45;font-size:10px">— spline strokes</span></h2>
+      <div class="btns"><button class="toggle" id="drawMode" style="flex:1">Draw mode</button></div>
+      <div class="row tintrow"><label>Ink</label><input type="color" id="drawColor" value="#e8f2ff"><label style="flex:0 0 30px">Bg</label><input type="color" id="drawBg" value="#101418"><button class="toggle" id="drawGuide" style="flex:0 0 auto" title="Dim backdrop while drawing">guide</button></div>
+      <div class="row"><label>Width</label><input type="range" id="drawW" min="0.001" max="0.08" step="0.001" value="0.012"><span class="val" id="drawWV"></span></div>
+      <div class="row"><label>Opacity</label><input type="range" id="drawA" min="0.05" max="1" step="0.01" value="1"><span class="val" id="drawAV"></span></div>
+      <div class="btns"><button id="drawUndo" style="flex:1">undo stroke</button><button id="drawClear" style="flex:1">clear</button></div>
+      <div class="note" style="display:block;opacity:0.7"><span id="drawStats">0 strokes · 0 pts</span></div>
+      <div class="note">Draw smooth spline strokes that become the <b>source image</b> — so the fold stack, IFS, fluid and renderers all act on your lines. Turn on <b>Draw mode</b> and drag on the canvas; strokes are captured as vectors, so they stay crisp at any export size and save inside presets. While drawing you see your strokes 1:1 in the square source area (the <b>guide</b> button dims the backdrop); switch Draw mode off to see the folded result. Undo stroke also works with Ctrl+Z.</div>
+    </div>
+
+<div class="group">
       <h2>Fold stack</h2>
       <div class="row" style="gap:6px;margin-bottom:8px">
         <input type="text" id="foldSearch" placeholder="search folds…" style="flex:1;min-width:0">
