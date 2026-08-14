@@ -80,6 +80,7 @@ renderer = very different image, so try switching.
 | **Slit-scan** | Each column samples a different time slice — diagonal motion smear | Time-smear, datamosh motion |
 | **Poincaré disk** | The hyperbolic disk model — the image crowds infinitely toward the rim | Escher-like hyperbolic space |
 | **Hyperbolic tiling** | A {p,·} reflection group tessellates the disk (Escher "Circle Limit") | Hyperbolic tessellations |
+| **None** | No renderer transform — shows the image straight, with only your fold stack (and IFS / fluid) applied. Use it to see exactly what the folds are doing, or to use Catoptron purely as a warp + colour tool. | — |
 
 Shared renderer controls:
 
