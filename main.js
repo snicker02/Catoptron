@@ -3,7 +3,7 @@ import { OPS } from './engine/ops.js';
 import { MAX_OPS } from './engine/assemble.js';
 import { createProgramCache } from './engine/glcache.js';
 import { createFluid } from './engine/fluid.js';
-import { newStroke, addPoint, renderStrokes, strokeStats } from './engine/draw.js';
+import { newStroke, addPoint, renderStrokes, strokeStats, samplePath, nearestNode, nearestOnPath } from './engine/draw.js';
 
 /* ================= GL setup ================= */
 const canvas = document.getElementById('glc');
@@ -540,6 +540,7 @@ function drawOverlayPaint(){
     c.fillRect(0, 0, px, px);
     renderStrokes(c, state.strokes, px, null);
   }
+  drawNodesOverlay(c, px);
   // always mark the square drawing area so you know the bounds (esp. when drawing over the live render)
   c.save();
   c.strokeStyle = state.drawGuide ? 'rgba(140,190,255,0.55)' : 'rgba(140,190,255,0.85)';
@@ -547,7 +548,80 @@ function drawOverlayPaint(){
   c.setLineDash([px * 0.02, px * 0.02]);
   c.strokeRect(c.lineWidth, c.lineWidth, px - c.lineWidth * 2, px - c.lineWidth * 2);
   c.restore();
+  if(!state.drawGuide) drawNodesOverlay(c, px);
 }
+// ---- node (pen) editing: a straight line you then bend with draggable points ----
+let selPath = -1, dragNode = -1, nodeMoved = false;
+const NODE_TOL = 0.022;                     // pick radius in normalised units
+function nodePaths(){ return state.strokes; }
+function drawNodesOverlay(c, px){
+  if(state.drawTool !== 'node' || !state.drawMode) return;
+  const paths = nodePaths();
+  for(let pi = 0; pi < paths.length; pi++){
+    const st = paths[pi]; if(!st.pts || st.pts.length < 1) continue;
+    const active = (pi === selPath);
+    for(let i = 0; i < st.pts.length; i++){
+      const x = st.pts[i][0] * px, y = st.pts[i][1] * px;
+      const r = Math.max(3, px * (active ? 0.009 : 0.006));
+      c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2);
+      c.fillStyle = active ? (i === dragNode ? '#ffd479' : '#8ab8ff') : 'rgba(150,180,220,0.55)';
+      c.fill();
+      c.lineWidth = Math.max(1, px * 0.0018); c.strokeStyle = 'rgba(8,12,18,0.85)'; c.stroke();
+    }
+  }
+}
+function nodePointerDown(e){
+  const p = drawNorm(e);
+  const paths = nodePaths();
+  // 1) grab an existing node?
+  for(let pi = paths.length - 1; pi >= 0; pi--){
+    const hit = nearestNode(paths[pi].pts, p[0], p[1], NODE_TOL);
+    if(hit >= 0){
+      if(e.altKey || e.button === 2){                 // alt-click removes a node
+        if(paths[pi].pts.length > 2){ paths[pi].pts.splice(hit, 1); }
+        else { paths.splice(pi, 1); selPath = -1; }
+        drawRebuild(); pushHistory(); return true;
+      }
+      selPath = pi; dragNode = hit; nodeMoved = false; return true;
+    }
+  }
+  // 2) click ON a line -> insert a node there and start dragging it
+  for(let pi = paths.length - 1; pi >= 0; pi--){
+    if(paths[pi].pts.length < 2) continue;
+    const on = nearestOnPath(paths[pi].pts, paths[pi].tension, p[0], p[1]);
+    if(on && on.dist < NODE_TOL){
+      paths[pi].pts.splice(on.seg + 1, 0, [on.x, on.y]);
+      selPath = pi; dragNode = on.seg + 1; nodeMoved = false;
+      drawRebuild(); return true;
+    }
+  }
+  // 3) empty space -> begin a new straight line (drag out its far end)
+  const st = newStroke({ color: state.drawColor, width: state.drawW, alpha: state.drawA, tension: state.drawTension });
+  st.pts = [[p[0], p[1]], [p[0], p[1]]];
+  paths.push(st);
+  selPath = paths.length - 1; dragNode = 1; nodeMoved = false;
+  drawRebuild(); return true;
+}
+function nodePointerMove(e){
+  if(dragNode < 0 || selPath < 0) return false;
+  const p = drawNorm(e);
+  const st = nodePaths()[selPath]; if(!st){ dragNode = -1; return false; }
+  st.pts[dragNode] = [Math.max(0, Math.min(1, p[0])), Math.max(0, Math.min(1, p[1]))];
+  nodeMoved = true; drawDirty = true; drawRebuild();
+  return true;
+}
+function nodePointerUp(){
+  if(dragNode < 0) return false;
+  const st = nodePaths()[selPath];
+  // a click with no drag on a brand-new line leaves a zero-length stub — drop it
+  if(st && st.pts.length === 2 && !nodeMoved){
+    const a = st.pts[0], b = st.pts[1];
+    if(Math.hypot(a[0]-b[0], a[1]-b[1]) < 0.005){ nodePaths().splice(selPath, 1); selPath = -1; }
+  }
+  dragNode = -1; drawRebuild(); pushHistory(); return true;
+}
+function retensionAll(){ for(const s of state.strokes) s.tension = state.drawTension; drawRebuild(); }
+
 function drawBegin(e){
   curStroke = newStroke({ color: state.drawColor, width: state.drawW, alpha: state.drawA });
   const p = drawNorm(e); addPoint(curStroke, p[0], p[1], true);
@@ -590,6 +664,7 @@ const state = {
   fluidOn: 0, fluidRes: 256, fluidDamp: 0.4, fluidFade: 0.6, fluidVort: 0.3, fluidIters: 20,
   fluidStir: 1.0, fluidStirScale: 3, fluidPtr: 0.6, fluidAud: 0, fluidInject: 0.6, fluidDye: 0, fluidSrc: 'ws', fluidPause: 0, fluidWind: 0, fluidWindDir: 0, fluidTilt: 0, fluidTiltGain: 1,
   strokes: [], drawMode: 0, drawColor: '#e8f2ff', drawW: 0.012, drawA: 1, drawBg: '#101418', drawGuide: 1,
+  drawTool: 'node', drawTension: 1,
   cx: 0.5, cy: 0.5, seed: 7.13, aspect: 'free', fbAmt: 0.9, src: 'orbs',
   ccMode: 0, ccTint: '#ff5d7a',
   srcScale: 1, srcHue: 0, srcVar: 0.5
@@ -776,6 +851,7 @@ const sliders = [
   ['fluidTiltGain','fluidTiltGainV', v=>v.toFixed(2)],
   ['drawW','drawWV', v=>v.toFixed(3)],
   ['drawA','drawAV', v=>v.toFixed(2)],
+  ['drawTension','drawTensionV', v=>v.toFixed(2)],
   ['rd','rdV',v=>v.toFixed(0)],
   ['srcScale','srcScaleV',v=>v.toFixed(2)],
   ['srcHue','srcHueV',v=>v.toFixed(0)],
@@ -872,7 +948,9 @@ function syncUI(){
           : 'Only applies while Draw mode is on';
       }
       const dc=$('drawColor'); if(dc) dc.value = state.drawColor;
-      const db=$('drawBg'); if(db) db.value = state.drawBg; }
+      const db=$('drawBg'); if(db) db.value = state.drawBg;
+      const dt=$('drawTool'); if(dt) dt.value = state.drawTool;
+      const tr=$('tensionRow'); if(tr) tr.style.display = state.drawTool === 'node' ? '' : 'none'; }
     const tr=$('tiltRow'); if(tr) tr.style.display = TILT_SUPPORTED ? '' : 'none'; }
   $('rendNote').textContent = rendNotes[state.rend];
   renderStack();
@@ -931,6 +1009,8 @@ $('drawMode').addEventListener('click', ()=>{
   if(state.drawMode) toast('draw on the canvas \u2014 strokes feed the fold stack');
 });
 $('drawUndo').addEventListener('click', drawUndo);
+$('drawTool').addEventListener('change', ()=>{ state.drawTool = $('drawTool').value; dragNode = -1; syncUI(); drawOverlayPaint(); });
+$('drawTension').addEventListener('input', ()=>{ retensionAll(); });
 $('drawClear').addEventListener('click', drawClear);
 $('drawGuide').addEventListener('click', ()=>{
   if(!state.drawMode){ toast('flat/live view \u2014 turn on Draw mode first'); return; }
@@ -1254,7 +1334,7 @@ function applyPreset(val){
     if('ifsCy' in d) state.ifsCy = d.ifsCy;
     if('ifsZ' in d) state.ifsZ = d.ifsZ;
     if('strokes' in d){ state.strokes = JSON.parse(JSON.stringify(d.strokes)); if(state.src === 'draw') drawRebuild(); }
-    ['drawColor','drawW','drawA','drawBg','drawGuide'].forEach(k=>{ if(k in d) state[k] = d[k]; });
+    ['drawColor','drawW','drawA','drawBg','drawGuide','drawTool','drawTension'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     ['fluidOn','fluidRes','fluidDamp','fluidFade','fluidVort','fluidIters','fluidStir','fluidStirScale','fluidPtr','fluidAud','fluidInject','fluidDye','fluidSrc','fluidPause','fluidWind','fluidWindDir','fluidTiltGain'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     if('rd' in d) state.rd = d.rd;
     if('tint'  in d) state.tint  = d.tint;
@@ -1540,8 +1620,10 @@ function _gMove(){
   state.shiftY = _gesture.sy0 - ((mid.y - _gesture.mid0.y) / r.height) * pf;
 }
 canvas.addEventListener('pointerdown', e=>{
-  if(state.drawMode && state.src === 'draw' && e.button === 0){
-    canvas.setPointerCapture(e.pointerId); e.preventDefault(); drawBegin(e); return;
+  if(state.drawMode && state.src === 'draw' && (e.button === 0 || e.button === 2)){
+    canvas.setPointerCapture(e.pointerId); e.preventDefault();
+    if(state.drawTool === 'node'){ nodePointerDown(e); return; }
+    if(e.button === 0){ drawBegin(e); return; }
   }
   canvas.setPointerCapture(e.pointerId);
   _ptrs.set(e.pointerId, { x:e.clientX, y:e.clientY });
@@ -1556,6 +1638,7 @@ canvas.addEventListener('pointerdown', e=>{
   }
 });
 canvas.addEventListener('pointermove', e=>{
+  if(dragNode >= 0){ nodePointerMove(e); return; }
   if(curStroke){ drawExtend(e); drawOverlayPaint(); return; }
   if(!_ptrs.has(e.pointerId)) return;
   _ptrs.set(e.pointerId, { x:e.clientX, y:e.clientY });
@@ -1582,8 +1665,9 @@ canvas.addEventListener('pointermove', e=>{
   fluidPtr = [x, y];      // track position always, so the first press pushes from the right spot
 });
 canvas.addEventListener('pointerdown', e=>{ if(e.button === 0) fluidLMB = true; });
-window.addEventListener('pointerup', e=>{ if(e.button === 0){ fluidLMB = false; fluidPtrV = [0, 0]; } if(curStroke) drawEnd(); });
+window.addEventListener('pointerup', e=>{ if(e.button === 0){ fluidLMB = false; fluidPtrV = [0, 0]; } if(curStroke) drawEnd(); if(dragNode >= 0) nodePointerUp(); });
 window.addEventListener('pointercancel', ()=>{ fluidLMB = false; fluidPtrV = [0, 0]; });
+canvas.addEventListener('contextmenu', e=>{ if(state.drawMode && state.drawTool === 'node') e.preventDefault(); });
 canvas.addEventListener('dblclick',    ()=>{ state.cx = 0.5; state.cy = 0.5; toast('recentered'); });
 
 /* file loading */
