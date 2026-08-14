@@ -156,6 +156,7 @@ body.panels-hidden #panelL,body.panels-hidden #panelR{display:none}
 .row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .row:last-child{margin-bottom:0}
 .row label{flex:0 0 78px;font-size:12px;color:var(--label)}
+.row select{min-width:0;max-width:100%}
 
 /* Clean, inline text field treatment for slider readouts */
 .row .val {
@@ -674,7 +675,7 @@ body.theme-light{
       <h2>Fluid <span style="font-weight:400;opacity:0.45;font-size:10px">— velocity + dye sim</span></h2>
       <div class="btns"><button class="toggle" id="fluidOn" style="flex:1">Enable fluid</button><button id="fluidReset" style="flex:0 0 auto">clear</button></div>
       <div class="row"><label>Resolution</label><select id="fluidRes" style="flex:1"><option value="128">128 (fast)</option><option value="256" selected>256</option><option value="384">384</option><option value="512">512 (heavy)</option></select></div>
-      <div class="row"><label>Dye source</label><select id="fluidSrc" style="flex:1"><option value="ws" selected>Workspace (current render)</option><option value="img">Source image</option></select></div>
+      <div class="row"><label>Dye source</label><select id="fluidSrc" style="flex:1;min-width:0" title="What gets injected into the dye"><option value="ws" selected>Workspace</option><option value="img">Source image</option></select></div>
       <div class="row"><label>Damping</label><input type="range" id="fluidDamp" min="0" max="1" step="0.01" value="0.4"><span class="val" id="fluidDampV"></span></div>
       <div class="row"><label>Dye fade</label><input type="range" id="fluidFade" min="0" max="1" step="0.01" value="0.6"><span class="val" id="fluidFadeV"></span></div>
       <div class="row"><label>Vorticity</label><input type="range" id="fluidVort" min="0" max="1" step="0.01" value="0.3"><span class="val" id="fluidVortV"></span></div>
