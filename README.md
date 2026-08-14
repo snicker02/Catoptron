@@ -134,6 +134,8 @@ The **Fluid** panel runs an actual fluid solver in the background (a Navier–St
 - **Stir** / **Stir scale** — a built-in curl-noise force that keeps the fluid moving on its own.
 - **Pointer** — move the mouse over the canvas to push the fluid around.
 - **Audio push** — transients shove the fluid outward from the centre.
+- **Wind / Wind dir** — a steady directional current: strength plus the angle it blows. Use it for drifting smoke, a river, or rain-on-glass runoff. Both are audio-reactive, so a band can gust the wind or swing its direction.
+- **Tilt** (mobile only — the row is hidden on devices without a motion sensor) — tap *Use device motion* and physically tilt your phone to push the fluid, as if the dye were liquid in a tray. iOS asks for motion permission the first time. The slider next to it sets how hard the tilt pushes.
 - **Inject** — how strongly your source image is fed into the dye.
 - **Dye mix** — blends the flowing dye over your render. 0 = invisible (but still available to the Fluid warp fold), 1 = pure fluid.
 
