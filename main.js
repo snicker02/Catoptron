@@ -534,8 +534,19 @@ function drawOverlayPaint(){
   if(ov.width !== px){ ov.width = ov.height = px; }
   const c = ov.getContext('2d');
   c.clearRect(0, 0, px, px);
-  if(state.drawGuide){ c.fillStyle = 'rgba(10,14,20,0.55)'; c.fillRect(0, 0, px, px); }
-  renderStrokes(c, state.strokes, px, null);
+  if(state.drawGuide){
+    // FLAT view: opaque source preview — what the fold stack is actually being fed
+    c.fillStyle = state.drawBg || '#101418';
+    c.fillRect(0, 0, px, px);
+    renderStrokes(c, state.strokes, px, null);
+  }
+  // always mark the square drawing area so you know the bounds (esp. when drawing over the live render)
+  c.save();
+  c.strokeStyle = state.drawGuide ? 'rgba(140,190,255,0.55)' : 'rgba(140,190,255,0.85)';
+  c.lineWidth = Math.max(1, px * 0.0025);
+  c.setLineDash([px * 0.02, px * 0.02]);
+  c.strokeRect(c.lineWidth, c.lineWidth, px - c.lineWidth * 2, px - c.lineWidth * 2);
+  c.restore();
 }
 function drawBegin(e){
   curStroke = newStroke({ color: state.drawColor, width: state.drawW, alpha: state.drawA });
@@ -855,7 +866,10 @@ function syncUI(){
       const dg=$('drawGuide'); if(dg){
         dg.classList.toggle('on', !!(state.drawGuide && state.drawMode));
         dg.style.opacity = state.drawMode ? '' : '0.4';
-        dg.title = state.drawMode ? 'Dim the backdrop while drawing' : 'Only applies while Draw mode is on';
+        dg.textContent = state.drawGuide ? 'flat' : 'live';
+        dg.title = state.drawMode
+          ? (state.drawGuide ? 'Flat view \u2014 click to draw over the live folded result' : 'Live view \u2014 click to draw on the flat source')
+          : 'Only applies while Draw mode is on';
       }
       const dc=$('drawColor'); if(dc) dc.value = state.drawColor;
       const db=$('drawBg'); if(db) db.value = state.drawBg; }
@@ -919,8 +933,9 @@ $('drawMode').addEventListener('click', ()=>{
 $('drawUndo').addEventListener('click', drawUndo);
 $('drawClear').addEventListener('click', drawClear);
 $('drawGuide').addEventListener('click', ()=>{
-  if(!state.drawMode){ toast('guide dims the backdrop \u2014 turn on Draw mode first'); return; }
+  if(!state.drawMode){ toast('flat/live view \u2014 turn on Draw mode first'); return; }
   state.drawGuide = state.drawGuide?0:1; syncUI(); drawOverlayPaint();
+  toast(state.drawGuide ? 'flat source view' : 'live view \u2014 drawing over the folded result');
 });
 $('drawColor').addEventListener('input', e=>{ state.drawColor = e.target.value; });
 $('drawBg').addEventListener('input', e=>{ state.drawBg = e.target.value; if(state.src==='draw') drawRebuild(); });
