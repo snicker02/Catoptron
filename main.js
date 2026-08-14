@@ -3,6 +3,7 @@ import { OPS } from './engine/ops.js';
 import { MAX_OPS } from './engine/assemble.js';
 import { createProgramCache } from './engine/glcache.js';
 import { createFluid } from './engine/fluid.js';
+import { newStroke, addPoint, renderStrokes, strokeStats } from './engine/draw.js';
 
 /* ================= GL setup ================= */
 const canvas = document.getElementById('glc');
@@ -500,7 +501,54 @@ const GENS = {
   halftone: {seeded: false, fn: genHalftone},
 };
 
+/* ================= drawing (spline source) ================= */
+const DRAW_RES = 2048;                       // strokes re-raster here: crisp at export sizes
+let drawCv = null, drawCtx = null, curStroke = null, drawDirty = false;
+function drawCanvas(){
+  if(!drawCv){ drawCv = document.createElement('canvas'); drawCv.width = drawCv.height = DRAW_RES; drawCtx = drawCv.getContext('2d'); }
+  return drawCv;
+}
+function drawRebuild(){
+  const cv = drawCanvas();
+  renderStrokes(drawCtx, state.strokes, DRAW_RES, state.drawBg);
+  setImage(cv, DRAW_RES, DRAW_RES);
+  drawDirty = false;
+  const s = strokeStats(state.strokes);
+  const el = $('drawStats'); if(el) el.textContent = s.strokes + ' stroke' + (s.strokes === 1 ? '' : 's') + ' \u00b7 ' + s.points + ' pts';
+  drawOverlayPaint();
+}
+function drawRect(){                          // square source area, letterboxed in the canvas
+  const r = canvas.getBoundingClientRect();
+  const s = Math.min(r.width, r.height);
+  return { x: r.left + (r.width - s) / 2, y: r.top + (r.height - s) / 2, s, r };
+}
+function drawNorm(e){ const d = drawRect(); return [ (e.clientX - d.x) / d.s, (e.clientY - d.y) / d.s ]; }
+function drawOverlayPaint(){
+  const ov = $('drawOverlay'); if(!ov) return;
+  if(!state.drawMode){ ov.style.display = 'none'; return; }
+  const d = drawRect();
+  ov.style.display = 'block';
+  ov.style.left = (d.x - d.r.left) + 'px'; ov.style.top = (d.y - d.r.top) + 'px';
+  ov.style.width = d.s + 'px'; ov.style.height = d.s + 'px';
+  const px = Math.max(64, Math.round(d.s * (window.devicePixelRatio || 1)));
+  if(ov.width !== px){ ov.width = ov.height = px; }
+  const c = ov.getContext('2d');
+  c.clearRect(0, 0, px, px);
+  if(state.drawGuide){ c.fillStyle = 'rgba(10,14,20,0.55)'; c.fillRect(0, 0, px, px); }
+  renderStrokes(c, state.strokes, px, null);
+}
+function drawBegin(e){
+  curStroke = newStroke({ color: state.drawColor, width: state.drawW, alpha: state.drawA });
+  const p = drawNorm(e); addPoint(curStroke, p[0], p[1], true);
+  state.strokes.push(curStroke); drawDirty = true;
+}
+function drawExtend(e){ if(!curStroke) return; const p = drawNorm(e); if(addPoint(curStroke, p[0], p[1])) drawDirty = true; }
+function drawEnd(){ if(!curStroke) return; curStroke = null; drawRebuild(); pushHistory(); }
+function drawUndo(){ if(!state.strokes.length){ toast('nothing to undo'); return; } state.strokes.pop(); drawRebuild(); pushHistory(); }
+function drawClear(){ if(!state.strokes.length) return; state.strokes = []; drawRebuild(); pushHistory(); toast('drawing cleared'); }
+
 function applySource(){
+  if(state.src === 'draw'){ drawRebuild(); return; }
   if(!GENS[state.src]) return;   // 'user': leave the loaded texture alone
   const s = 1024, cv = document.createElement('canvas');
   cv.width = cv.height = s;
@@ -530,6 +578,7 @@ const state = {
   ifsOn: 0, ifsN: 5, ifsScale: 0.6, ifsRot: 0, ifsCx: 0, ifsCy: 0, ifsZ: 0,
   fluidOn: 0, fluidRes: 256, fluidDamp: 0.4, fluidFade: 0.6, fluidVort: 0.3, fluidIters: 20,
   fluidStir: 1.0, fluidStirScale: 3, fluidPtr: 0.6, fluidAud: 0, fluidInject: 0.6, fluidDye: 0, fluidSrc: 'ws', fluidPause: 0, fluidWind: 0, fluidWindDir: 0, fluidTilt: 0, fluidTiltGain: 1,
+  strokes: [], drawMode: 0, drawColor: '#e8f2ff', drawW: 0.012, drawA: 1, drawBg: '#101418', drawGuide: 1,
   cx: 0.5, cy: 0.5, seed: 7.13, aspect: 'free', fbAmt: 0.9, src: 'orbs',
   ccMode: 0, ccTint: '#ff5d7a',
   srcScale: 1, srcHue: 0, srcVar: 0.5
@@ -714,6 +763,8 @@ const sliders = [
   ['fluidWind','fluidWindV', v=>v.toFixed(2)],
   ['fluidWindDir','fluidWindDirV', v=>v.toFixed(0)],
   ['fluidTiltGain','fluidTiltGainV', v=>v.toFixed(2)],
+  ['drawW','drawWV', v=>v.toFixed(3)],
+  ['drawA','drawAV', v=>v.toFixed(2)],
   ['rd','rdV',v=>v.toFixed(0)],
   ['srcScale','srcScaleV',v=>v.toFixed(2)],
   ['srcHue','srcHueV',v=>v.toFixed(0)],
@@ -800,6 +851,10 @@ function syncUI(){
     const fs2=$('fluidSrc'); if(fs2) fs2.value = state.fluidSrc;
     const fp=$('fluidPause'); if(fp){ fp.classList.toggle('on', !!state.fluidPause); fp.innerHTML = state.fluidPause ? '&#9654;' : '&#10074;&#10074;'; fp.title = state.fluidPause ? 'Resume fluid' : 'Pause fluid'; }
     const tb=$('fluidTilt'); if(tb) tb.classList.toggle('on', !!state.fluidTilt);
+    { const dm=$('drawMode'); if(dm){ dm.classList.toggle('on', !!state.drawMode); dm.textContent = state.drawMode ? 'Drawing \u2014 click to stop' : 'Draw mode'; }
+      const dg=$('drawGuide'); if(dg) dg.classList.toggle('on', !!state.drawGuide);
+      const dc=$('drawColor'); if(dc) dc.value = state.drawColor;
+      const db=$('drawBg'); if(db) db.value = state.drawBg; }
     const tr=$('tiltRow'); if(tr) tr.style.display = TILT_SUPPORTED ? '' : 'none'; }
   $('rendNote').textContent = rendNotes[state.rend];
   renderStack();
@@ -833,6 +888,9 @@ $('srcSel').addEventListener('change', e=>{
     startCamera();
   } else if(state.src === 'user'){
     toast('load or paste an image');
+  } else if(state.src === 'draw'){
+    applySource();
+    toast(state.strokes.length ? 'drawing source' : 'drawing \u2014 turn on Draw mode and draw');
   } else {
     applySource();
     toast(state.src + (GENS[state.src].seeded ? ' \u00b7 reseed rerolls it' : ''));
@@ -848,6 +906,18 @@ $('fluidOn').addEventListener('click', ()=>{ state.fluidOn = state.fluidOn?0:1; 
 $('fluidReset').addEventListener('click', ()=>{ if(FLUID) FLUID.reset(); toast('fluid cleared'); });
 $('fluidPause').addEventListener('click', ()=>{ state.fluidPause = state.fluidPause?0:1; syncUI(); });
 if($('fluidTilt')) $('fluidTilt').addEventListener('click', ()=>{ enableTilt(!state.fluidTilt); });
+$('drawMode').addEventListener('click', ()=>{
+  state.drawMode = state.drawMode ? 0 : 1;
+  if(state.drawMode && state.src !== 'draw'){ state.src = 'draw'; $('srcSel').value = 'draw'; applySource(); }
+  syncUI(); drawOverlayPaint();
+  if(state.drawMode) toast('draw on the canvas \u2014 strokes feed the fold stack');
+});
+$('drawUndo').addEventListener('click', drawUndo);
+$('drawClear').addEventListener('click', drawClear);
+$('drawGuide').addEventListener('click', ()=>{ state.drawGuide = state.drawGuide?0:1; syncUI(); drawOverlayPaint(); });
+$('drawColor').addEventListener('input', e=>{ state.drawColor = e.target.value; });
+$('drawBg').addEventListener('input', e=>{ state.drawBg = e.target.value; if(state.src==='draw') drawRebuild(); });
+window.addEventListener('resize', ()=> drawOverlayPaint());
 $('fluidRes').addEventListener('change', ()=>{ state.fluidRes = +$('fluidRes').value; if(state.fluidOn) ensureFluid(); });
 $('fluidSrc').addEventListener('change', ()=>{ state.fluidSrc = $('fluidSrc').value; });
 $('audioOn').addEventListener('click', ()=>{ audioEnable(!state.audioOn); });
@@ -1161,6 +1231,8 @@ function applyPreset(val){
     if('ifsCx' in d) state.ifsCx = d.ifsCx;
     if('ifsCy' in d) state.ifsCy = d.ifsCy;
     if('ifsZ' in d) state.ifsZ = d.ifsZ;
+    if('strokes' in d){ state.strokes = JSON.parse(JSON.stringify(d.strokes)); if(state.src === 'draw') drawRebuild(); }
+    ['drawColor','drawW','drawA','drawBg','drawGuide'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     ['fluidOn','fluidRes','fluidDamp','fluidFade','fluidVort','fluidIters','fluidStir','fluidStirScale','fluidPtr','fluidAud','fluidInject','fluidDye','fluidSrc','fluidPause','fluidWind','fluidWindDir','fluidTiltGain'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     if('rd' in d) state.rd = d.rd;
     if('tint'  in d) state.tint  = d.tint;
@@ -1446,6 +1518,9 @@ function _gMove(){
   state.shiftY = _gesture.sy0 - ((mid.y - _gesture.mid0.y) / r.height) * pf;
 }
 canvas.addEventListener('pointerdown', e=>{
+  if(state.drawMode && state.src === 'draw' && e.button === 0){
+    canvas.setPointerCapture(e.pointerId); e.preventDefault(); drawBegin(e); return;
+  }
   canvas.setPointerCapture(e.pointerId);
   _ptrs.set(e.pointerId, { x:e.clientX, y:e.clientY });
   if(_ptrs.size === 1){
@@ -1459,6 +1534,7 @@ canvas.addEventListener('pointerdown', e=>{
   }
 });
 canvas.addEventListener('pointermove', e=>{
+  if(curStroke){ drawExtend(e); drawOverlayPaint(); return; }
   if(!_ptrs.has(e.pointerId)) return;
   _ptrs.set(e.pointerId, { x:e.clientX, y:e.clientY });
   if(_ptrs.size >= 2) _gMove();
@@ -1484,7 +1560,7 @@ canvas.addEventListener('pointermove', e=>{
   fluidPtr = [x, y];      // track position always, so the first press pushes from the right spot
 });
 canvas.addEventListener('pointerdown', e=>{ if(e.button === 0) fluidLMB = true; });
-window.addEventListener('pointerup', e=>{ if(e.button === 0){ fluidLMB = false; fluidPtrV = [0, 0]; } });
+window.addEventListener('pointerup', e=>{ if(e.button === 0){ fluidLMB = false; fluidPtrV = [0, 0]; } if(curStroke) drawEnd(); });
 window.addEventListener('pointercancel', ()=>{ fluidLMB = false; fluidPtrV = [0, 0]; });
 canvas.addEventListener('dblclick',    ()=>{ state.cx = 0.5; state.cy = 0.5; toast('recentered'); });
 
@@ -2149,6 +2225,7 @@ function frame(now){
   applyAR();
   try { renderScene(w, h); } finally { restoreAR(); }
   fluidPresent(w, h);
+  if(curStroke && drawDirty) drawRebuild();
   { const mb = state.mblur + (AR.mblur||0); if(mb > 0.001) motionBlurPass(w, h, mb); else mbInit = false; }
   requestAnimationFrame(frame);
 }
