@@ -123,7 +123,12 @@ let FLUID = null, fluidPtr = [0.5, 0.5], fluidPtrV = [0, 0], fluidTime = 0;
 let fluidLMB = false;
 // device tilt (mobile): gamma = left/right, beta = front/back, smoothed so the flow eases
 let tiltX = 0, tiltY = 0, tiltActive = false;
-const TILT_SUPPORTED = (typeof window !== 'undefined') && ('DeviceOrientationEvent' in window);
+// NB: desktop browsers define DeviceOrientationEvent too, so its presence proves nothing.
+// iOS 13+ exposes requestPermission(); other mobiles report a coarse (touch) pointer.
+const TILT_SUPPORTED = (typeof window !== 'undefined') && ('DeviceOrientationEvent' in window) && (
+  typeof window.DeviceOrientationEvent.requestPermission === 'function' ||
+  (window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
+);
 function onTilt(e){
   if(e.gamma == null && e.beta == null) return;
   const gx = Math.max(-1, Math.min(1, (e.gamma || 0) / 45));      // tilt right -> +x
