@@ -38,6 +38,13 @@ vec2 velLin(sampler2D t, vec2 uv){
   vec2 d = velAt(t, (i + vec2(1.5, 1.5)) * uTexel);
   return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
+float curlAt(sampler2D t, vec2 uv){
+  float r = velAt(t, uv + vec2(uTexel.x, 0.0)).y;
+  float l = velAt(t, uv - vec2(uTexel.x, 0.0)).y;
+  float u = velAt(t, uv + vec2(0.0, uTexel.y)).x;
+  float d = velAt(t, uv - vec2(0.0, uTexel.y)).x;
+  return 0.5 * ((r - l) - (u - d));
+}
 float hashF(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 float vnoise(vec2 p){
   vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -70,16 +77,14 @@ void main(){
   }
   // vorticity confinement — re-inject swirl the solver damps out
   if(uVort > 0.0){
-    float cL = velAt(uVel, vUv - vec2(uTexel.x, 0.0)).y, cR = velAt(uVel, vUv + vec2(uTexel.x, 0.0)).y;
-    float cB = velAt(uVel, vUv - vec2(0.0, uTexel.y)).x, cT = velAt(uVel, vUv + vec2(0.0, uTexel.y)).x;
-    float curl = (cR - cL) - (cT - cB);
-    float mL = abs((velAt(uVel, vUv - vec2(uTexel.x, 0.0)).y));
-    float mR = abs((velAt(uVel, vUv + vec2(uTexel.x, 0.0)).y));
-    float mB = abs((velAt(uVel, vUv - vec2(0.0, uTexel.y)).x));
-    float mT = abs((velAt(uVel, vUv + vec2(0.0, uTexel.y)).x));
-    vec2 g = vec2(mR - mL, mT - mB);
+    float c  = curlAt(uVel, vUv);
+    float cl = abs(curlAt(uVel, vUv - vec2(uTexel.x, 0.0)));
+    float cr = abs(curlAt(uVel, vUv + vec2(uTexel.x, 0.0)));
+    float cb = abs(curlAt(uVel, vUv - vec2(0.0, uTexel.y)));
+    float ct = abs(curlAt(uVel, vUv + vec2(0.0, uTexel.y)));
+    vec2 g = vec2(cr - cl, ct - cb) * 0.5;
     float len = length(g) + 1e-5;
-    v += vec2(g.y, -g.x) / len * curl * uVort * uDt * 6.0;
+    v += vec2(g.y, -g.x) / len * c * uVort * uDt * 6.0;
   }
   // pointer drag
   if(uPtrF > 0.0){
@@ -135,7 +140,7 @@ void main(){
   vec3 dye = texture2D(uDye, clampUv(vUv - v * uDt)).rgb * uFade;
   if(uInject > 0.0){
     vec3 s = texture2D(uSrc, vUv).rgb;
-    dye = mix(dye, max(dye, s), clamp(uInject * uDt * 4.0, 0.0, 1.0));
+    dye = clamp(dye + s * uInject * uDt * 1.5, 0.0, 1.0);
   }
   gl_FragColor = vec4(dye, 1.0);
 }`;
