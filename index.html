@@ -687,7 +687,10 @@ body.theme-light{
       <div class="row"><label>Inject</label><input type="range" id="fluidInject" min="0" max="2" step="0.01" value="0.6"><span class="val" id="fluidInjectV"></span></div>
       <div class="row"><label>Wind</label><input type="range" id="fluidWind" min="0" max="3" step="0.01" value="0"><span class="val" id="fluidWindV"></span></div>
       <div class="row"><label>Wind dir</label><input type="range" id="fluidWindDir" min="-180" max="180" step="1" value="0"><span class="val" id="fluidWindDirV"></span></div>
-      <div class="row" id="tiltRow" style="display:none"><label>Tilt</label><button class="toggle" id="fluidTilt" style="flex:1">Use device motion</button><input type="range" id="fluidTiltGain" min="0" max="3" step="0.01" value="1" style="flex:1;min-width:0"><span class="val" id="fluidTiltGainV"></span></div>
+      <div id="tiltRow" style="display:none">
+        <div class="row"><label>Tilt</label><button class="toggle" id="fluidTilt" style="flex:1;min-width:0">Use device motion</button></div>
+        <div class="row"><label>Tilt force</label><input type="range" id="fluidTiltGain" min="0" max="3" step="0.01" value="1"><span class="val" id="fluidTiltGainV"></span></div>
+      </div>
       <div class="row"><label>Dye mix</label><input type="range" id="fluidDye" min="0" max="1" step="0.01" value="0"><span class="val" id="fluidDyeV"></span></div>
       <div class="note">A real fluid solver running in the background: velocity is advected, stirred, made incompressible by a pressure solve, and carries a dye field that the source image is injected into. <b>Dye mix</b> blends that flowing dye over your render (1 = pure fluid). Add the <b>Fluid warp</b> fold to push the fold stack around by the same velocity field instead. <b>Dye source</b> picks what gets injected: the current render (so the fluid carries your whole workspace — folds, IFS, colour) or the raw source image. Hold the <b>left mouse button</b> and drag on the canvas to stir it. The <b>&#10074;&#10074;</b> button freezes the sim where it is (the dye stays on screen); the global pause (Space) freezes it too. Higher Pressure = more incompressible (and slower); Vorticity re-injects swirl the solver damps out.</div>
     </div>
