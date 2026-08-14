@@ -2449,14 +2449,24 @@ vec2 opFlow(vec2 q, vec4 P0){
 }` },
   { name:'Fluid warp', fn:'opFluid', deps:[],
     params:[["Amount",-4,4,0.01,1],["Swirl",0,1,0.01,0],["Scale",0.25,3,0.01,1]],
-    glsl:`vec2 opFluid(vec2 q, vec4 P0){
+    glsl:`vec2 _flDec(vec4 t){
+  vec2 e = vec2((floor(t.r*255.0+0.5)*256.0 + floor(t.g*255.0+0.5)) / 65535.0,
+                (floor(t.b*255.0+0.5)*256.0 + floor(t.a*255.0+0.5)) / 65535.0);
+  return (e*2.0-1.0)*4.0;
+}
+vec2 opFluid(vec2 q, vec4 P0){
   if(uFluidOn < 0.5) return q;
   float amt=P0.x, swirl=P0.y, scl=P0.z;
   float ca=uCanvas.x/uCanvas.y;
-  vec2 uv=(q/vec2(ca,1.0))*scl + uCenter;          // fold space -> sim space
-  vec4 t=texture2D(uFluidV, clamp(uv, 0.0, 1.0));
-  vec2 v=vec2((t.r*255.0*256.0 + t.g*255.0)/65535.0, (t.b*255.0*256.0 + t.a*255.0)/65535.0);
-  v=(v*2.0-1.0)*4.0;                                // decode 16-bit packed velocity
+  vec2 uv=clamp((q/vec2(ca,1.0))*scl + uCenter, 0.0, 1.0);   // fold space -> sim space
+  // packed velocity can't use hardware LINEAR — decode 4 taps and blend manually
+  float tx=uFluidTexel;
+  vec2 st=uv/tx - 0.5; vec2 i=floor(st), fr=fract(st);
+  vec2 a=_flDec(texture2D(uFluidV, (i+vec2(0.5,0.5))*tx));
+  vec2 b=_flDec(texture2D(uFluidV, (i+vec2(1.5,0.5))*tx));
+  vec2 c=_flDec(texture2D(uFluidV, (i+vec2(0.5,1.5))*tx));
+  vec2 d=_flDec(texture2D(uFluidV, (i+vec2(1.5,1.5))*tx));
+  vec2 v=mix(mix(a,b,fr.x), mix(c,d,fr.x), fr.y);
   v=mix(v, vec2(-v.y, v.x), swirl);
   return q + v*amt*0.08;
 }` },
