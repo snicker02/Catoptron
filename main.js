@@ -515,6 +515,10 @@ function drawRebuild(){
   drawDirty = false;
   const s = strokeStats(state.strokes);
   const el = $('drawStats'); if(el) el.textContent = s.strokes + ' stroke' + (s.strokes === 1 ? '' : 's') + ' \u00b7 ' + s.points + ' pts';
+  const sel = $('drawSel');
+  if(sel) sel.textContent = (selPath >= 0 && state.strokes[selPath])
+    ? ('line ' + (selPath + 1) + '/' + state.strokes.length + ' \u00b7 ' + state.strokes[selPath].pts.length + ' nodes \u00b7 curve ' + (+state.strokes[selPath].tension).toFixed(2))
+    : (state.strokes.length + ' line' + (state.strokes.length === 1 ? '' : 's') + ' \u00b7 none selected');
   drawOverlayPaint();
 }
 function drawRect(){
@@ -577,7 +581,7 @@ function nodePointerDown(e){
         else { paths.splice(pi, 1); selPath = -1; }
         drawRebuild(); pushHistory(); return true;
       }
-      selPath = pi; dragNode = hit; nodeMoved = false; return true;
+      selPath = pi; dragNode = hit; nodeMoved = false; syncDrawSel(); return true;
     }
   }
   // 2) click ON a line -> insert a node there and start dragging it
@@ -587,7 +591,7 @@ function nodePointerDown(e){
     if(on && on.dist < NODE_TOL){
       paths[pi].pts.splice(on.seg + 1, 0, [on.x, on.y]);
       selPath = pi; dragNode = on.seg + 1; nodeMoved = false;
-      drawRebuild(); return true;
+      drawRebuild(); syncDrawSel(); return true;
     }
   }
   // 3) empty space -> begin a new straight line (drag out its far end)
@@ -595,7 +599,7 @@ function nodePointerDown(e){
   st.pts = [[p[0], p[1]], [p[0], p[1]]];
   paths.push(st);
   selPath = paths.length - 1; dragNode = 1; nodeMoved = false;
-  drawRebuild(); return true;
+  drawRebuild(); syncDrawSel(); return true;
 }
 function nodePointerMove(e){
   if(dragNode < 0 || selPath < 0) return false;
@@ -615,7 +619,53 @@ function nodePointerUp(){
   }
   dragNode = -1; drawRebuild(); pushHistory(); return true;
 }
-function retensionAll(){ for(const s of state.strokes) s.tension = state.drawTension; drawRebuild(); }
+// Curve applies to the SELECTED path; with nothing selected it sets the default for new lines.
+function applyTension(){
+  const v = state.drawTension;
+  if(selPath >= 0 && state.strokes[selPath]) state.strokes[selPath].tension = v;
+  drawRebuild();
+}
+function syncDrawSel(){
+  // reflect the selected path's own curve value in the slider
+  const st = (selPath >= 0) ? state.strokes[selPath] : null;
+  if(st && st.tension != null){
+    state.drawTension = st.tension;
+    const el = $('drawTension'); if(el) el.value = st.tension;
+    const lab = $('drawTensionV'); if(lab) lab.textContent = (+st.tension).toFixed(2);
+  }
+  const info = $('drawSel');
+  if(info) info.textContent = (selPath >= 0 && state.strokes[selPath])
+    ? ('line ' + (selPath + 1) + '/' + state.strokes.length + ' \u00b7 ' + state.strokes[selPath].pts.length + ' nodes \u00b7 curve ' + (+state.strokes[selPath].tension).toFixed(2))
+    : (state.strokes.length + ' line' + (state.strokes.length === 1 ? '' : 's') + ' \u00b7 none selected');
+}
+let drawClip = null;
+function drawCopy(){
+  if(selPath < 0 || !state.strokes[selPath]){ toast('select a line first (click one of its nodes)'); return; }
+  drawClip = JSON.parse(JSON.stringify(state.strokes[selPath]));
+  toast('line copied');
+}
+function drawPaste(off){
+  if(!drawClip){ toast('nothing copied yet'); return; }
+  const c = JSON.parse(JSON.stringify(drawClip));
+  const d = (off == null ? 0.04 : off);
+  c.pts = c.pts.map(p => [Math.max(0, Math.min(1, p[0] + d)), Math.max(0, Math.min(1, p[1] + d))]);
+  state.strokes.push(c);
+  selPath = state.strokes.length - 1; dragNode = -1;
+  drawRebuild(); syncDrawSel(); pushHistory();
+  toast('pasted \u2014 drag its nodes to edit');
+}
+function drawDuplicate(){
+  if(selPath < 0 || !state.strokes[selPath]){ toast('select a line first'); return; }
+  const keep = drawClip;
+  drawClip = JSON.parse(JSON.stringify(state.strokes[selPath]));
+  drawPaste(0.04);
+  drawClip = keep || drawClip;
+}
+function drawDeleteSel(){
+  if(selPath < 0 || !state.strokes[selPath]){ toast('select a line first'); return; }
+  state.strokes.splice(selPath, 1); selPath = -1; dragNode = -1;
+  drawRebuild(); syncDrawSel(); pushHistory();
+}
 
 function drawBegin(e){
   curStroke = newStroke({ color: state.drawColor, width: state.drawW, alpha: state.drawA });
@@ -1005,7 +1055,19 @@ $('drawMode').addEventListener('click', ()=>{
 });
 $('drawUndo').addEventListener('click', drawUndo);
 $('drawTool').addEventListener('change', ()=>{ state.drawTool = $('drawTool').value; dragNode = -1; syncUI(); drawOverlayPaint(); });
-$('drawTension').addEventListener('input', ()=>{ retensionAll(); });
+$('drawTension').addEventListener('input', ()=>{ applyTension(); });
+$('drawCopy').addEventListener('click', drawCopy);
+$('drawPaste').addEventListener('click', ()=> drawPaste());
+$('drawDup').addEventListener('click', drawDuplicate);
+$('drawDel').addEventListener('click', drawDeleteSel);
+window.addEventListener('keydown', e=>{
+  if(!state.drawMode || state.drawTool !== 'node' || navTyping()) return;
+  const k = e.key.toLowerCase();
+  if((e.ctrlKey || e.metaKey) && k === 'c'){ e.preventDefault(); drawCopy(); }
+  else if((e.ctrlKey || e.metaKey) && k === 'v'){ e.preventDefault(); drawPaste(); }
+  else if((e.ctrlKey || e.metaKey) && k === 'd'){ e.preventDefault(); drawDuplicate(); }
+  else if(!e.ctrlKey && !e.metaKey && (k === 'delete' || k === 'backspace')){ e.preventDefault(); drawDeleteSel(); }
+});
 $('drawClear').addEventListener('click', drawClear);
 $('drawGuide').addEventListener('click', ()=>{
   if(!state.drawMode){ toast('flat/live view \u2014 turn on Draw mode first'); return; }
