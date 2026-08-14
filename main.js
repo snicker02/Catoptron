@@ -517,38 +517,33 @@ function drawRebuild(){
   const el = $('drawStats'); if(el) el.textContent = s.strokes + ' stroke' + (s.strokes === 1 ? '' : 's') + ' \u00b7 ' + s.points + ' pts';
   drawOverlayPaint();
 }
-function drawRect(){                          // square source area, letterboxed in the canvas
+function drawRect(){
+  // photo() maps a square source with COVER semantics: it fills the canvas and crops the
+  // long axis. The preview has to use the same mapping or strokes land in the wrong place.
   const r = canvas.getBoundingClientRect();
-  const s = Math.min(r.width, r.height);
+  const s = Math.max(r.width, r.height);
   return { x: r.left + (r.width - s) / 2, y: r.top + (r.height - s) / 2, s, r };
 }
 function drawNorm(e){ const d = drawRect(); return [ (e.clientX - d.x) / d.s, (e.clientY - d.y) / d.s ]; }
 function drawOverlayPaint(){
   const ov = $('drawOverlay'); if(!ov) return;
   if(!state.drawMode){ ov.style.display = 'none'; return; }
-  const d = drawRect();
+  const d = drawRect(), dpr = window.devicePixelRatio || 1;
   ov.style.display = 'block';
-  ov.style.left = (d.x - d.r.left) + 'px'; ov.style.top = (d.y - d.r.top) + 'px';
-  ov.style.width = d.s + 'px'; ov.style.height = d.s + 'px';
-  const px = Math.max(64, Math.round(d.s * (window.devicePixelRatio || 1)));
-  if(ov.width !== px){ ov.width = ov.height = px; }
+  ov.style.left = '0px'; ov.style.top = '0px';
+  ov.style.width = d.r.width + 'px'; ov.style.height = d.r.height + 'px';
+  const cw = Math.max(4, Math.round(d.r.width * dpr)), ch = Math.max(4, Math.round(d.r.height * dpr));
+  if(ov.width !== cw || ov.height !== ch){ ov.width = cw; ov.height = ch; }
   const c = ov.getContext('2d');
-  c.clearRect(0, 0, px, px);
+  c.clearRect(0, 0, cw, ch);
+  const S = d.s * dpr, ox = (d.x - d.r.left) * dpr, oy = (d.y - d.r.top) * dpr;
   if(state.drawGuide){
-    // FLAT view: opaque source preview — what the fold stack is actually being fed
-    c.fillStyle = state.drawBg || '#101418';
-    c.fillRect(0, 0, px, px);
-    renderStrokes(c, state.strokes, px, null);
+    // FLAT view: opaque preview of exactly what the stack is being fed
+    c.fillStyle = state.drawBg || '#000000';
+    c.fillRect(0, 0, cw, ch);
+    c.save(); c.translate(ox, oy); renderStrokes(c, state.strokes, S, null); c.restore();
   }
-  drawNodesOverlay(c, px);
-  // always mark the square drawing area so you know the bounds (esp. when drawing over the live render)
-  c.save();
-  c.strokeStyle = state.drawGuide ? 'rgba(140,190,255,0.55)' : 'rgba(140,190,255,0.85)';
-  c.lineWidth = Math.max(1, px * 0.0025);
-  c.setLineDash([px * 0.02, px * 0.02]);
-  c.strokeRect(c.lineWidth, c.lineWidth, px - c.lineWidth * 2, px - c.lineWidth * 2);
-  c.restore();
-  if(!state.drawGuide) drawNodesOverlay(c, px);
+  c.save(); c.translate(ox, oy); drawNodesOverlay(c, S); c.restore();
 }
 // ---- node (pen) editing: a straight line you then bend with draggable points ----
 let selPath = -1, dragNode = -1, nodeMoved = false;
@@ -663,7 +658,7 @@ const state = {
   ifsOn: 0, ifsN: 5, ifsScale: 0.6, ifsRot: 0, ifsCx: 0, ifsCy: 0, ifsZ: 0,
   fluidOn: 0, fluidRes: 256, fluidDamp: 0.4, fluidFade: 0.6, fluidVort: 0.3, fluidIters: 20,
   fluidStir: 1.0, fluidStirScale: 3, fluidPtr: 0.6, fluidAud: 0, fluidInject: 0.6, fluidDye: 0, fluidSrc: 'ws', fluidPause: 0, fluidWind: 0, fluidWindDir: 0, fluidTilt: 0, fluidTiltGain: 1,
-  strokes: [], drawMode: 0, drawColor: '#e8f2ff', drawW: 0.012, drawA: 1, drawBg: '#101418', drawGuide: 1,
+  strokes: [], drawMode: 0, drawColor: '#e8f2ff', drawW: 0.012, drawA: 1, drawBg: '#000000', drawGuide: 1,
   drawTool: 'node', drawTension: 1,
   cx: 0.5, cy: 0.5, seed: 7.13, aspect: 'free', fbAmt: 0.9, src: 'orbs',
   ccMode: 0, ccTint: '#ff5d7a',
