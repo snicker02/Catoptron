@@ -512,7 +512,8 @@ const rendNotes = [
   'Sphere: the image wraps onto a rotating ball. Ball size scales it, spin turns the globe, shift scrolls the surface.',
   'Slit-scan: each column samples a different time slice, smearing motion diagonally across the frame. Time density = column rate, skew tilts the smear, drift/spin animate it.',
   'Poincaré disk: the hyperbolic disk model — the image crowds infinitely toward the rim. Ring density sets the recession rate, rotate spins it, drift scrolls inward.',
-  'Hyperbolic tiling: a reflection group tessellates the disk (Escher “Circle Limit”). Sides sets the polygon order, rotate turns the pattern, drift drifts it.'
+  'Hyperbolic tiling: a reflection group tessellates the disk (Escher “Circle Limit”). Sides sets the polygon order, rotate turns the pattern, drift drifts it.',
+  'None \u2014 no renderer transform: the image is shown straight, with only your fold stack (and IFS / fluid) applied. Good for seeing exactly what the folds are doing, or for using Catoptron purely as a warp/grade tool.'
 ];
 
 /* ================= presets (lite set uses operator indices 0\u201314) ================= */
