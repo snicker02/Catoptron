@@ -852,7 +852,11 @@ function syncUI(){
     const fp=$('fluidPause'); if(fp){ fp.classList.toggle('on', !!state.fluidPause); fp.innerHTML = state.fluidPause ? '&#9654;' : '&#10074;&#10074;'; fp.title = state.fluidPause ? 'Resume fluid' : 'Pause fluid'; }
     const tb=$('fluidTilt'); if(tb) tb.classList.toggle('on', !!state.fluidTilt);
     { const dm=$('drawMode'); if(dm){ dm.classList.toggle('on', !!state.drawMode); dm.textContent = state.drawMode ? 'Drawing \u2014 click to stop' : 'Draw mode'; }
-      const dg=$('drawGuide'); if(dg) dg.classList.toggle('on', !!state.drawGuide);
+      const dg=$('drawGuide'); if(dg){
+        dg.classList.toggle('on', !!(state.drawGuide && state.drawMode));
+        dg.style.opacity = state.drawMode ? '' : '0.4';
+        dg.title = state.drawMode ? 'Dim the backdrop while drawing' : 'Only applies while Draw mode is on';
+      }
       const dc=$('drawColor'); if(dc) dc.value = state.drawColor;
       const db=$('drawBg'); if(db) db.value = state.drawBg; }
     const tr=$('tiltRow'); if(tr) tr.style.display = TILT_SUPPORTED ? '' : 'none'; }
@@ -914,7 +918,10 @@ $('drawMode').addEventListener('click', ()=>{
 });
 $('drawUndo').addEventListener('click', drawUndo);
 $('drawClear').addEventListener('click', drawClear);
-$('drawGuide').addEventListener('click', ()=>{ state.drawGuide = state.drawGuide?0:1; syncUI(); drawOverlayPaint(); });
+$('drawGuide').addEventListener('click', ()=>{
+  if(!state.drawMode){ toast('guide dims the backdrop \u2014 turn on Draw mode first'); return; }
+  state.drawGuide = state.drawGuide?0:1; syncUI(); drawOverlayPaint();
+});
 $('drawColor').addEventListener('input', e=>{ state.drawColor = e.target.value; });
 $('drawBg').addEventListener('input', e=>{ state.drawBg = e.target.value; if(state.src==='draw') drawRebuild(); });
 window.addEventListener('resize', ()=> drawOverlayPaint());
