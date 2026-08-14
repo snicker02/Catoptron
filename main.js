@@ -147,7 +147,7 @@ function ensureFluid(){
   return FLUID;
 }
 function stepFluid(dt){
-  if(!state.fluidOn){ return; }
+  if(!state.fluidOn || state.fluidPause || paused){ return; }
   const F = ensureFluid(); if(!F) return;
   fluidTime += dt;
   F.step({
@@ -493,7 +493,7 @@ const state = {
   stutter: 0, jitter: 0, burst: 0, mosh: 0, rd: 0, mblur: 0,
   ifsOn: 0, ifsN: 5, ifsScale: 0.6, ifsRot: 0, ifsCx: 0, ifsCy: 0, ifsZ: 0,
   fluidOn: 0, fluidRes: 256, fluidDamp: 0.4, fluidFade: 0.6, fluidVort: 0.3, fluidIters: 20,
-  fluidStir: 1.0, fluidStirScale: 3, fluidPtr: 0.6, fluidAud: 0, fluidInject: 0.6, fluidDye: 0, fluidSrc: 'ws',
+  fluidStir: 1.0, fluidStirScale: 3, fluidPtr: 0.6, fluidAud: 0, fluidInject: 0.6, fluidDye: 0, fluidSrc: 'ws', fluidPause: 0,
   cx: 0.5, cy: 0.5, seed: 7.13, aspect: 'free', fbAmt: 0.9, src: 'orbs',
   ccMode: 0, ccTint: '#ff5d7a',
   srcScale: 1, srcHue: 0, srcVar: 0.5
@@ -758,7 +758,8 @@ function syncUI(){
   { const ib=$('ifsOn'); if(ib){ ib.classList.toggle('on', !!state.ifsOn); ib.textContent = state.ifsOn ? 'IFS on' : 'Enable IFS'; } }
   { const fb=$('fluidOn'); if(fb){ fb.classList.toggle('on', !!state.fluidOn); fb.textContent = state.fluidOn ? 'Fluid on' : 'Enable fluid'; }
     const fr=$('fluidRes'); if(fr) fr.value = state.fluidRes;
-    const fs2=$('fluidSrc'); if(fs2) fs2.value = state.fluidSrc; }
+    const fs2=$('fluidSrc'); if(fs2) fs2.value = state.fluidSrc;
+    const fp=$('fluidPause'); if(fp){ fp.classList.toggle('on', !!state.fluidPause); fp.innerHTML = state.fluidPause ? '&#9654;' : '&#10074;&#10074;'; fp.title = state.fluidPause ? 'Resume fluid' : 'Pause fluid'; } }
   $('rendNote').textContent = rendNotes[state.rend];
   renderStack();
 }
@@ -804,6 +805,7 @@ $('flip').addEventListener('click', ()=>{ state.flip = state.flip?0:1; syncUI();
 $('ifsOn').addEventListener('click', ()=>{ state.ifsOn = state.ifsOn?0:1; syncUI(); });
 $('fluidOn').addEventListener('click', ()=>{ state.fluidOn = state.fluidOn?0:1; if(state.fluidOn) ensureFluid(); syncUI(); });
 $('fluidReset').addEventListener('click', ()=>{ if(FLUID) FLUID.reset(); toast('fluid cleared'); });
+$('fluidPause').addEventListener('click', ()=>{ state.fluidPause = state.fluidPause?0:1; syncUI(); });
 $('fluidRes').addEventListener('change', ()=>{ state.fluidRes = +$('fluidRes').value; if(state.fluidOn) ensureFluid(); });
 $('fluidSrc').addEventListener('change', ()=>{ state.fluidSrc = $('fluidSrc').value; });
 $('audioOn').addEventListener('click', ()=>{ audioEnable(!state.audioOn); });
@@ -1117,7 +1119,7 @@ function applyPreset(val){
     if('ifsCx' in d) state.ifsCx = d.ifsCx;
     if('ifsCy' in d) state.ifsCy = d.ifsCy;
     if('ifsZ' in d) state.ifsZ = d.ifsZ;
-    ['fluidOn','fluidRes','fluidDamp','fluidFade','fluidVort','fluidIters','fluidStir','fluidStirScale','fluidPtr','fluidAud','fluidInject','fluidDye','fluidSrc'].forEach(k=>{ if(k in d) state[k] = d[k]; });
+    ['fluidOn','fluidRes','fluidDamp','fluidFade','fluidVort','fluidIters','fluidStir','fluidStirScale','fluidPtr','fluidAud','fluidInject','fluidDye','fluidSrc','fluidPause'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     if('rd' in d) state.rd = d.rd;
     if('tint'  in d) state.tint  = d.tint;
     if('tintA' in d) state.tintA = d.tintA;
