@@ -238,6 +238,12 @@ const RENDERERS = {
     }
     vec2 p = z * 0.5 + c + uShift + vec2(ph*0.05, 0.0);
     col = shade(p, 0.0, 999.0);`,
+  12: `
+    /* None — no renderer transform: sample the (folded) image straight. */
+    vec2 p = uv + uShift;
+    if(uFlip > 0.5 && mod(floor(ph), 2.0) > 0.5) p.x = 1.0 - p.x;
+    float e = min(min(p.x, 1.0 - p.x), min(p.y, 1.0 - p.y));
+    col = shade(p, 0.0, e * 999.0);`
 };
 
 // transitive closure of helper deps, emitted in dependency order
