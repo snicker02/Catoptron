@@ -1653,6 +1653,7 @@ function setUniforms(entry, w, h){
     gl.activeTexture(gl.TEXTURE0);
   }
   if(L.uFluidOn) gl.uniform1f(L.uFluidOn, (state.fluidOn && FLUID) ? 1 : 0);
+  if(L.uFluidTexel) gl.uniform1f(L.uFluidTexel, 1 / ((state.fluidOn && FLUID) ? (FLUID.resolution() || 256) : 256));
   gl.uniform1f(L.uFbAmt, state.fbAmt);
   gl.uniform1f(L.uMosh, state.mosh);
   gl.uniform1f(L.uRD, state.rd);
