@@ -519,6 +519,7 @@ function drawRebuild(){
   if(sel) sel.textContent = (selPath >= 0 && state.strokes[selPath])
     ? ('line ' + (selPath + 1) + '/' + state.strokes.length + ' \u00b7 ' + state.strokes[selPath].pts.length + ' nodes \u00b7 curve ' + (+state.strokes[selPath].tension).toFixed(2))
     : (state.strokes.length + ' line' + (state.strokes.length === 1 ? '' : 's') + ' \u00b7 none selected');
+  renderLineList();
   drawOverlayPaint();
 }
 function drawRect(){
@@ -581,7 +582,7 @@ function nodePointerDown(e){
         else { paths.splice(pi, 1); selPath = -1; }
         drawRebuild(); pushHistory(); return true;
       }
-      selPath = pi; dragNode = hit; nodeMoved = false; _dragPrev = p; pullStyleFrom(paths[pi]); syncDrawSel(); return true;
+      selPath = pi; dragNode = hit; nodeMoved = false; _dragPrev = p; pullStyleFrom(paths[pi]); syncDrawSel(); renderLineList(); return true;
     }
   }
   // 2) click ON a line -> insert a node there and start dragging it
@@ -724,6 +725,60 @@ function snapPt(x, y){
   if(!state.drawSnap) return [x, y];
   const g = Math.max(2, state.drawSnapGrid | 0);
   return [Math.round(x * g) / g, Math.round(y * g) / g];
+}
+// ---- line list: a mini view of every path, click to select ----
+const LT = 46;
+function selectLine(i){
+  selPath = i; dragNode = -1;
+  pullStyleFrom(state.strokes[i]);
+  syncDrawSel(); renderLineList(); drawOverlayPaint();
+}
+function renderLineList(){
+  const host = $('lineList'); if(!host) return;
+  if(dragNode >= 0 || curStroke) return;        // don't rebuild thumbnails mid-drag
+  host.innerHTML = '';
+  if(!state.strokes.length){
+    host.innerHTML = '<div class="ll-empty">no lines yet \u2014 drag on the canvas to make one</div>';
+    return;
+  }
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  state.strokes.forEach((st, i)=>{
+    const row = document.createElement('div');
+    row.className = 'll-row' + (i === selPath ? ' sel' : '');
+    const cv = document.createElement('canvas');
+    cv.className = 'll-thumb';
+    cv.width = cv.height = Math.round(LT * dpr);
+    cv.style.width = cv.style.height = LT + 'px';
+    const c = cv.getContext('2d');
+    c.fillStyle = state.drawBg || '#000'; c.fillRect(0, 0, cv.width, cv.height);
+    const thumb = Object.assign({}, st, { width: Math.max(st.width, 0.022) });
+    renderStrokes(c, [thumb], cv.width, null);   // frame space: the thumb shows WHERE it sits
+    const meta = document.createElement('div');
+    meta.className = 'll-meta';
+    const badges = [];
+    if(st.closed) badges.push('closed');
+    if(st.fill) badges.push('fill');
+    if(st.sym && st.sym.mode !== 'none') badges.push(st.sym.mode === 'radial' ? ('radial ' + (st.sym.k || 6)) : 'mirror');
+    if(st.brush && st.brush !== 'solid') badges.push(st.brush);
+    if(st.taper > 0) badges.push('taper');
+    meta.innerHTML = '<span class="ll-name">line ' + (i + 1) + '</span>' +
+      '<span class="ll-sub">' + st.pts.length + ' nodes \u00b7 curve ' + (+st.tension).toFixed(2) + '</span>' +
+      (badges.length ? '<span class="ll-badges">' + badges.join(' \u00b7 ') + '</span>' : '');
+    const sw = document.createElement('span');
+    sw.className = 'll-swatch'; sw.style.background = st.color;
+    const del = document.createElement('button');
+    del.className = 'll-del'; del.innerHTML = '&#10005;'; del.title = 'Delete this line';
+    del.addEventListener('click', e=>{ e.stopPropagation();
+      state.strokes.splice(i, 1);
+      if(selPath === i) selPath = -1; else if(selPath > i) selPath--;
+      drawRebuild(); syncDrawSel(); pushHistory();
+    });
+    row.append(cv, meta, sw, del);
+    row.addEventListener('click', ()=> selectLine(i));
+    host.appendChild(row);
+  });
+  const selRow = host.querySelector('.ll-row.sel');
+  if(selRow && selRow.scrollIntoView) selRow.scrollIntoView({ block: 'nearest' });
 }
 let drawClip = null;
 function drawCopy(){
@@ -2528,6 +2583,7 @@ applySource();
 requestAnimationFrame(frame);
 buildAR();
 injectARButtons();
+renderLineList();
 renderRoutes();
 syncUI();
 
