@@ -3,7 +3,7 @@ import { OPS } from './engine/ops.js';
 import { MAX_OPS } from './engine/assemble.js';
 import { createProgramCache } from './engine/glcache.js';
 import { createFluid } from './engine/fluid.js';
-import { newStroke, addPoint, renderStrokes, strokeStats, samplePath, nearestNode, nearestOnPath } from './engine/draw.js';
+import { newStroke, addPoint, renderStrokes, strokeStats, samplePath, nearestNode, nearestOnPath, simplify, primitive, bbox } from './engine/draw.js';
 
 /* ================= GL setup ================= */
 const canvas = document.getElementById('glc');
@@ -581,7 +581,7 @@ function nodePointerDown(e){
         else { paths.splice(pi, 1); selPath = -1; }
         drawRebuild(); pushHistory(); return true;
       }
-      selPath = pi; dragNode = hit; nodeMoved = false; syncDrawSel(); return true;
+      selPath = pi; dragNode = hit; nodeMoved = false; _dragPrev = p; pullStyleFrom(paths[pi]); syncDrawSel(); return true;
     }
   }
   // 2) click ON a line -> insert a node there and start dragging it
@@ -595,17 +595,26 @@ function nodePointerDown(e){
     }
   }
   // 3) empty space -> begin a new straight line (drag out its far end)
-  const st = newStroke({ color: state.drawColor, width: state.drawW, alpha: state.drawA, tension: state.drawTension });
-  st.pts = [[p[0], p[1]], [p[0], p[1]]];
+  const st = newStroke(currentStyle());
+  const sp = snapPt(p[0], p[1]);
+  st.pts = [[sp[0], sp[1]], [sp[0], sp[1]]];
   paths.push(st);
   selPath = paths.length - 1; dragNode = 1; nodeMoved = false;
   drawRebuild(); syncDrawSel(); return true;
 }
+let _dragPrev = null;
 function nodePointerMove(e){
   if(dragNode < 0 || selPath < 0) return false;
   const p = drawNorm(e);
   const st = nodePaths()[selPath]; if(!st){ dragNode = -1; return false; }
-  st.pts[dragNode] = [Math.max(0, Math.min(1, p[0])), Math.max(0, Math.min(1, p[1]))];
+  if(e.shiftKey && _dragPrev){                     // shift-drag moves the whole line
+    const dx = p[0] - _dragPrev[0], dy = p[1] - _dragPrev[1];
+    st.pts = st.pts.map(q => [Math.max(0, Math.min(1, q[0] + dx)), Math.max(0, Math.min(1, q[1] + dy))]);
+  } else {
+    const s = snapPt(Math.max(0, Math.min(1, p[0])), Math.max(0, Math.min(1, p[1])));
+    st.pts[dragNode] = [s[0], s[1]];
+  }
+  _dragPrev = p;
   nodeMoved = true; drawDirty = true; drawRebuild();
   return true;
 }
@@ -617,7 +626,7 @@ function nodePointerUp(){
     const a = st.pts[0], b = st.pts[1];
     if(Math.hypot(a[0]-b[0], a[1]-b[1]) < 0.005){ nodePaths().splice(selPath, 1); selPath = -1; }
   }
-  dragNode = -1; drawRebuild(); pushHistory(); return true;
+  dragNode = -1; _dragPrev = null; drawRebuild(); pushHistory(); return true;
 }
 // Curve applies to the SELECTED path; with nothing selected it sets the default for new lines.
 function applyTension(){
@@ -637,6 +646,84 @@ function syncDrawSel(){
   if(info) info.textContent = (selPath >= 0 && state.strokes[selPath])
     ? ('line ' + (selPath + 1) + '/' + state.strokes.length + ' \u00b7 ' + state.strokes[selPath].pts.length + ' nodes \u00b7 curve ' + (+state.strokes[selPath].tension).toFixed(2))
     : (state.strokes.length + ' line' + (state.strokes.length === 1 ? '' : 's') + ' \u00b7 none selected');
+}
+function selStroke(){ return (selPath >= 0) ? state.strokes[selPath] : null; }
+// Style controls act on the selected line when there is one, else set the default for new lines.
+function applyStyle(patch){
+  const st = selStroke();
+  if(st){ Object.assign(st, patch); drawRebuild(); pushHistory(); }
+}
+function currentStyle(){
+  return {
+    color: state.drawColor, width: state.drawW, alpha: state.drawA, tension: state.drawTension,
+    closed: !!state.drawClosed,
+    color2: state.drawColor2 || null,
+    brush: state.drawBrush, taper: state.drawTaper,
+    fill: state.drawFill ? { color: state.drawFillColor, color2: state.drawFillColor2 || null, angle: state.drawFillAngle } : null,
+    sym: { mode: state.drawSymMode, k: state.drawSymK },
+  };
+}
+function pullStyleFrom(st){
+  if(!st) return;
+  state.drawColor = st.color; state.drawW = st.width; state.drawA = st.alpha;
+  state.drawTension = st.tension; state.drawClosed = st.closed ? 1 : 0;
+  state.drawColor2 = st.color2 || ''; state.drawBrush = st.brush || 'solid'; state.drawTaper = st.taper || 0;
+  state.drawFill = st.fill ? 1 : 0;
+  if(st.fill){ state.drawFillColor = st.fill.color; state.drawFillColor2 = st.fill.color2 || ''; state.drawFillAngle = st.fill.angle || 0; }
+  if(st.sym){ state.drawSymMode = st.sym.mode || 'none'; state.drawSymK = st.sym.k || 6; }
+  syncUI();
+}
+// whole-path transforms
+function xformSel(fn){
+  const st = selStroke(); if(!st){ toast('select a line first'); return; }
+  const b = bbox(st.pts);
+  st.pts = st.pts.map(p => { const q = fn(p[0], p[1], b); return [Math.max(0, Math.min(1, q[0])), Math.max(0, Math.min(1, q[1]))]; });
+  drawRebuild(); pushHistory();
+}
+function moveSel(dx, dy){ xformSel((x, y) => [x + dx, y + dy]); }
+function rotateSel(deg){ const a = deg * Math.PI/180, c = Math.cos(a), s = Math.sin(a);
+  xformSel((x, y, b) => { const dx = x - b.cx, dy = y - b.cy; return [b.cx + dx*c - dy*s, b.cy + dx*s + dy*c]; }); }
+function scaleSel(f){ xformSel((x, y, b) => [b.cx + (x - b.cx)*f, b.cy + (y - b.cy)*f]); }
+function flipSel(ax){ xformSel((x, y, b) => ax === 'x' ? [2*b.cx - x, y] : [x, 2*b.cy - y]); }
+function orderSel(dir){
+  if(selPath < 0) { toast('select a line first'); return; }
+  const to = selPath + dir;
+  if(to < 0 || to >= state.strokes.length) return;
+  const [s] = state.strokes.splice(selPath, 1);
+  state.strokes.splice(to, 0, s); selPath = to;
+  drawRebuild(); pushHistory();
+}
+// freehand -> editable nodes
+function convertSel(){
+  const st = selStroke(); if(!st){ toast('select a line first'); return; }
+  const before = st.pts.length;
+  st.pts = simplify(st.pts, 0.008);
+  drawRebuild(); pushHistory();
+  toast('converted: ' + before + ' pts \u2192 ' + st.pts.length + ' nodes');
+}
+function convertAllFreehand(){
+  let tot = 0;
+  for(const s of state.strokes){ if(s.pts.length > 12){ const b = s.pts.length; s.pts = simplify(s.pts, 0.008); tot += b - s.pts.length; } }
+  drawRebuild(); pushHistory(); toast(tot ? ('simplified \u2212' + tot + ' pts') : 'nothing to simplify');
+}
+// primitives
+function addPrimitive(kind){
+  const parts = primitive(kind, { n: state.drawSymK, turns: 3 });
+  for(const p of parts){
+    const st = newStroke(currentStyle());
+    st.pts = p.pts.map(q => [q[0], q[1]]);
+    st.closed = p.closed; st.tension = p.tension;
+    state.strokes.push(st);
+  }
+  selPath = state.strokes.length - 1; dragNode = -1;
+  drawRebuild(); syncDrawSel(); pushHistory();
+  toast(kind + ' added \u2014 drag its nodes to warp it');
+}
+// snapping
+function snapPt(x, y){
+  if(!state.drawSnap) return [x, y];
+  const g = Math.max(2, state.drawSnapGrid | 0);
+  return [Math.round(x * g) / g, Math.round(y * g) / g];
 }
 let drawClip = null;
 function drawCopy(){
@@ -668,7 +755,7 @@ function drawDeleteSel(){
 }
 
 function drawBegin(e){
-  curStroke = newStroke({ color: state.drawColor, width: state.drawW, alpha: state.drawA });
+  curStroke = newStroke(currentStyle());
   const p = drawNorm(e); addPoint(curStroke, p[0], p[1], true);
   state.strokes.push(curStroke); drawDirty = true;
 }
@@ -710,6 +797,9 @@ const state = {
   fluidStir: 1.0, fluidStirScale: 3, fluidPtr: 0.6, fluidAud: 0, fluidInject: 0.6, fluidDye: 0, fluidSrc: 'ws', fluidPause: 0, fluidWind: 0, fluidWindDir: 0, fluidTilt: 0, fluidTiltGain: 1,
   strokes: [], drawMode: 0, drawColor: '#e8f2ff', drawW: 0.012, drawA: 1, drawBg: '#000000', drawGuide: 1,
   drawTool: 'node', drawTension: 1,
+  drawClosed: 0, drawFill: 0, drawFillColor: '#2a3a5a', drawFillColor2: '', drawFillAngle: 0,
+  drawColor2: '', drawGrad: 0, drawBrush: 'solid', drawTaper: 0,
+  drawSymMode: 'none', drawSymK: 6, drawSnap: 0, drawSnapGrid: 12,
   cx: 0.5, cy: 0.5, seed: 7.13, aspect: 'free', fbAmt: 0.9, src: 'orbs',
   ccMode: 0, ccTint: '#ff5d7a',
   srcScale: 1, srcHue: 0, srcVar: 0.5
@@ -895,6 +985,9 @@ const sliders = [
   ['fluidWindDir','fluidWindDirV', v=>v.toFixed(0)],
   ['fluidTiltGain','fluidTiltGainV', v=>v.toFixed(2)],
   ['drawW','drawWV', v=>v.toFixed(3)],
+  ['drawTaper','drawTaperV', v=>v.toFixed(2)],
+  ['drawSymK','drawSymKV', v=>v.toFixed(0)],
+  ['drawSnapGrid','drawSnapGridV', v=>v.toFixed(0)],
   ['drawA','drawAV', v=>v.toFixed(2)],
   ['drawTension','drawTensionV', v=>v.toFixed(2)],
   ['rd','rdV',v=>v.toFixed(0)],
@@ -995,6 +1088,17 @@ function syncUI(){
       const dc=$('drawColor'); if(dc) dc.value = state.drawColor;
       const db=$('drawBg'); if(db) db.value = state.drawBg;
       const dt=$('drawTool'); if(dt) dt.value = state.drawTool;
+      const dcl=$('drawClosed'); if(dcl) dcl.classList.toggle('on', !!state.drawClosed);
+      const dfl=$('drawFill'); if(dfl) dfl.classList.toggle('on', !!state.drawFill);
+      const dgr=$('drawGrad'); if(dgr) dgr.classList.toggle('on', !!state.drawGrad);
+      const dsn=$('drawSnapBtn'); if(dsn) dsn.classList.toggle('on', !!state.drawSnap);
+      const dbr=$('drawBrush'); if(dbr) dbr.value = state.drawBrush;
+      const dsy=$('drawSym'); if(dsy) dsy.value = state.drawSymMode;
+      const dc2=$('drawColor2'); if(dc2 && state.drawColor2) dc2.value = state.drawColor2;
+      const dfc=$('drawFillColor'); if(dfc) dfc.value = state.drawFillColor;
+      const dfc2=$('drawFillColor2'); if(dfc2 && state.drawFillColor2) dfc2.value = state.drawFillColor2;
+      const symkRow=$('symkRow'); if(symkRow) symkRow.style.display = state.drawSymMode === 'radial' ? '' : 'none';
+      const fillRow=$('fillRow'); if(fillRow) fillRow.style.display = state.drawFill ? '' : 'none';
       const tr=$('tensionRow'); if(tr) tr.style.display = state.drawTool === 'node' ? '' : 'none'; }
     const tr=$('tiltRow'); if(tr) tr.style.display = TILT_SUPPORTED ? '' : 'none'; }
   $('rendNote').textContent = rendNotes[state.rend];
@@ -1056,6 +1160,10 @@ $('drawMode').addEventListener('click', ()=>{
 $('drawUndo').addEventListener('click', drawUndo);
 $('drawTool').addEventListener('change', ()=>{ state.drawTool = $('drawTool').value; dragNode = -1; syncUI(); drawOverlayPaint(); });
 $('drawTension').addEventListener('input', ()=>{ applyTension(); });
+$('drawW').addEventListener('input', ()=>{ const st = selStroke(); if(st){ st.width = state.drawW; drawRebuild(); } });
+$('drawA').addEventListener('input', ()=>{ const st = selStroke(); if(st){ st.alpha = state.drawA; drawRebuild(); } });
+$('drawTaper').addEventListener('input', ()=>{ const st = selStroke(); if(st){ st.taper = state.drawTaper; drawRebuild(); } });
+$('drawSymK').addEventListener('input', ()=>{ const st = selStroke(); if(st && st.sym){ st.sym.k = state.drawSymK; drawRebuild(); } });
 $('drawCopy').addEventListener('click', drawCopy);
 $('drawPaste').addEventListener('click', ()=> drawPaste());
 $('drawDup').addEventListener('click', drawDuplicate);
@@ -1074,7 +1182,31 @@ $('drawGuide').addEventListener('click', ()=>{
   state.drawGuide = state.drawGuide?0:1; syncUI(); drawOverlayPaint();
   toast(state.drawGuide ? 'flat source view' : 'live view \u2014 drawing over the folded result');
 });
-$('drawColor').addEventListener('input', e=>{ state.drawColor = e.target.value; });
+$('drawColor').addEventListener('input', e=>{ state.drawColor = e.target.value; applyStyle({ color: e.target.value }); });
+$('drawColor2').addEventListener('input', e=>{ state.drawColor2 = e.target.value; applyStyle({ color2: state.drawGrad ? e.target.value : null }); });
+$('drawGrad').addEventListener('click', ()=>{ state.drawGrad = state.drawGrad?0:1; applyStyle({ color2: state.drawGrad ? (state.drawColor2 || '#7fd8ff') : null }); syncUI(); });
+$('drawBrush').addEventListener('change', ()=>{ state.drawBrush = $('drawBrush').value; applyStyle({ brush: state.drawBrush }); });
+$('drawClosed').addEventListener('click', ()=>{ state.drawClosed = state.drawClosed?0:1; applyStyle({ closed: !!state.drawClosed }); syncUI(); });
+$('drawFill').addEventListener('click', ()=>{
+  state.drawFill = state.drawFill?0:1;
+  applyStyle({ fill: state.drawFill ? { color: state.drawFillColor, color2: state.drawFillColor2 || null, angle: state.drawFillAngle } : null });
+  syncUI();
+});
+$('drawFillColor').addEventListener('input', e=>{ state.drawFillColor = e.target.value; if(state.drawFill) applyStyle({ fill: { color: e.target.value, color2: state.drawFillColor2 || null, angle: state.drawFillAngle } }); });
+$('drawFillColor2').addEventListener('input', e=>{ state.drawFillColor2 = e.target.value; if(state.drawFill) applyStyle({ fill: { color: state.drawFillColor, color2: e.target.value, angle: state.drawFillAngle } }); });
+$('drawSym').addEventListener('change', ()=>{ state.drawSymMode = $('drawSym').value; applyStyle({ sym: { mode: state.drawSymMode, k: state.drawSymK } }); syncUI(); });
+$('drawConvert').addEventListener('click', convertSel);
+$('drawConvertAll').addEventListener('click', convertAllFreehand);
+$('drawSnapBtn').addEventListener('click', ()=>{ state.drawSnap = state.drawSnap?0:1; syncUI(); });
+$('drawRaise').addEventListener('click', ()=> orderSel(1));
+$('drawLower').addEventListener('click', ()=> orderSel(-1));
+$('drawRotL').addEventListener('click', ()=> rotateSel(-15));
+$('drawRotR').addEventListener('click', ()=> rotateSel(15));
+$('drawBigger').addEventListener('click', ()=> scaleSel(1.1));
+$('drawSmaller').addEventListener('click', ()=> scaleSel(1/1.1));
+$('drawFlipH').addEventListener('click', ()=> flipSel('x'));
+$('drawFlipV').addEventListener('click', ()=> flipSel('y'));
+['circle','polygon','star','spiral','grid'].forEach(k=>{ const b = $('prim_'+k); if(b) b.addEventListener('click', ()=> addPrimitive(k)); });
 $('drawBg').addEventListener('input', e=>{ state.drawBg = e.target.value; if(state.src==='draw') drawRebuild(); });
 window.addEventListener('resize', ()=> drawOverlayPaint());
 $('fluidRes').addEventListener('change', ()=>{ state.fluidRes = +$('fluidRes').value; if(state.fluidOn) ensureFluid(); });
@@ -1391,7 +1523,7 @@ function applyPreset(val){
     if('ifsCy' in d) state.ifsCy = d.ifsCy;
     if('ifsZ' in d) state.ifsZ = d.ifsZ;
     if('strokes' in d){ state.strokes = JSON.parse(JSON.stringify(d.strokes)); if(state.src === 'draw') drawRebuild(); }
-    ['drawColor','drawW','drawA','drawBg','drawGuide','drawTool','drawTension'].forEach(k=>{ if(k in d) state[k] = d[k]; });
+    ['drawColor','drawW','drawA','drawBg','drawGuide','drawTool','drawTension','drawClosed','drawFill','drawFillColor','drawFillColor2','drawFillAngle','drawColor2','drawGrad','drawBrush','drawTaper','drawSymMode','drawSymK','drawSnap','drawSnapGrid'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     ['fluidOn','fluidRes','fluidDamp','fluidFade','fluidVort','fluidIters','fluidStir','fluidStirScale','fluidPtr','fluidAud','fluidInject','fluidDye','fluidSrc','fluidPause','fluidWind','fluidWindDir','fluidTiltGain'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     if('rd' in d) state.rd = d.rd;
     if('tint'  in d) state.tint  = d.tint;
