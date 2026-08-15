@@ -479,6 +479,20 @@ body.theme-light{
   --ovrC:0,0,0;
   color-scheme:light;
 }
+.ll-empty{font-family:var(--mono);font-size:10px;color:var(--note);padding:8px 4px;text-align:center}
+#lineList{max-height:230px;overflow-y:auto;margin:6px 0 2px;border:1px solid var(--edge);border-radius:6px;background:var(--sunken)}
+.ll-row{display:flex;align-items:center;gap:8px;padding:5px 6px;cursor:pointer;border-bottom:1px solid rgba(var(--ovrC),0.05)}
+.ll-row:last-child{border-bottom:none}
+.ll-row:hover{background:rgba(var(--ovrC),0.05)}
+.ll-row.sel{background:rgba(var(--iceC),0.14);box-shadow:inset 2px 0 0 var(--ice1)}
+.ll-thumb{flex:0 0 auto;border-radius:4px;border:1px solid var(--edge);display:block}
+.ll-meta{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:1px;overflow:hidden}
+.ll-name{font-size:11px;color:var(--label)}
+.ll-sub{font-family:var(--mono);font-size:9px;color:var(--note);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ll-badges{font-family:var(--mono);font-size:9px;color:var(--ice1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ll-swatch{flex:0 0 auto;width:12px;height:12px;border-radius:3px;border:1px solid rgba(var(--ovrC),0.25)}
+.ll-del{flex:0 0 auto;width:18px;height:18px;padding:0;line-height:1;font-size:10px;border-radius:4px;border:1px solid var(--edge);background:transparent;color:var(--dim);cursor:pointer;opacity:0.5}
+.ll-del:hover{opacity:1;color:var(--rec1);border-color:var(--rec1)}
 </style>
 </head>
 <body>
@@ -651,6 +665,7 @@ body.theme-light{
       <div class="row" id="tensionRow"><label title="Applies to the selected line; with none selected it sets the default for new lines">Curve</label><input type="range" id="drawTension" min="0" max="1.6" step="0.01" value="1"><span class="val" id="drawTensionV"></span></div>
       <div class="btns" id="lineEditRow"><button id="drawCopy" style="flex:1" title="Copy selected line (Ctrl+C)">copy</button><button id="drawPaste" style="flex:1" title="Paste (Ctrl+V)">paste</button><button id="drawDup" style="flex:1" title="Duplicate selected line (Ctrl+D)">dupe</button><button id="drawDel" style="flex:0 0 auto" title="Delete selected line (Del)">&#10005;</button></div>
       <div class="note" style="display:block;opacity:0.7"><span id="drawSel">0 lines \u00b7 none selected</span></div>
+      <div id="lineList"></div>
       <div class="btns"><button id="drawRotL" style="flex:1" title="Rotate -15°">&#8630;</button><button id="drawRotR" style="flex:1" title="Rotate +15°">&#8631;</button><button id="drawSmaller" style="flex:1" title="Scale down">&#8722;</button><button id="drawBigger" style="flex:1" title="Scale up">+</button><button id="drawFlipH" style="flex:1" title="Flip horizontally">&#8646;</button><button id="drawFlipV" style="flex:1" title="Flip vertically">&#8645;</button></div>
       <div class="btns"><button id="drawLower" style="flex:1" title="Send backwards">&#9660; back</button><button id="drawRaise" style="flex:1" title="Bring forwards">&#9650; front</button><button id="drawConvert" style="flex:1.4" title="Simplify the selected line into editable nodes">to nodes</button></div>
       <div class="row"><label>Snap</label><button class="toggle" id="drawSnapBtn" style="flex:0 0 auto" title="Snap nodes to a grid">snap</button><input type="range" id="drawSnapGrid" min="2" max="48" step="1" value="12"><span class="val" id="drawSnapGridV"></span></div>
