@@ -321,9 +321,8 @@ function setImage(source, w, h){
 }
 function refreshSourceTexture(){
   const strokes = state.strokes || [];
-  const drawSrc = (state.src === 'draw');
-  // nothing drawn and a real source -> straight upload, no compositing cost
-  if(!strokes.length && !drawSrc){ if(_srcRaw) uploadTexture(_srcRaw.source, _srcRaw.w, _srcRaw.h); return; }
+  // nothing drawn -> straight upload, no compositing cost
+  if(!strokes.length){ if(_srcRaw) uploadTexture(_srcRaw.source, _srcRaw.w, _srcRaw.h); return; }
   const R = (state.src === 'camera') ? 1024 : DRAW_RES;
   if(!_composeCv || _composeCv.width !== R){
     _composeCv = document.createElement('canvas'); _composeCv.width = _composeCv.height = R;
@@ -335,7 +334,7 @@ function refreshSourceTexture(){
   c.clearRect(0, 0, R, R);
   c.fillStyle = '#000000'; c.fillRect(0, 0, R, R);
   // 1. the working image underneath (cover-fitted into the square drawing space)
-  if(!drawSrc && _srcRaw){
+  if(_srcRaw){
     const sw = _srcRaw.w || R, sh = _srcRaw.h || R;
     const sc = Math.max(R / sw, R / sh), dw = sw * sc, dh = sh * sc;
     try { c.drawImage(_srcRaw.source, (R - dw) / 2, (R - dh) / 2, dw, dh); } catch(_){}
@@ -581,7 +580,7 @@ function drawOverlayPaint(){
   if(state.drawGuide){
     // FLAT view: exactly what the stack is being fed — image, bg at its opacity, strokes
     c.fillStyle = '#000000'; c.fillRect(0, 0, cw, ch);
-    if(_srcRaw && state.src !== 'draw'){
+    if(_srcRaw){
       const sw = _srcRaw.w || 1, sh = _srcRaw.h || 1;
       const sc = Math.max(S / sw, S / sh), dw = sw * sc, dh = sh * sc;
       try { c.drawImage(_srcRaw.source, ox + (S - dw) / 2, oy + (S - dh) / 2, dw, dh); } catch(_){}
@@ -910,7 +909,7 @@ function drawUndo(){ if(!state.strokes.length){ toast('nothing to undo'); return
 function drawClear(){ if(!state.strokes.length) return; state.strokes = []; drawRebuild(); pushHistory(); toast('drawing cleared'); }
 
 function applySource(){
-  if(state.src === 'draw'){ drawRebuild(); return; }
+  if(state.src === 'draw') state.src = _preDrawSrc || 'orbs';   // legacy: drawing is an overlay now
   if(!GENS[state.src]) return;   // 'user': leave the loaded texture alone
   const s = 1024, cv = document.createElement('canvas');
   cv.width = cv.height = s;
@@ -1288,9 +1287,6 @@ $('srcSel').addEventListener('change', e=>{
     startCamera();
   } else if(state.src === 'user'){
     toast('load or paste an image');
-  } else if(state.src === 'draw'){
-    applySource();
-    toast(state.strokes.length ? 'drawing source' : 'drawing \u2014 turn on Draw mode and draw');
   } else {
     applySource();
     toast(state.src + (GENS[state.src].seeded ? ' \u00b7 reseed rerolls it' : ''));
@@ -1308,6 +1304,7 @@ $('fluidPause').addEventListener('click', ()=>{ state.fluidPause = state.fluidPa
 if($('fluidTilt')) $('fluidTilt').addEventListener('click', ()=>{ enableTilt(!state.fluidTilt); });
 $('drawMode').addEventListener('click', ()=>{
   state.drawMode = state.drawMode ? 0 : 1;
+  if(state.src === 'draw'){ state.src = _preDrawSrc || 'orbs'; const ss = $('srcSel'); if(ss) ss.value = state.src; applySource(); }
   syncUI(); drawOverlayPaint();
   if(state.drawMode) toast('draw on the canvas \u2014 strokes feed the fold stack');
 });
@@ -1683,7 +1680,7 @@ function applyPreset(val){
     if('ifsCx' in d) state.ifsCx = d.ifsCx;
     if('ifsCy' in d) state.ifsCy = d.ifsCy;
     if('ifsZ' in d) state.ifsZ = d.ifsZ;
-    if('strokes' in d){ state.strokes = JSON.parse(JSON.stringify(d.strokes)); if(state.src === 'draw') drawRebuild(); }
+    if('strokes' in d){ state.strokes = JSON.parse(JSON.stringify(d.strokes)); drawRebuild(); }
     ['drawColor','drawW','drawA','drawBg','drawGuide','drawTool','drawTension','drawClosed','drawFill','drawFillColor','drawFillColor2','drawFillAngle','drawColor2','drawGrad','drawBrush','drawTaper','drawSymMode','drawSymK','drawSnap','drawSnapGrid','drawBgA','textStr','textFont','textBold','textSize','textSpace','textDetail'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     ['fluidOn','fluidRes','fluidDamp','fluidFade','fluidVort','fluidIters','fluidStir','fluidStirScale','fluidPtr','fluidAud','fluidInject','fluidDye','fluidSrc','fluidPause','fluidWind','fluidWindDir','fluidTiltGain'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     if('rd' in d) state.rd = d.rd;
@@ -1970,7 +1967,7 @@ function _gMove(){
   state.shiftY = _gesture.sy0 - ((mid.y - _gesture.mid0.y) / r.height) * pf;
 }
 canvas.addEventListener('pointerdown', e=>{
-  if(state.drawMode && state.src === 'draw' && (e.button === 0 || e.button === 2)){
+  if(state.drawMode && (e.button === 0 || e.button === 2)){
     canvas.setPointerCapture(e.pointerId); e.preventDefault();
     if(state.drawTool === 'node'){ nodePointerDown(e); return; }
     if(e.button === 0){ drawBegin(e); return; }
