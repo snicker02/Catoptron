@@ -319,7 +319,20 @@ function setImage(source, w, h){
   _srcRaw = { source, w, h };
   refreshSourceTexture();
 }
+let _composeErr = 0;
 function refreshSourceTexture(){
+  try { composeSourceTexture(); }
+  catch(err){
+    // never let a compositing failure kill drawing: fall back to strokes-only
+    if(!_composeErr++){ console.error('compose failed:', err); toast('compose error: ' + (err && err.message ? err.message : err)); }
+    try {
+      const cv = drawCanvas();
+      renderStrokes(drawCtx, state.strokes || [], DRAW_RES, state.drawBg || '#000000');
+      uploadTexture(cv, DRAW_RES, DRAW_RES);
+    } catch(_){}
+  }
+}
+function composeSourceTexture(){
   const strokes = state.strokes || [];
   // nothing drawn -> straight upload, no compositing cost
   if(!strokes.length){ if(_srcRaw) uploadTexture(_srcRaw.source, _srcRaw.w, _srcRaw.h); return; }
@@ -910,6 +923,7 @@ function drawClear(){ if(!state.strokes.length) return; state.strokes = []; draw
 
 function applySource(){
   if(state.src === 'draw') state.src = _preDrawSrc || 'orbs';   // legacy: drawing is an overlay now
+  if(state.src === 'user' && !_srcRaw){ state.src = 'orbs'; const ss = $('srcSel'); if(ss) ss.value = 'orbs'; }
   if(!GENS[state.src]) return;   // 'user': leave the loaded texture alone
   const s = 1024, cv = document.createElement('canvas');
   cv.width = cv.height = s;
