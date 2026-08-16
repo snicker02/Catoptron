@@ -4,6 +4,7 @@ import { MAX_OPS } from './engine/assemble.js';
 import { createProgramCache } from './engine/glcache.js';
 import { createFluid } from './engine/fluid.js';
 import { newStroke, addPoint, renderStrokes, strokeStats, samplePath, nearestNode, nearestOnPath, simplify, primitive, bbox } from './engine/draw.js';
+import { contoursFromMask, markHoles } from './engine/text.js';
 
 /* ================= GL setup ================= */
 const canvas = document.getElementById('glc');
@@ -726,6 +727,54 @@ function snapPt(x, y){
   const g = Math.max(2, state.drawSnapGrid | 0);
   return [Math.round(x * g) / g, Math.round(y * g) / g];
 }
+// ---- text as editable vector paths ----
+// No glyph-outline API exists in browsers, so the text is rasterised to a mask,
+// its contours traced (marching squares) and simplified into draggable nodes.
+function addTextPaths(){
+  const txt = (state.textStr || '').trim();
+  if(!txt){ toast('type some text first'); return; }
+  const R = 640;                                     // mask resolution: detail vs speed
+  const cv = document.createElement('canvas'); cv.width = cv.height = R;
+  const c = cv.getContext('2d', { willReadFrequently: true });
+  c.fillStyle = '#000'; c.fillRect(0, 0, R, R);
+  c.fillStyle = '#fff';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  if('letterSpacing' in c) c.letterSpacing = (state.textSpace * R * 0.02).toFixed(2) + 'px';
+  const weight = state.textBold ? '800' : '400';
+  let size = R * 0.42 * state.textSize;
+  c.font = weight + ' ' + size + 'px ' + state.textFont;
+  // shrink to fit the frame
+  let w = c.measureText(txt).width;
+  const maxW = R * 0.88;
+  if(w > maxW){ size *= maxW / w; c.font = weight + ' ' + size + 'px ' + state.textFont; }
+  c.fillText(txt, R / 2, R / 2);
+
+  const d = c.getImageData(0, 0, R, R).data;
+  const mask = new Uint8Array(R * R);
+  for(let i = 0; i < R * R; i++) mask[i] = d[i * 4] > 128 ? 1 : 0;
+
+  const loops = contoursFromMask(mask, R, R);
+  if(!loops.length){ toast('no outlines found \u2014 try a bigger size'); return; }
+  const marked = markHoles(loops);
+  const eps = Math.max(0.0008, state.textDetail);
+  let added = 0, pts = 0;
+  for(const lp of marked){
+    if(lp.area < 12) continue;                        // drop specks
+    const norm = lp.pts.map(p => [p[0] / R, p[1] / R]);
+    const simp = simplify(norm, eps);
+    if(simp.length < 3) continue;
+    const st = newStroke(currentStyle());
+    st.pts = simp; st.closed = true;
+    // a hole punched in a filled letter gets the background colour so 'o' reads correctly
+    if(st.fill && lp.hole) st.fill = { color: state.drawBg || '#000000', color2: null, angle: 0 };
+    state.strokes.push(st);
+    added++; pts += simp.length;
+  }
+  selPath = state.strokes.length - 1; dragNode = -1;
+  drawRebuild(); syncDrawSel(); pushHistory();
+  toast('added ' + added + ' path' + (added === 1 ? '' : 's') + ' \u00b7 ' + pts + ' nodes \u2014 drag them to warp the letters');
+}
+
 // ---- line list: a mini view of every path, click to select ----
 const LT = 46;
 function selectLine(i){
@@ -855,6 +904,7 @@ const state = {
   drawClosed: 0, drawFill: 0, drawFillColor: '#2a3a5a', drawFillColor2: '', drawFillAngle: 0,
   drawColor2: '', drawGrad: 0, drawBrush: 'solid', drawTaper: 0,
   drawSymMode: 'none', drawSymK: 6, drawSnap: 0, drawSnapGrid: 12,
+  textStr: '', textFont: 'sans-serif', textBold: 1, textSize: 1, textSpace: 0, textDetail: 0.004,
   cx: 0.5, cy: 0.5, seed: 7.13, aspect: 'free', fbAmt: 0.9, src: 'orbs',
   ccMode: 0, ccTint: '#ff5d7a',
   srcScale: 1, srcHue: 0, srcVar: 0.5
@@ -1043,6 +1093,9 @@ const sliders = [
   ['drawTaper','drawTaperV', v=>v.toFixed(2)],
   ['drawSymK','drawSymKV', v=>v.toFixed(0)],
   ['drawSnapGrid','drawSnapGridV', v=>v.toFixed(0)],
+  ['textSize','textSizeV', v=>v.toFixed(2)],
+  ['textSpace','textSpaceV', v=>v.toFixed(2)],
+  ['textDetail','textDetailV', v=>v.toFixed(4)],
   ['drawA','drawAV', v=>v.toFixed(2)],
   ['drawTension','drawTensionV', v=>v.toFixed(2)],
   ['rd','rdV',v=>v.toFixed(0)],
@@ -1148,6 +1201,9 @@ function syncUI(){
       const dgr=$('drawGrad'); if(dgr) dgr.classList.toggle('on', !!state.drawGrad);
       const dsn=$('drawSnapBtn'); if(dsn) dsn.classList.toggle('on', !!state.drawSnap);
       const dbr=$('drawBrush'); if(dbr) dbr.value = state.drawBrush;
+      const tb2=$('textBold'); if(tb2) tb2.classList.toggle('on', !!state.textBold);
+      const tf=$('textFont'); if(tf) tf.value = state.textFont;
+      const ti=$('textInput'); if(ti && ti !== document.activeElement) ti.value = state.textStr || '';
       const dsy=$('drawSym'); if(dsy) dsy.value = state.drawSymMode;
       const dc2=$('drawColor2'); if(dc2 && state.drawColor2) dc2.value = state.drawColor2;
       const dfc=$('drawFillColor'); if(dfc) dfc.value = state.drawFillColor;
@@ -1251,6 +1307,11 @@ $('drawFillColor').addEventListener('input', e=>{ state.drawFillColor = e.target
 $('drawFillColor2').addEventListener('input', e=>{ state.drawFillColor2 = e.target.value; if(state.drawFill) applyStyle({ fill: { color: state.drawFillColor, color2: e.target.value, angle: state.drawFillAngle } }); });
 $('drawSym').addEventListener('change', ()=>{ state.drawSymMode = $('drawSym').value; applyStyle({ sym: { mode: state.drawSymMode, k: state.drawSymK } }); syncUI(); });
 $('drawConvert').addEventListener('click', convertSel);
+$('textAdd').addEventListener('click', addTextPaths);
+$('textInput').addEventListener('input', e=>{ state.textStr = e.target.value; });
+$('textInput').addEventListener('keydown', e=>{ if(e.key === 'Enter'){ e.preventDefault(); addTextPaths(); } });
+$('textFont').addEventListener('change', ()=>{ state.textFont = $('textFont').value; });
+$('textBold').addEventListener('click', ()=>{ state.textBold = state.textBold?0:1; syncUI(); });
 $('drawConvertAll').addEventListener('click', convertAllFreehand);
 $('drawSnapBtn').addEventListener('click', ()=>{ state.drawSnap = state.drawSnap?0:1; syncUI(); });
 $('drawRaise').addEventListener('click', ()=> orderSel(1));
@@ -1578,7 +1639,7 @@ function applyPreset(val){
     if('ifsCy' in d) state.ifsCy = d.ifsCy;
     if('ifsZ' in d) state.ifsZ = d.ifsZ;
     if('strokes' in d){ state.strokes = JSON.parse(JSON.stringify(d.strokes)); if(state.src === 'draw') drawRebuild(); }
-    ['drawColor','drawW','drawA','drawBg','drawGuide','drawTool','drawTension','drawClosed','drawFill','drawFillColor','drawFillColor2','drawFillAngle','drawColor2','drawGrad','drawBrush','drawTaper','drawSymMode','drawSymK','drawSnap','drawSnapGrid'].forEach(k=>{ if(k in d) state[k] = d[k]; });
+    ['drawColor','drawW','drawA','drawBg','drawGuide','drawTool','drawTension','drawClosed','drawFill','drawFillColor','drawFillColor2','drawFillAngle','drawColor2','drawGrad','drawBrush','drawTaper','drawSymMode','drawSymK','drawSnap','drawSnapGrid','textStr','textFont','textBold','textSize','textSpace','textDetail'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     ['fluidOn','fluidRes','fluidDamp','fluidFade','fluidVort','fluidIters','fluidStir','fluidStirScale','fluidPtr','fluidAud','fluidInject','fluidDye','fluidSrc','fluidPause','fluidWind','fluidWindDir','fluidTiltGain'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     if('rd' in d) state.rd = d.rd;
     if('tint'  in d) state.tint  = d.tint;
