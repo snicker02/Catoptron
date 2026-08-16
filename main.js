@@ -305,11 +305,43 @@ gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
 let imgW = 1024, imgH = 1024;
 
-function setImage(source, w, h){
+function uploadTexture(source, w, h){
   imgW = w; imgH = h;
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+}
+// The last real source (photo / generator / camera frame). Kept so the drawing can be
+// composited ON TOP of it instead of replacing it.
+let _preDrawSrc = null;
+let _srcRaw = null, _composeCv = null, _composeCtx = null;
+function setImage(source, w, h){
+  _srcRaw = { source, w, h };
+  refreshSourceTexture();
+}
+function refreshSourceTexture(){
+  if(!_srcRaw) return;
+  const over = state.drawOver && state.strokes && state.strokes.length && state.src !== 'draw';
+  if(!over){ uploadTexture(_srcRaw.source, _srcRaw.w, _srcRaw.h); return; }
+  // square compose buffer: the photo is cover-fitted into it, then the strokes go on top,
+  // so drawn coordinates line up with the flat preview exactly
+  const R = (state.src === 'camera') ? 1024 : DRAW_RES;
+  if(!_composeCv || _composeCv.width !== R){
+    _composeCv = document.createElement('canvas'); _composeCv.width = _composeCv.height = R;
+    _composeCtx = _composeCv.getContext('2d');
+  }
+  const c = _composeCtx;
+  c.save();
+  c.clearRect(0, 0, R, R);
+  c.fillStyle = state.drawBg || '#000000';
+  c.fillRect(0, 0, R, R);
+  const sw = _srcRaw.w || R, sh = _srcRaw.h || R;
+  const sc = Math.max(R / sw, R / sh);                 // cover
+  const dw = sw * sc, dh = sh * sc;
+  try { c.drawImage(_srcRaw.source, (R - dw) / 2, (R - dh) / 2, dw, dh); } catch(_){}
+  c.restore();
+  renderStrokes(c, state.strokes, R, null);            // strokes over the image
+  uploadTexture(_composeCv, R, R);
 }
 
 /* ================= source generators (probes) ================= */
@@ -510,9 +542,13 @@ function drawCanvas(){
   return drawCv;
 }
 function drawRebuild(){
-  const cv = drawCanvas();
-  renderStrokes(drawCtx, state.strokes, DRAW_RES, state.drawBg);
-  setImage(cv, DRAW_RES, DRAW_RES);
+  if(state.src === 'draw'){
+    const cv = drawCanvas();
+    renderStrokes(drawCtx, state.strokes, DRAW_RES, state.drawBg);
+    uploadTexture(cv, DRAW_RES, DRAW_RES);
+  } else {
+    refreshSourceTexture();      // strokes layered over the photo / generator / camera
+  }
   drawDirty = false;
   const s = strokeStats(state.strokes);
   const el = $('drawStats'); if(el) el.textContent = s.strokes + ' stroke' + (s.strokes === 1 ? '' : 's') + ' \u00b7 ' + s.points + ' pts';
@@ -547,6 +583,13 @@ function drawOverlayPaint(){
     // FLAT view: opaque preview of exactly what the stack is being fed
     c.fillStyle = state.drawBg || '#000000';
     c.fillRect(0, 0, cw, ch);
+    if(state.drawOver && _srcRaw && state.src !== 'draw'){       // show the image underneath
+      const sw = _srcRaw.w || 1, sh = _srcRaw.h || 1;
+      const sc = Math.max(S / sw, S / sh), dw = sw * sc, dh = sh * sc;
+      c.save(); c.globalAlpha = 0.9;
+      try { c.drawImage(_srcRaw.source, ox + (S - dw) / 2, oy + (S - dh) / 2, dw, dh); } catch(_){}
+      c.restore();
+    }
     c.save(); c.translate(ox, oy); renderStrokes(c, state.strokes, S, null); c.restore();
   }
   c.save(); c.translate(ox, oy); drawNodesOverlay(c, S); c.restore();
@@ -904,6 +947,7 @@ const state = {
   drawClosed: 0, drawFill: 0, drawFillColor: '#2a3a5a', drawFillColor2: '', drawFillAngle: 0,
   drawColor2: '', drawGrad: 0, drawBrush: 'solid', drawTaper: 0,
   drawSymMode: 'none', drawSymK: 6, drawSnap: 0, drawSnapGrid: 12,
+  drawOver: 0,
   textStr: '', textFont: 'sans-serif', textBold: 1, textSize: 1, textSpace: 0, textDetail: 0.004,
   cx: 0.5, cy: 0.5, seed: 7.13, aspect: 'free', fbAmt: 0.9, src: 'orbs',
   ccMode: 0, ccTint: '#ff5d7a',
@@ -1200,6 +1244,7 @@ function syncUI(){
       const dfl=$('drawFill'); if(dfl) dfl.classList.toggle('on', !!state.drawFill);
       const dgr=$('drawGrad'); if(dgr) dgr.classList.toggle('on', !!state.drawGrad);
       const dsn=$('drawSnapBtn'); if(dsn) dsn.classList.toggle('on', !!state.drawSnap);
+      const dov=$('drawOver'); if(dov) dov.classList.toggle('on', !!state.drawOver);
       const dbr=$('drawBrush'); if(dbr) dbr.value = state.drawBrush;
       const tb2=$('textBold'); if(tb2) tb2.classList.toggle('on', !!state.textBold);
       const tf=$('textFont'); if(tf) tf.value = state.textFont;
@@ -1237,6 +1282,7 @@ $('ccMode').addEventListener('change', e=>{
 $('ccTint').addEventListener('input', e=> state.ccTint = e.target.value);
 $('srcSel').addEventListener('change', e=>{
   const _prev = state.src;
+  if(_prev !== 'draw') _preDrawSrc = _prev;
   state.src = e.target.value;
   if(_prev === 'camera' && state.src !== 'camera') stopCamera();
   if(state.src === 'camera'){
@@ -1264,7 +1310,7 @@ $('fluidPause').addEventListener('click', ()=>{ state.fluidPause = state.fluidPa
 if($('fluidTilt')) $('fluidTilt').addEventListener('click', ()=>{ enableTilt(!state.fluidTilt); });
 $('drawMode').addEventListener('click', ()=>{
   state.drawMode = state.drawMode ? 0 : 1;
-  if(state.drawMode && state.src !== 'draw'){ state.src = 'draw'; $('srcSel').value = 'draw'; applySource(); }
+  if(state.drawMode && state.src !== 'draw' && !state.drawOver){ state.src = 'draw'; $('srcSel').value = 'draw'; applySource(); }
   syncUI(); drawOverlayPaint();
   if(state.drawMode) toast('draw on the canvas \u2014 strokes feed the fold stack');
 });
@@ -1314,6 +1360,20 @@ $('textFont').addEventListener('change', ()=>{ state.textFont = $('textFont').va
 $('textBold').addEventListener('click', ()=>{ state.textBold = state.textBold?0:1; syncUI(); });
 $('drawConvertAll').addEventListener('click', convertAllFreehand);
 $('drawSnapBtn').addEventListener('click', ()=>{ state.drawSnap = state.drawSnap?0:1; syncUI(); });
+$('drawOver').addEventListener('click', ()=>{
+  state.drawOver = state.drawOver ? 0 : 1;
+  if(state.drawOver && state.src === 'draw'){
+    // 'draw' means strokes-only; hop back to a real source so there is something underneath
+    state.src = _preDrawSrc || 'orbs';
+    const ss = $('srcSel'); if(ss) ss.value = state.src;
+    applySource();
+    toast('drawing over ' + state.src);
+  } else {
+    refreshSourceTexture();
+    toast(state.drawOver ? 'drawing over the source image' : 'drawing only');
+  }
+  syncUI(); drawOverlayPaint();
+});
 $('drawRaise').addEventListener('click', ()=> orderSel(1));
 $('drawLower').addEventListener('click', ()=> orderSel(-1));
 $('drawRotL').addEventListener('click', ()=> rotateSel(-15));
@@ -1639,7 +1699,7 @@ function applyPreset(val){
     if('ifsCy' in d) state.ifsCy = d.ifsCy;
     if('ifsZ' in d) state.ifsZ = d.ifsZ;
     if('strokes' in d){ state.strokes = JSON.parse(JSON.stringify(d.strokes)); if(state.src === 'draw') drawRebuild(); }
-    ['drawColor','drawW','drawA','drawBg','drawGuide','drawTool','drawTension','drawClosed','drawFill','drawFillColor','drawFillColor2','drawFillAngle','drawColor2','drawGrad','drawBrush','drawTaper','drawSymMode','drawSymK','drawSnap','drawSnapGrid','textStr','textFont','textBold','textSize','textSpace','textDetail'].forEach(k=>{ if(k in d) state[k] = d[k]; });
+    ['drawColor','drawW','drawA','drawBg','drawGuide','drawTool','drawTension','drawClosed','drawFill','drawFillColor','drawFillColor2','drawFillAngle','drawColor2','drawGrad','drawBrush','drawTaper','drawSymMode','drawSymK','drawSnap','drawSnapGrid','drawOver','textStr','textFont','textBold','textSize','textSpace','textDetail'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     ['fluidOn','fluidRes','fluidDamp','fluidFade','fluidVort','fluidIters','fluidStir','fluidStirScale','fluidPtr','fluidAud','fluidInject','fluidDye','fluidSrc','fluidPause','fluidWind','fluidWindDir','fluidTiltGain'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     if('rd' in d) state.rd = d.rd;
     if('tint'  in d) state.tint  = d.tint;
