@@ -574,6 +574,33 @@ body.theme-light{
       </div>
     </div>
 
+    <div class="group collapsed">
+      <h2>Record</h2>
+      <div class="btns">
+        <select id="recFps" style="flex:1"><option value="30">30 fps</option><option value="60" selected>60 fps</option></select>
+        <select id="recQ" style="flex:1"><option value="8">8 Mbps</option><option value="16" selected>16 Mbps</option><option value="32">32 Mbps</option></select>
+        <select id="recLen" style="flex:1">
+          <option value="loop1" selected>1 loop</option>
+          <option value="loop2">2 loops</option>
+          <option value="5">5 s</option>
+          <option value="10">10 s</option>
+          <option value="30">30 s</option>
+          <option value="manual">manual</option>
+        </select>
+      </div>
+      <div class="btns" style="margin-top:6px"><select id="recFmt" style="flex:1"><option value="webm" selected>WebM (VP9)</option><option value="mp4">MP4 (H.264)</option></select><button id="recBtn" class="rec" style="flex:1.6">Record WebM</button></div>
+      <div class="btns" style="margin-top:6px">
+        <select id="hqSize" style="flex:1">
+          <option value="1080" selected>1080p</option>
+          <option value="1440">1440p</option>
+          <option value="2160">2160p</option>
+        </select>
+        <button id="hqBtn" class="rec" style="flex:1.2">HQ Video</button>
+      </div>
+      <label class="row" style="gap:6px;font-size:11px;margin-top:5px;cursor:pointer;margin-bottom:0"><input type="checkbox" id="hqSyncAudio" checked style="flex:0 0 auto;width:auto;margin:0"> sync audio into MP4 (file source)</label>
+      <div class="note">Record captures the live canvas in realtime. HQ Video renders offline frame-by-frame via WebCodecs &mdash; loops close exactly, and Feedback history is rebuilt at export resolution. With an audio <b>file</b> loaded and <b>MP4</b> selected, HQ Video re-analyses the track offline so the reactivity stays frame-synced and muxes the audio into the file.</div>
+    </div>
+
     <div class="group">
       <h2>Presets</h2>
       <div class="btns">
@@ -649,6 +676,7 @@ body.theme-light{
       <div class="row"><label>Interlace</label><input type="range" id="interlace" min="0" max="1" step="0.01" value="0"><span class="val" id="interlaceV"></span></div>
       <div class="note">Signal glitch: channel split/swap corrupt RGB, block dropout punches holes, dither crushes to a palette, signal noise adds static, interlace combs scanlines. Reseed rerolls the block patterns.</div>
     </div>
+
   </div>
   <div id="stage">
     <canvas id="glc"></canvas>
@@ -656,7 +684,70 @@ body.theme-light{
     <div id="toast"></div>
   </div>
   <div id="panelR">
-        <div class="group">
+    <div class="group">
+      <h2>Fold stack</h2>
+      <div class="row" style="gap:6px;margin-bottom:8px">
+        <input type="text" id="foldSearch" placeholder="search folds…" style="flex:1;min-width:0">
+        <select id="foldSort" style="flex:0 0 auto" title="How the fold pickers are ordered">
+          <option value="az">A–Z</option>
+          <option value="type">By type</option>
+          <option value="recent">Recent</option>
+        </select>
+      </div>
+      <div id="stackList"></div>
+      <div class="btns">
+        <select id="addOpSel" style="flex:1"></select>
+        <button id="addOp" style="flex:0 0 auto">+ add</button>
+      </div>
+      <div class="note">Folds run top to bottom, then feed the renderer. Order matters — reordering the same folds makes a different mirror.</div>
+    </div>
+
+    <div class="group">
+      <h2>Renderer</h2>
+      <div class="btns" style="margin-bottom:8px">
+        <button class="mode on" data-rend="0">Panes</button>
+        <button class="mode" data-rend="1">Droste</button>
+        <button class="mode" data-rend="2">Room</button>
+        <button class="mode" data-rend="3">Tube</button>
+        <button class="mode" data-rend="4">Strip</button>
+        <button class="mode" data-rend="5">Feedback</button>
+        <button class="mode" data-rend="6">Grid</button>
+        <button class="mode" data-rend="7">Kaleido</button>
+        <button class="mode" data-rend="8">Sphere</button>
+        <button class="mode" data-rend="9">Slit-scan</button>
+        <button class="mode" data-rend="10">Poincaré</button>
+        <button class="mode" data-rend="11">Hyper tiling</button>
+        <button class="mode" data-rend="12">None</button>
+      </div>
+      <div class="row" id="depthRow"><label id="depthLbl">Depth</label><input type="range" id="depth" min="1" max="60" step="1" value="14"><span class="val" id="depthV"></span></div>
+      <div class="row" id="fbRow" style="display:none"><label id="fbLbl">Feedback</label><input type="range" id="fbAmt" min="0" max="0.98" step="0.005" value="0.9"><span class="val" id="fbAmtV"></span></div>
+      <div class="row" id="moshRow" style="display:none"><label title="Datamosh: block-displace the previous frame before it re-enters">Mosh</label><input type="range" id="mosh" min="0" max="1" step="0.01" value="0"><span class="val" id="moshV"></span></div>
+      <div class="row" id="rdRow" style="display:none"><label title="Reaction-diffusion: grow Gray-Scott Turing patterns from the image (Pull/Rotate become Feed/Kill)">Reaction-diffusion</label><input type="range" id="rd" min="0" max="1" step="1" value="0"><span class="val" id="rdV"></span></div>
+      <div class="row"><label id="stepLbl">Step scale</label><input type="range" id="step" min="0.42" max="0.94" step="0.005" value="0.72"><span class="val" id="stepV"></span></div>
+      <div class="row"><label id="twistLbl">Twist</label><input type="range" id="twist" min="-90" max="90" step="0.5" value="8"><span class="val" id="twistV"></span></div>
+      <div class="row"><label>Shift X</label><input type="range" id="shiftX" min="-0.2" max="0.2" step="0.001" value="0"><span class="val" id="shiftXV"></span></div>
+      <div class="row"><label>Shift Y</label><input type="range" id="shiftY" min="-0.2" max="0.2" step="0.001" value="0"><span class="val" id="shiftYV"></span></div>
+      <div class="row"><label>Zoom</label><input type="range" id="zoom" min="0.02" max="8" step="0.005" value="1"><span class="val" id="zoomV"></span></div>
+      <div class="row">
+        <label>Alt. flip</label>
+        <button class="toggle on" id="flip" style="flex:0 0 auto;padding:5px 12px">mirrored</button>
+      </div>
+      <div class="note" id="rendNote"></div>
+    </div>
+
+    <div class="group">
+      <h2>IFS <span style="font-weight:400;opacity:0.45;font-size:10px">— self-similar fold recursion</span></h2>
+      <div class="btns"><button class="toggle" id="ifsOn" style="width:100%">Enable IFS</button></div>
+      <div class="row"><label>Iterations</label><input type="range" id="ifsN" min="2" max="12" step="1" value="5"><span class="val" id="ifsNV"></span></div>
+      <div class="row"><label>Contraction</label><input type="range" id="ifsScale" min="0.3" max="0.98" step="0.005" value="0.6"><span class="val" id="ifsScaleV"></span></div>
+      <div class="row"><label>Rotation</label><input type="range" id="ifsRot" min="-180" max="180" step="1" value="0"><span class="val" id="ifsRotV"></span></div>
+      <div class="row"><label>Z-tunnel</label><input type="range" id="ifsZ" min="-0.6" max="0.6" step="0.005" value="0"><span class="val" id="ifsZV"></span></div>
+      <div class="row"><label>Fixed X</label><input type="range" id="ifsCx" min="-1" max="1" step="0.01" value="0"><span class="val" id="ifsCxV"></span></div>
+      <div class="row"><label>Fixed Y</label><input type="range" id="ifsCy" min="-1" max="1" step="0.01" value="0"><span class="val" id="ifsCyV"></span></div>
+      <div class="note">Wraps the whole fold stack in a self-similar loop: each pass runs your folds, then contracts toward the fixed point (with optional rotation), turning the stack into a fractal generator. More iterations = deeper recursion; lower contraction = tighter nesting. Z-tunnel adds perspective so the recursion tunnels into (+) or bulges out of (−) the screen — a 3D Droste. Off = a single normal pass.</div>
+    </div>
+
+    <div class="group collapsed">
       <h2>Draw <span style="font-weight:400;opacity:0.45;font-size:10px">— spline strokes</span></h2>
       <div class="btns"><button class="toggle" id="drawMode" style="flex:1">Draw mode</button></div>
       <div class="row tintrow"><label>Ink</label><input type="color" id="drawColor" value="#e8f2ff"><label style="flex:0 0 30px">Bg</label><input type="color" id="drawBg" value="#000000"><button class="toggle" id="drawGuide" style="flex:0 0 auto" title="Flat source view vs live folded view">flat</button></div>
@@ -697,37 +788,7 @@ body.theme-light{
       The <b>circle / poly / star / spiral / grid</b> buttons drop in ready-made shapes as node paths you can then warp. <b>BG opacity</b> controls how much of the working image shows through: at <b>1</b> the Bg colour is solid and you get lines on a flat field; at <b>0</b> your lines and text sit straight on the loaded photo (or generator, or camera); in between it tints or dims the image behind them. The combined result is what feeds the fold stack. <b>Text</b> converts a typed word into real editable outlines: the letters are traced into closed node paths you can drag, warp, fill and fold like anything else. <b>Detail</b> trades node count against fidelity — raise it for chunky, angular letterforms. Holes (inside ‘o’, ‘a’) are detected so fills read correctly. The <b>flat / live</b> button switches how you draw: <b>flat</b> shows an opaque 1:1 preview of the source you are feeding the stack, while <b>live</b> hides it so you draw straight over the folded result. The preview fills the canvas exactly the way the source does, so what you draw is where it lands. Switch Draw mode off to see the folded result full-screen. Undo stroke also works with Ctrl+Z.</div>
     </div>
 
-<div class="group">
-      <h2>Fold stack</h2>
-      <div class="row" style="gap:6px;margin-bottom:8px">
-        <input type="text" id="foldSearch" placeholder="search folds…" style="flex:1;min-width:0">
-        <select id="foldSort" style="flex:0 0 auto" title="How the fold pickers are ordered">
-          <option value="az">A–Z</option>
-          <option value="type">By type</option>
-          <option value="recent">Recent</option>
-        </select>
-      </div>
-      <div id="stackList"></div>
-      <div class="btns">
-        <select id="addOpSel" style="flex:1"></select>
-        <button id="addOp" style="flex:0 0 auto">+ add</button>
-      </div>
-      <div class="note">Folds run top to bottom, then feed the renderer. Order matters — reordering the same folds makes a different mirror.</div>
-    </div>
-
-    <div class="group">
-      <h2>IFS <span style="font-weight:400;opacity:0.45;font-size:10px">— self-similar fold recursion</span></h2>
-      <div class="btns"><button class="toggle" id="ifsOn" style="width:100%">Enable IFS</button></div>
-      <div class="row"><label>Iterations</label><input type="range" id="ifsN" min="2" max="12" step="1" value="5"><span class="val" id="ifsNV"></span></div>
-      <div class="row"><label>Contraction</label><input type="range" id="ifsScale" min="0.3" max="0.98" step="0.005" value="0.6"><span class="val" id="ifsScaleV"></span></div>
-      <div class="row"><label>Rotation</label><input type="range" id="ifsRot" min="-180" max="180" step="1" value="0"><span class="val" id="ifsRotV"></span></div>
-      <div class="row"><label>Z-tunnel</label><input type="range" id="ifsZ" min="-0.6" max="0.6" step="0.005" value="0"><span class="val" id="ifsZV"></span></div>
-      <div class="row"><label>Fixed X</label><input type="range" id="ifsCx" min="-1" max="1" step="0.01" value="0"><span class="val" id="ifsCxV"></span></div>
-      <div class="row"><label>Fixed Y</label><input type="range" id="ifsCy" min="-1" max="1" step="0.01" value="0"><span class="val" id="ifsCyV"></span></div>
-      <div class="note">Wraps the whole fold stack in a self-similar loop: each pass runs your folds, then contracts toward the fixed point (with optional rotation), turning the stack into a fractal generator. More iterations = deeper recursion; lower contraction = tighter nesting. Z-tunnel adds perspective so the recursion tunnels into (+) or bulges out of (−) the screen — a 3D Droste. Off = a single normal pass.</div>
-    </div>
-
-    <div class="group">
+    <div class="group collapsed">
       <h2>Fluid <span style="font-weight:400;opacity:0.45;font-size:10px">— velocity + dye sim</span></h2>
       <div class="btns"><button class="toggle" id="fluidOn" style="flex:1">Enable fluid</button><button class="toggle" id="fluidPause" style="flex:0 0 auto" title="Pause fluid">&#10074;&#10074;</button><button id="fluidReset" style="flex:0 0 auto">clear</button></div>
       <div class="row"><label>Resolution</label><select id="fluidRes" style="flex:1"><option value="128">128 (fast)</option><option value="256" selected>256</option><option value="384">384</option><option value="512">512 (heavy)</option></select></div>
@@ -751,40 +812,7 @@ body.theme-light{
       <div class="note">A real fluid solver running in the background: velocity is advected, stirred, made incompressible by a pressure solve, and carries a dye field that the source image is injected into. <b>Dye mix</b> blends that flowing dye over your render (1 = pure fluid). Add the <b>Fluid warp</b> fold to push the fold stack around by the same velocity field instead. <b>Dye source</b> picks what gets injected: the current render (so the fluid carries your whole workspace — folds, IFS, colour) or the raw source image. Hold the <b>left mouse button</b> and drag on the canvas to stir it. The <b>&#10074;&#10074;</b> button freezes the sim where it is (the dye stays on screen); the global pause (Space) freezes it too. Higher Pressure = more incompressible (and slower); Vorticity re-injects swirl the solver damps out.</div>
     </div>
 
-    <div class="group">
-      <h2>Renderer</h2>
-      <div class="btns" style="margin-bottom:8px">
-        <button class="mode on" data-rend="0">Panes</button>
-        <button class="mode" data-rend="1">Droste</button>
-        <button class="mode" data-rend="2">Room</button>
-        <button class="mode" data-rend="3">Tube</button>
-        <button class="mode" data-rend="4">Strip</button>
-        <button class="mode" data-rend="5">Feedback</button>
-        <button class="mode" data-rend="6">Grid</button>
-        <button class="mode" data-rend="7">Kaleido</button>
-        <button class="mode" data-rend="8">Sphere</button>
-        <button class="mode" data-rend="9">Slit-scan</button>
-        <button class="mode" data-rend="10">Poincaré</button>
-        <button class="mode" data-rend="11">Hyper tiling</button>
-        <button class="mode" data-rend="12">None</button>
-      </div>
-      <div class="row" id="depthRow"><label id="depthLbl">Depth</label><input type="range" id="depth" min="1" max="60" step="1" value="14"><span class="val" id="depthV"></span></div>
-      <div class="row" id="fbRow" style="display:none"><label id="fbLbl">Feedback</label><input type="range" id="fbAmt" min="0" max="0.98" step="0.005" value="0.9"><span class="val" id="fbAmtV"></span></div>
-      <div class="row" id="moshRow" style="display:none"><label title="Datamosh: block-displace the previous frame before it re-enters">Mosh</label><input type="range" id="mosh" min="0" max="1" step="0.01" value="0"><span class="val" id="moshV"></span></div>
-      <div class="row" id="rdRow" style="display:none"><label title="Reaction-diffusion: grow Gray-Scott Turing patterns from the image (Pull/Rotate become Feed/Kill)">Reaction-diffusion</label><input type="range" id="rd" min="0" max="1" step="1" value="0"><span class="val" id="rdV"></span></div>
-      <div class="row"><label id="stepLbl">Step scale</label><input type="range" id="step" min="0.42" max="0.94" step="0.005" value="0.72"><span class="val" id="stepV"></span></div>
-      <div class="row"><label id="twistLbl">Twist</label><input type="range" id="twist" min="-90" max="90" step="0.5" value="8"><span class="val" id="twistV"></span></div>
-      <div class="row"><label>Shift X</label><input type="range" id="shiftX" min="-0.2" max="0.2" step="0.001" value="0"><span class="val" id="shiftXV"></span></div>
-      <div class="row"><label>Shift Y</label><input type="range" id="shiftY" min="-0.2" max="0.2" step="0.001" value="0"><span class="val" id="shiftYV"></span></div>
-      <div class="row"><label>Zoom</label><input type="range" id="zoom" min="0.02" max="8" step="0.005" value="1"><span class="val" id="zoomV"></span></div>
-      <div class="row">
-        <label>Alt. flip</label>
-        <button class="toggle on" id="flip" style="flex:0 0 auto;padding:5px 12px">mirrored</button>
-      </div>
-      <div class="note" id="rendNote"></div>
-    </div>
-
-    <div class="group">
+    <div class="group collapsed">
       <h2>Motion</h2>
       <div class="row"><label>Drift</label><input type="range" id="drift" min="-1" max="1" step="0.01" value="0.15"><span class="val" id="driftV"></span></div>
       <div class="row"><label>Spin</label><input type="range" id="spin" min="-1" max="1" step="0.01" value="0"><span class="val" id="spinV"></span></div>
@@ -800,7 +828,7 @@ body.theme-light{
       <div class="note">Drift falls through the reflections, spin rotates everything, wobble undulates the whole pattern. Pulse breathes the zoom, sway drifts the framing, hue cycle rotates colours over time. Stutter quantises the clock into steps, jitter shakes the framing per frame, and glitch burst spikes channel-split/noise/dropout on a beat (0 = still). Motion blur smears moving areas by blending recent frames (static areas stay sharp) &mdash; it blurs all motion, including audio-driven moves.</div>
     </div>
 
-    <div class="group">
+    <div class="group collapsed">
       <h2>Audio reactivity</h2>
       <div class="row" style="gap:6px;flex-wrap:wrap">
         <button class="toggle" id="audioOn" style="flex:0 0 auto;padding:5px 12px">enable</button>
@@ -820,33 +848,6 @@ body.theme-light{
       <div id="aroutes"></div>
       <button class="btn" id="addRoute" style="width:100%;margin-top:4px">+ add route</button>
       <div class="note">Drive parameters from live sound. Enable, choose mic or a file, then map Bass / Mid / Treble / Level / Beat onto a target with a bipolar amount. Sensitivity scales input gain; Response sets how snappy the reaction is. Base values are untouched &mdash; turn audio off and everything returns to normal.</div>
-    </div>
-
-    <div class="group">
-      <h2>Record</h2>
-      <div class="btns">
-        <select id="recFps" style="flex:1"><option value="30">30 fps</option><option value="60" selected>60 fps</option></select>
-        <select id="recQ" style="flex:1"><option value="8">8 Mbps</option><option value="16" selected>16 Mbps</option><option value="32">32 Mbps</option></select>
-        <select id="recLen" style="flex:1">
-          <option value="loop1" selected>1 loop</option>
-          <option value="loop2">2 loops</option>
-          <option value="5">5 s</option>
-          <option value="10">10 s</option>
-          <option value="30">30 s</option>
-          <option value="manual">manual</option>
-        </select>
-      </div>
-      <div class="btns" style="margin-top:6px"><select id="recFmt" style="flex:1"><option value="webm" selected>WebM (VP9)</option><option value="mp4">MP4 (H.264)</option></select><button id="recBtn" class="rec" style="flex:1.6">Record WebM</button></div>
-      <div class="btns" style="margin-top:6px">
-        <select id="hqSize" style="flex:1">
-          <option value="1080" selected>1080p</option>
-          <option value="1440">1440p</option>
-          <option value="2160">2160p</option>
-        </select>
-        <button id="hqBtn" class="rec" style="flex:1.2">HQ Video</button>
-      </div>
-      <label class="row" style="gap:6px;font-size:11px;margin-top:5px;cursor:pointer;margin-bottom:0"><input type="checkbox" id="hqSyncAudio" checked style="flex:0 0 auto;width:auto;margin:0"> sync audio into MP4 (file source)</label>
-      <div class="note">Record captures the live canvas in realtime. HQ Video renders offline frame-by-frame via WebCodecs &mdash; loops close exactly, and Feedback history is rebuilt at export resolution. With an audio <b>file</b> loaded and <b>MP4</b> selected, HQ Video re-analyses the track offline so the reactivity stays frame-synced and muxes the audio into the file.</div>
     </div>
 
   </div>
