@@ -266,8 +266,13 @@ function drawOne(ctx, st, S, pts){
 
 export function renderStrokes(ctx, strokes, S, bg){
   ctx.save();
-  ctx.clearRect(0, 0, S, S);
-  if(bg && bg !== 'transparent'){ ctx.fillStyle = bg; ctx.fillRect(0, 0, S, S); }
+  // Only wipe when we own the surface (a bg was supplied). With bg = null the caller has
+  // already composited something underneath (the source image, a thumbnail backdrop),
+  // so clearing here would erase it and leave a black frame.
+  if(bg && bg !== 'transparent'){
+    ctx.clearRect(0, 0, S, S);
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, S, S);
+  }
   for(const st of strokes){
     if(!st.pts || !st.pts.length) continue;
     for(const T of symTransforms(st.sym)){
