@@ -36,33 +36,54 @@ void main(){
 }`;
 
 const FS_STEP = HEAD + `
-uniform float uBirth, uSurvive, uDecay;
+uniform sampler2D uSrc;
+uniform float uBirth, uSurvive, uDecay, uImgFeed, uAudio, uSeedT;
 // is bit n set in a 9-bit rule mask?
 float bitAt(float mask, float n){ return mod(floor(mask / pow(2.0, n)), 2.0); }
 void main(){
   vec2 t = uTexel;
-  float c = aliveAt(vUv);
+  vec4 me = texture2D(uField, clampUv(vUv));
+  float c = me.r;
   float cnt =
       aliveAt(vUv + vec2(-t.x, -t.y)) + aliveAt(vUv + vec2(0.0, -t.y)) + aliveAt(vUv + vec2(t.x, -t.y))
     + aliveAt(vUv + vec2(-t.x,  0.0))                                  + aliveAt(vUv + vec2(t.x,  0.0))
     + aliveAt(vUv + vec2(-t.x,  t.y)) + aliveAt(vUv + vec2(0.0,  t.y)) + aliveAt(vUv + vec2(t.x,  t.y));
   cnt = floor(cnt + 0.5);
   float next = (c > 0.5) ? bitAt(uSurvive, cnt) : bitAt(uBirth, cnt);
-  float prevTrail = texture2D(uField, clampUv(vUv)).g;
-  float trail = max(next, prevTrail * uDecay);
-  gl_FragColor = vec4(next, trail, 0.0, 1.0);
+
+  float img = dot(texture2D(uSrc, vUv).rgb, vec3(0.299, 0.587, 0.114));
+  vec2 cell = floor(vUv / uTexel);
+  // the picture keeps feeding the colony: bright areas (photo, drawing, text) spawn cells
+  if(uImgFeed > 0.001){
+    float r = hashS(cell + uSeedT);
+    next = max(next, step(1.0 - img * img * uImgFeed * 0.5, r));
+  }
+  // transients throw in a burst of new life
+  if(uAudio > 0.001){
+    float r2 = hashS(cell * 1.7 + uSeedT * 3.1);
+    next = max(next, step(1.0 - uAudio * 0.25, r2));
+  }
+  float trail = max(next, me.g * uDecay);
+  float age = next > 0.5 ? min(1.0, me.b + 0.02) : 0.0;   // how long this cell has lived
+  gl_FragColor = vec4(next, trail, age, 1.0);
 }`;
 
 const FS_VIEW = PACK + `
-uniform sampler2D uField;
+uniform sampler2D uField, uSrc;
 uniform float uMode;
+vec3 heat(float t){
+  return clamp(vec3(1.6*t - 0.4, 1.2*t*(1.0-t)*2.2 + 0.15*t, 1.1 - 1.5*t), 0.0, 1.0);
+}
 void main(){
   vec4 s = texture2D(uField, vUv);
-  float a = s.r, tr = s.g;
+  float a = s.r, tr = s.g, age = s.b;
+  vec3 img = texture2D(uSrc, vUv).rgb;
   vec3 col;
-  if(uMode < 0.5)      col = vec3(a);                                        // hard cells
-  else if(uMode < 1.5) col = vec3(tr);                                       // soft trails
-  else                 col = vec3(tr * 1.5, tr * 0.75 + a * 0.25, 1.0 - tr); // tinted
+  if(uMode < 0.5)      col = vec3(a);                       // hard cells
+  else if(uMode < 1.5) col = vec3(tr);                      // soft trails
+  else if(uMode < 2.5) col = img * tr;                      // living cells reveal the picture
+  else if(uMode < 3.5) col = heat(age) * max(tr, a * 0.6);  // colour by how long a cell has lived
+  else                 col = mix(img * 0.35, heat(1.0 - age) * 1.1, tr);  // picture + heat blend
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
 }`;
 
@@ -122,11 +143,12 @@ export function createCA(gl, VS, compile, bindQuad){
       const iters = Math.max(0, Math.min(16, o.steps | 0));
       for(let i = 0; i < iters; i++){
         core.run(P.step, pair.write(), res,
-          { uBirth: o.birth, uSurvive: o.survive, uDecay: o.decay },
-          { uField: pair.read() });
+          { uBirth: o.birth, uSurvive: o.survive, uDecay: o.decay,
+            uImgFeed: o.imgFeed || 0, uAudio: o.audio || 0, uSeedT: (o.seed || 7) + gens * 0.137 },
+          { uField: pair.read(), uSrc: o.srcTex });
         pair.swap(); gens++;
       }
-      core.run(P.view, viewTex, res, { uMode: o.viewMode || 0 }, { uField: pair.read() });
+      core.run(P.view, viewTex, res, { uMode: o.viewMode || 0 }, { uField: pair.read(), uSrc: o.srcTex });
     },
   };
 }
