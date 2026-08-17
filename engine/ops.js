@@ -2470,5 +2470,28 @@ vec2 opFluid(vec2 q, vec4 P0){
   v=mix(v, vec2(-v.y, v.x), swirl);
   return q + v*amt*0.08;
 }` },
+  { name:'RD warp', fn:'opRD', deps:[],
+    params:[["Amount",-4,4,0.01,1],["Channel",0,1,1,1,["U","V"]],["Mode",0,1,1,0,["gradient","value"]],["Scale",0.25,3,0.01,1]],
+    glsl:`vec2 _rdF(vec2 uv){
+  vec4 t=texture2D(uRDField, clamp(uv,0.0,1.0));
+  return vec2((floor(t.r*255.0+0.5)*256.0+floor(t.g*255.0+0.5))/65535.0,
+              (floor(t.b*255.0+0.5)*256.0+floor(t.a*255.0+0.5))/65535.0);
+}
+vec2 opRD(vec2 q, vec4 P0){
+  if(uRDOn < 0.5) return q;
+  float amt=P0.x, chan=P0.y, mode=P0.z, scl=P0.w;
+  float ca=uCanvas.x/uCanvas.y;
+  vec2 uv=clamp((q/vec2(ca,1.0))*scl + uCenter, 0.0, 1.0);
+  float tx=uRDTexel;
+  if(mode < 0.5){                                   // follow the chemical gradient
+    vec2 l=_rdF(uv-vec2(tx,0.0)), r=_rdF(uv+vec2(tx,0.0));
+    vec2 b=_rdF(uv-vec2(0.0,tx)), t=_rdF(uv+vec2(0.0,tx));
+    vec2 g = (chan<0.5) ? vec2(r.x-l.x, t.x-b.x) : vec2(r.y-l.y, t.y-b.y);
+    return q + g*amt*6.0;
+  }
+  vec2 f=_rdF(uv);                                  // push along the value itself
+  float v = (chan<0.5) ? f.x : f.y;
+  return q + vec2(v-0.25)*amt*0.25;
+}` },
 ];
 export { OPS };
