@@ -142,6 +142,8 @@ function stepCA(dt){
     birth: r.birth, survive: r.survive, decay: state.caDecay,
     steps, density: state.caDensity, fromImage: !!state.caFromImage,
     srcTex: tex, seed: state.seed, viewMode: state.caView | 0,
+    imgFeed: state.caImgFeed,
+    audio: state.caAudio * Math.max(AUD.beat, AUD.level * 0.7),
   });
 }
 
@@ -1000,7 +1002,7 @@ const state = {
   drawSymMode: 'none', drawSymK: 6, drawSnap: 0, drawSnapGrid: 12,
   drawBgA: 1,
   caOn: 0, caRes: 256, caRule: 'Life', caRate: 8, caDecay: 0.9, caDensity: 0.32,
-  caFromImage: 1, caMix: 0, caView: 1, caPause: 0,
+  caFromImage: 1, caMix: 0, caView: 2, caPause: 0, caImgFeed: 0.35, caAudio: 0,
   textStr: '', textFont: 'sans-serif', textBold: 1, textSize: 1, textSpace: 0, textDetail: 0.004,
   cx: 0.5, cy: 0.5, seed: 7.13, aspect: 'free', fbAmt: 0.9, src: 'orbs',
   ccMode: 0, ccTint: '#ff5d7a',
@@ -1176,6 +1178,8 @@ const sliders = [
   ['caRate','caRateV', v=>v.toFixed(0)],
   ['caDecay','caDecayV', v=>v.toFixed(2)],
   ['caDensity','caDensityV', v=>v.toFixed(2)],
+  ['caImgFeed','caImgFeedV', v=>v.toFixed(2)],
+  ['caAudio','caAudioV', v=>v.toFixed(2)],
   ['caMix','caMixV', v=>v.toFixed(2)],
   ['fluidDamp','fluidDampV', v=>v.toFixed(2)],
   ['fluidFade','fluidFadeV', v=>v.toFixed(2)],
@@ -1759,7 +1763,7 @@ function applyPreset(val){
     if('ifsZ' in d) state.ifsZ = d.ifsZ;
     if('strokes' in d){ state.strokes = JSON.parse(JSON.stringify(d.strokes)); drawRebuild(); }
     ['drawColor','drawW','drawA','drawBg','drawGuide','drawTool','drawTension','drawClosed','drawFill','drawFillColor','drawFillColor2','drawFillAngle','drawColor2','drawGrad','drawBrush','drawTaper','drawSymMode','drawSymK','drawSnap','drawSnapGrid','drawBgA','textStr','textFont','textBold','textSize','textSpace','textDetail'].forEach(k=>{ if(k in d) state[k] = d[k]; });
-    ['caOn','caRes','caRule','caRate','caDecay','caDensity','caFromImage','caMix','caView','caPause'].forEach(k=>{ if(k in d) state[k] = d[k]; });
+    ['caOn','caRes','caRule','caRate','caDecay','caDensity','caFromImage','caMix','caView','caPause','caImgFeed','caAudio'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     ['fluidOn','fluidRes','fluidDamp','fluidFade','fluidVort','fluidIters','fluidStir','fluidStirScale','fluidPtr','fluidAud','fluidInject','fluidDye','fluidSrc','fluidPause','fluidWind','fluidWindDir','fluidTiltGain'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     if('rd' in d) state.rd = d.rd;
     if('tint'  in d) state.tint  = d.tint;
@@ -2511,7 +2515,7 @@ function makeOfflineAudio(chL, chR, sampleRate, fps, startSec){
 const AR_BANDS = ['bass','mid','treble','level','beat'];
 const AR_BLABEL = { bass:'Bass', mid:'Mid', treble:'Treble', level:'Level', beat:'Beat' };
 // AR targets are auto-derived from every sensible slider: real range -> scale + clamp, so all params react
-const AR_LABEL = { zoom:'Zoom', twist:'Twist', rot:'Rotate', shiftX:'Pan X', shiftY:'Pan Y', depth:'Depth', step:'Step / RD Feed', ripple:'Ripple', chroma:'Chroma', wobble:'Wobble', fbAmt:'Feedback', exposure:'Exposure', contrast:'Contrast', sat:'Saturation', warm:'Warmth', hue:'Hue', tintA:'Tint amount', vign:'Vignette', grain:'Grain', posterize:'Posterize', scan:'Scanlines', chanSplit:'Channel split', chanSwap:'Channel swap', dropout:'Dropout', dither:'Dither', noiseG:'Noise', interlace:'Interlace', stutter:'Stutter', jitter:'Jitter', burst:'Glitch burst', mosh:'Datamosh', driftRate:'Drift speed', spinRate:'Spin speed', hueRate:'Hue-cycle speed', frame:'Frame', frameW:'Frame width', srcScale:'Source scale', srcHue:'Source hue', srcVar:'Source variance', pulse:'Pulse', sway:'Sway', mblur:'Motion blur', ifsN:'IFS iterations', ifsScale:'IFS contraction', ifsRot:'IFS rotation', ifsCx:'IFS fixed X', ifsCy:'IFS fixed Y', ifsZ:'IFS z-tunnel', fluidStir:'Fluid stir', fluidVort:'Fluid vorticity', fluidDye:'Fluid dye mix', fluidInject:'Fluid inject', fluidWind:'Fluid wind', fluidWindDir:'Fluid wind dir', caMix:'CA mix', caRate:'CA speed', caDecay:'CA trail', caDensity:'CA density' };
+const AR_LABEL = { zoom:'Zoom', twist:'Twist', rot:'Rotate', shiftX:'Pan X', shiftY:'Pan Y', depth:'Depth', step:'Step / RD Feed', ripple:'Ripple', chroma:'Chroma', wobble:'Wobble', fbAmt:'Feedback', exposure:'Exposure', contrast:'Contrast', sat:'Saturation', warm:'Warmth', hue:'Hue', tintA:'Tint amount', vign:'Vignette', grain:'Grain', posterize:'Posterize', scan:'Scanlines', chanSplit:'Channel split', chanSwap:'Channel swap', dropout:'Dropout', dither:'Dither', noiseG:'Noise', interlace:'Interlace', stutter:'Stutter', jitter:'Jitter', burst:'Glitch burst', mosh:'Datamosh', driftRate:'Drift speed', spinRate:'Spin speed', hueRate:'Hue-cycle speed', frame:'Frame', frameW:'Frame width', srcScale:'Source scale', srcHue:'Source hue', srcVar:'Source variance', pulse:'Pulse', sway:'Sway', mblur:'Motion blur', ifsN:'IFS iterations', ifsScale:'IFS contraction', ifsRot:'IFS rotation', ifsCx:'IFS fixed X', ifsCy:'IFS fixed Y', ifsZ:'IFS z-tunnel', fluidStir:'Fluid stir', fluidVort:'Fluid vorticity', fluidDye:'Fluid dye mix', fluidInject:'Fluid inject', fluidWind:'Fluid wind', fluidWindDir:'Fluid wind dir', caMix:'CA mix', caRate:'CA speed', caDecay:'CA trail', caDensity:'CA density', caImgFeed:'CA image feed', caAudio:'CA audio burst' };
 const AR_TUNE = { ripple:{mult:3.0,max:4}, chroma:{mult:1.2}, depth:{mult:0.5}, twist:{mult:0.5}, rot:{mult:0.35}, hue:{mult:0.5}, srcHue:{mult:0.4}, posterize:{mult:0.5}, dither:{mult:0.5}, zoom:{mult:0.125}, ifsRot:{mult:0.35}, ifsN:{mult:0.4} };
 const AR_MOTION = { drift:'driftRate', spin:'spinRate', hueCycle:'hueRate' };   // rate targets (added to accumulators)
 const AR_RATE_META = { driftRate:{s:3}, spinRate:{s:3}, hueRate:{s:2.5} };
@@ -2526,7 +2530,7 @@ const AR_GROUPS = [
   ['Frame / source', ['frame','frameW','srcScale','srcHue','srcVar']],
   ['IFS', ['ifsScale','ifsRot','ifsZ','ifsN','ifsCx','ifsCy']],
   ['Fluid', ['fluidStir','fluidVort','fluidDye','fluidInject','fluidWind','fluidWindDir']],
-  ['Cellular automata', ['caMix','caRate','caDecay','caDensity']],
+  ['Cellular automata', ['caMix','caRate','caDecay','caDensity','caImgFeed','caAudio']],
 ];
 const AR_DIRECT = {}, AR_TLABEL = {}, AR_SCALE = {};
 function buildAR(){
