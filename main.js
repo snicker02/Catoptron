@@ -3,6 +3,7 @@ import { OPS } from './engine/ops.js';
 import { MAX_OPS } from './engine/assemble.js';
 import { createProgramCache } from './engine/glcache.js';
 import { createFluid } from './engine/fluid.js';
+import { createRD, RD_PRESETS } from './engine/rd.js';
 import { newStroke, addPoint, renderStrokes, strokeStats, samplePath, nearestNode, nearestOnPath, simplify, primitive, bbox } from './engine/draw.js';
 import { contoursFromMask, markHoles } from './engine/text.js';
 
@@ -120,6 +121,25 @@ const PU = {};
 ['uSrc','uVign','uGrain','uWavePh','uSeed','uExposure','uContrast','uSat','uWarm','uPosterize','uScan','uHueRot','uChanSplit','uChanSwap','uDropout','uDither','uNoiseG','uInterlace','uRD','uTint','uTintA','uFx','uDye','uDyeMix'].forEach(n => PU[n] = gl.getUniformLocation(postProg, n));
 const postLoc = gl.getAttribLocation(postProg, 'aPos');
 
+// ---- reaction-diffusion: Gray-Scott field sim ----
+let RDS = null;
+function ensureRD(){
+  if(!RDS){ try { RDS = createRD(gl, VS, compile, bindQuad); } catch(e){ console.warn('rd init failed', e); RDS = false; } }
+  if(!RDS) return null;
+  RDS.resize(state.rdRes | 0);
+  return RDS;
+}
+function stepRD(){
+  if(!state.rdOn || state.rdPause || paused) return;
+  const S = ensureRD(); if(!S) return;
+  S.step({
+    du: state.rdDu, dv: state.rdDv, f: state.rdF, k: state.rdK, dt: state.rdDt,
+    steps: state.rdSteps | 0, imgDrive: state.rdImgDrive,
+    seedAmount: state.rdSeedAmt, fromImage: !!state.rdFromImage,
+    srcTex: tex, seed: state.seed, viewMode: state.rdView | 0,
+  });
+}
+
 // ---- fluid: Navier-Stokes-lite velocity + dye sim ----
 let FLUID = null, fluidPtr = [0.5, 0.5], fluidPtrV = [0, 0], fluidTime = 0;
 let fluidLMB = false;
@@ -215,6 +235,21 @@ const DU = {}; ['uBase','uDye','uMix'].forEach(k => DU[k] = gl.getUniformLocatio
 const dyeLoc = gl.getAttribLocation(dyeProg, 'aPos');
 // Called right after the scene is drawn: snapshot the CLEAN render (so dye never
 // injects itself and decays to black), then composite the dye on top for display.
+function overlayBlend(w, h, texture, mix){
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, w, h);
+  gl.useProgram(dyeProg); bindQuad(dyeLoc);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, wsTex); gl.uniform1i(DU.uBase, 0);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texture); gl.uniform1i(DU.uDye, 1);
+  gl.uniform1f(DU.uMix, mix);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.activeTexture(gl.TEXTURE0);
+}
+function rdPresent(w, h){
+  if(!state.rdOn || !RDS || state.rdMix <= 0.001) return;
+  captureWorkspace(w, h);                     // clean frame -> base
+  overlayBlend(w, h, RDS.viewTex(), state.rdMix);
+}
 function fluidPresent(w, h){
   if(!state.fluidOn || !FLUID) return;
   const mix = state.fluidDye;
@@ -959,6 +994,8 @@ const state = {
   drawColor2: '', drawGrad: 0, drawBrush: 'solid', drawTaper: 0,
   drawSymMode: 'none', drawSymK: 6, drawSnap: 0, drawSnapGrid: 12,
   drawBgA: 1,
+  rdOn: 0, rdRes: 256, rdF: 0.0545, rdK: 0.0620, rdDu: 0.16, rdDv: 0.08, rdDt: 1.0,
+  rdSteps: 12, rdSeedAmt: 1, rdFromImage: 1, rdImgDrive: 0, rdMix: 0, rdView: 0, rdPause: 0,
   textStr: '', textFont: 'sans-serif', textBold: 1, textSize: 1, textSpace: 0, textDetail: 0.004,
   cx: 0.5, cy: 0.5, seed: 7.13, aspect: 'free', fbAmt: 0.9, src: 'orbs',
   ccMode: 0, ccTint: '#ff5d7a',
@@ -1131,6 +1168,14 @@ const sliders = [
   ['ifsCx','ifsCxV', v=>v.toFixed(2)],
   ['ifsCy','ifsCyV', v=>v.toFixed(2)],
   ['ifsZ','ifsZV', v=>v.toFixed(3)],
+  ['rdF','rdFV', v=>v.toFixed(4)],
+  ['rdK','rdKV', v=>v.toFixed(4)],
+  ['rdDu','rdDuV', v=>v.toFixed(3)],
+  ['rdDv','rdDvV', v=>v.toFixed(3)],
+  ['rdSteps','rdStepsV', v=>v.toFixed(0)],
+  ['rdImgDrive','rdImgDriveV', v=>v.toFixed(2)],
+  ['rdSeedAmt','rdSeedAmtV', v=>v.toFixed(2)],
+  ['rdMix','rdMixV', v=>v.toFixed(2)],
   ['fluidDamp','fluidDampV', v=>v.toFixed(2)],
   ['fluidFade','fluidFadeV', v=>v.toFixed(2)],
   ['fluidVort','fluidVortV', v=>v.toFixed(2)],
@@ -1235,6 +1280,11 @@ function syncUI(){
     const am=$('audioMic'); if(am) am.classList.toggle('on', state.audioMode==='mic');
     const af=$('audioFileBtn'); if(af) af.classList.toggle('on', state.audioMode==='file'); }
   { const ib=$('ifsOn'); if(ib){ ib.classList.toggle('on', !!state.ifsOn); ib.textContent = state.ifsOn ? 'IFS on' : 'Enable IFS'; } }
+  { const rb=$('rdOn'); if(rb){ rb.classList.toggle('on', !!state.rdOn); rb.textContent = state.rdOn ? 'RD on' : 'Enable RD'; }
+    const rp=$('rdPause'); if(rp){ rp.classList.toggle('on', !!state.rdPause); rp.innerHTML = state.rdPause ? '&#9654;' : '&#10074;&#10074;'; }
+    const rfi=$('rdFromImage'); if(rfi) rfi.classList.toggle('on', !!state.rdFromImage);
+    const rr=$('rdRes'); if(rr) rr.value = state.rdRes;
+    const rv=$('rdView'); if(rv) rv.value = state.rdView; }
   { const fb=$('fluidOn'); if(fb){ fb.classList.toggle('on', !!state.fluidOn); fb.textContent = state.fluidOn ? 'Fluid on' : 'Enable fluid'; }
     const fr=$('fluidRes'); if(fr) fr.value = state.fluidRes;
     const fs2=$('fluidSrc'); if(fs2) fs2.value = state.fluidSrc;
@@ -1314,6 +1364,18 @@ $('flip').addEventListener('click', ()=>{ state.flip = state.flip?0:1; syncUI();
 $('ifsOn').addEventListener('click', ()=>{ state.ifsOn = state.ifsOn?0:1; syncUI(); });
 $('fluidOn').addEventListener('click', ()=>{ state.fluidOn = state.fluidOn?0:1; if(state.fluidOn) ensureFluid(); syncUI(); });
 $('fluidReset').addEventListener('click', ()=>{ if(FLUID) FLUID.reset(); toast('fluid cleared'); });
+$('rdOn').addEventListener('click', ()=>{ state.rdOn = state.rdOn?0:1; if(state.rdOn) ensureRD(); syncUI(); });
+$('rdPause').addEventListener('click', ()=>{ state.rdPause = state.rdPause?0:1; syncUI(); });
+$('rdReseed').addEventListener('click', ()=>{ if(RDS) RDS.reseed(); toast('reaction reseeded'); });
+$('rdRes').addEventListener('change', ()=>{ state.rdRes = +$('rdRes').value; if(state.rdOn) ensureRD(); });
+$('rdView').addEventListener('change', ()=>{ state.rdView = +$('rdView').value; });
+$('rdFromImage').addEventListener('click', ()=>{ state.rdFromImage = state.rdFromImage?0:1; if(RDS) RDS.reseed(); syncUI(); });
+$('rdPreset').addEventListener('change', ()=>{
+  const p = RD_PRESETS[$('rdPreset').value]; if(!p) return;
+  state.rdF = p.f; state.rdK = p.k;
+  if(RDS) RDS.reseed();
+  syncUI(); toast($('rdPreset').value + ' \u00b7 f ' + p.f.toFixed(4) + ' k ' + p.k.toFixed(4));
+});
 $('fluidPause').addEventListener('click', ()=>{ state.fluidPause = state.fluidPause?0:1; syncUI(); });
 if($('fluidTilt')) $('fluidTilt').addEventListener('click', ()=>{ enableTilt(!state.fluidTilt); });
 $('drawMode').addEventListener('click', ()=>{
@@ -1696,6 +1758,7 @@ function applyPreset(val){
     if('ifsZ' in d) state.ifsZ = d.ifsZ;
     if('strokes' in d){ state.strokes = JSON.parse(JSON.stringify(d.strokes)); drawRebuild(); }
     ['drawColor','drawW','drawA','drawBg','drawGuide','drawTool','drawTension','drawClosed','drawFill','drawFillColor','drawFillColor2','drawFillAngle','drawColor2','drawGrad','drawBrush','drawTaper','drawSymMode','drawSymK','drawSnap','drawSnapGrid','drawBgA','textStr','textFont','textBold','textSize','textSpace','textDetail'].forEach(k=>{ if(k in d) state[k] = d[k]; });
+    ['rdOn','rdRes','rdF','rdK','rdDu','rdDv','rdDt','rdSteps','rdSeedAmt','rdFromImage','rdImgDrive','rdMix','rdView','rdPause'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     ['fluidOn','fluidRes','fluidDamp','fluidFade','fluidVort','fluidIters','fluidStir','fluidStirScale','fluidPtr','fluidAud','fluidInject','fluidDye','fluidSrc','fluidPause','fluidWind','fluidWindDir','fluidTiltGain'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     if('rd' in d) state.rd = d.rd;
     if('tint'  in d) state.tint  = d.tint;
@@ -2242,6 +2305,13 @@ function setUniforms(entry, w, h){
   }
   if(L.uFluidOn) gl.uniform1f(L.uFluidOn, (state.fluidOn && FLUID) ? 1 : 0);
   if(L.uFluidTexel) gl.uniform1f(L.uFluidTexel, 1 / ((state.fluidOn && FLUID) ? (FLUID.resolution() || 256) : 256));
+  if(L.uRDField){
+    const rt = (state.rdOn && RDS) ? RDS.fieldTex() : tex;
+    gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, rt); gl.uniform1i(L.uRDField, 3);
+    gl.activeTexture(gl.TEXTURE0);
+  }
+  if(L.uRDOn) gl.uniform1f(L.uRDOn, (state.rdOn && RDS) ? 1 : 0);
+  if(L.uRDTexel) gl.uniform1f(L.uRDTexel, 1 / ((state.rdOn && RDS) ? (RDS.resolution() || 256) : 256));
   gl.uniform1f(L.uFbAmt, state.fbAmt);
   gl.uniform1f(L.uMosh, state.mosh);
   gl.uniform1f(L.uRD, state.rd);
@@ -2440,12 +2510,12 @@ function makeOfflineAudio(chL, chR, sampleRate, fps, startSec){
 const AR_BANDS = ['bass','mid','treble','level','beat'];
 const AR_BLABEL = { bass:'Bass', mid:'Mid', treble:'Treble', level:'Level', beat:'Beat' };
 // AR targets are auto-derived from every sensible slider: real range -> scale + clamp, so all params react
-const AR_LABEL = { zoom:'Zoom', twist:'Twist', rot:'Rotate', shiftX:'Pan X', shiftY:'Pan Y', depth:'Depth', step:'Step / RD Feed', ripple:'Ripple', chroma:'Chroma', wobble:'Wobble', fbAmt:'Feedback', exposure:'Exposure', contrast:'Contrast', sat:'Saturation', warm:'Warmth', hue:'Hue', tintA:'Tint amount', vign:'Vignette', grain:'Grain', posterize:'Posterize', scan:'Scanlines', chanSplit:'Channel split', chanSwap:'Channel swap', dropout:'Dropout', dither:'Dither', noiseG:'Noise', interlace:'Interlace', stutter:'Stutter', jitter:'Jitter', burst:'Glitch burst', mosh:'Datamosh', driftRate:'Drift speed', spinRate:'Spin speed', hueRate:'Hue-cycle speed', frame:'Frame', frameW:'Frame width', srcScale:'Source scale', srcHue:'Source hue', srcVar:'Source variance', pulse:'Pulse', sway:'Sway', mblur:'Motion blur', ifsN:'IFS iterations', ifsScale:'IFS contraction', ifsRot:'IFS rotation', ifsCx:'IFS fixed X', ifsCy:'IFS fixed Y', ifsZ:'IFS z-tunnel', fluidStir:'Fluid stir', fluidVort:'Fluid vorticity', fluidDye:'Fluid dye mix', fluidInject:'Fluid inject', fluidWind:'Fluid wind', fluidWindDir:'Fluid wind dir' };
+const AR_LABEL = { zoom:'Zoom', twist:'Twist', rot:'Rotate', shiftX:'Pan X', shiftY:'Pan Y', depth:'Depth', step:'Step / RD Feed', ripple:'Ripple', chroma:'Chroma', wobble:'Wobble', fbAmt:'Feedback', exposure:'Exposure', contrast:'Contrast', sat:'Saturation', warm:'Warmth', hue:'Hue', tintA:'Tint amount', vign:'Vignette', grain:'Grain', posterize:'Posterize', scan:'Scanlines', chanSplit:'Channel split', chanSwap:'Channel swap', dropout:'Dropout', dither:'Dither', noiseG:'Noise', interlace:'Interlace', stutter:'Stutter', jitter:'Jitter', burst:'Glitch burst', mosh:'Datamosh', driftRate:'Drift speed', spinRate:'Spin speed', hueRate:'Hue-cycle speed', frame:'Frame', frameW:'Frame width', srcScale:'Source scale', srcHue:'Source hue', srcVar:'Source variance', pulse:'Pulse', sway:'Sway', mblur:'Motion blur', ifsN:'IFS iterations', ifsScale:'IFS contraction', ifsRot:'IFS rotation', ifsCx:'IFS fixed X', ifsCy:'IFS fixed Y', ifsZ:'IFS z-tunnel', fluidStir:'Fluid stir', fluidVort:'Fluid vorticity', fluidDye:'Fluid dye mix', fluidInject:'Fluid inject', fluidWind:'Fluid wind', fluidWindDir:'Fluid wind dir', rdMix:'RD mix', rdF:'RD feed', rdK:'RD kill', rdImgDrive:'RD image drive' };
 const AR_TUNE = { ripple:{mult:3.0,max:4}, chroma:{mult:1.2}, depth:{mult:0.5}, twist:{mult:0.5}, rot:{mult:0.35}, hue:{mult:0.5}, srcHue:{mult:0.4}, posterize:{mult:0.5}, dither:{mult:0.5}, zoom:{mult:0.125}, ifsRot:{mult:0.35}, ifsN:{mult:0.4} };
 const AR_MOTION = { drift:'driftRate', spin:'spinRate', hueCycle:'hueRate' };   // rate targets (added to accumulators)
 const AR_RATE_META = { driftRate:{s:3}, spinRate:{s:3}, hueRate:{s:2.5} };
 const AR_SPECIAL = { burst:{s:1} };
-const AR_EXCLUDE = new Set(['audioGain','audioResp','beatSens','rd','burst','ifsOn','fluidOn','fluidRes','fluidIters','fluidTilt','fluidTiltGain']);
+const AR_EXCLUDE = new Set(['audioGain','audioResp','beatSens','rd','burst','ifsOn','fluidOn','fluidRes','fluidIters','fluidTilt','fluidTiltGain','rdOn','rdRes','rdSteps','rdView','rdPause','rdFromImage']);
 const AR_GROUPS = [
   ['Geometry', ['zoom','twist','rot','shiftX','shiftY','depth','step','ripple','chroma','wobble']],
   ['Feedback', ['fbAmt']],
@@ -2455,6 +2525,7 @@ const AR_GROUPS = [
   ['Frame / source', ['frame','frameW','srcScale','srcHue','srcVar']],
   ['IFS', ['ifsScale','ifsRot','ifsZ','ifsN','ifsCx','ifsCy']],
   ['Fluid', ['fluidStir','fluidVort','fluidDye','fluidInject','fluidWind','fluidWindDir']],
+  ['Reaction-diffusion', ['rdMix','rdF','rdK','rdImgDrive']],
 ];
 const AR_DIRECT = {}, AR_TLABEL = {}, AR_SCALE = {};
 function buildAR(){
@@ -2666,6 +2737,7 @@ function frame(now){
   if(exporting){ requestAnimationFrame(frame); return; }
   audioSample(dt); AR = audioRoutes(); arBurst = AR.burst || 0; updateMeter(); updateAudTransport();
   navStep(dt);
+  stepRD();
   stepFluid(dt);
   if(!reduced && !paused){
     phase  += dt * (state.drift + (AR.driftRate||0)) * 0.6;
@@ -2691,6 +2763,7 @@ function frame(now){
   }
   applyAR();
   try { renderScene(w, h); } finally { restoreAR(); }
+  rdPresent(w, h);
   fluidPresent(w, h);
   if(curStroke && drawDirty) drawRebuild();
   { const mb = state.mblur + (AR.mblur||0); if(mb > 0.001) motionBlurPass(w, h, mb); else mbInit = false; }
@@ -3120,10 +3193,12 @@ hqBtn.addEventListener('click', async ()=>{
       if(syncAudio){ const A = offlineSampler(n); AUD.bass=A.bass; AUD.mid=A.mid; AUD.treble=A.treble; AUD.level=A.level; AUD.beat=A.beat; AR = audioRoutes(); } else { AR = {}; }
       arBurst = AR.burst || 0;
       if(syncAudio) applyAR();
+      stepRD();
       stepFluid(1 / fps);
       renderScene(ew, eh);
       const mbAmt = state.mblur;
       if(syncAudio) restoreAR();
+      rdPresent(ew, eh);
       fluidPresent(ew, eh);
       if(mbAmt > 0.001) motionBlurPass(ew, eh, mbAmt);
       const vf = new VideoFrame(canvas, {
@@ -3233,6 +3308,7 @@ $('exportBtn').addEventListener('click', async ()=>{
       }
     }
     renderScene(rw, rh);
+    rdPresent(rw, rh);
     fluidPresent(rw, rh);        /* dye is a composite pass now — include it in stills too */
 
     let blob;
