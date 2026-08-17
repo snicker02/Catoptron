@@ -789,6 +789,23 @@ body.theme-light{
     </div>
 
     <div class="group collapsed">
+      <h2>Reaction&#8211;diffusion <span style="font-weight:400;opacity:0.45;font-size:10px">&mdash; Gray&#8211;Scott field</span></h2>
+      <div class="btns"><button class="toggle" id="rdOn" style="flex:1">Enable RD</button><button class="toggle" id="rdPause" style="flex:0 0 auto" title="Pause the reaction">&#10074;&#10074;</button><button id="rdReseed" style="flex:0 0 auto">reseed</button></div>
+      <div class="row"><label>Pattern</label><select id="rdPreset" style="flex:1;min-width:0"><option value="">custom&#8230;</option><option value="coral">coral</option><option value="mitosis">mitosis</option><option value="spots">spots</option><option value="maze">maze</option><option value="stripes">stripes</option><option value="holes">holes</option><option value="worms">worms</option><option value="solitons">solitons</option></select></div>
+      <div class="row"><label>Resolution</label><select id="rdRes" style="flex:1;min-width:0"><option value="128">128 (fast)</option><option value="256" selected>256</option><option value="384">384</option><option value="512">512 (heavy)</option></select></div>
+      <div class="row"><label>Feed</label><input type="range" id="rdF" min="0.005" max="0.09" step="0.0005" value="0.0545"><span class="val" id="rdFV"></span></div>
+      <div class="row"><label>Kill</label><input type="range" id="rdK" min="0.03" max="0.075" step="0.0005" value="0.062"><span class="val" id="rdKV"></span></div>
+      <div class="row"><label>Diffuse U</label><input type="range" id="rdDu" min="0.05" max="0.4" step="0.005" value="0.16"><span class="val" id="rdDuV"></span></div>
+      <div class="row"><label>Diffuse V</label><input type="range" id="rdDv" min="0.02" max="0.2" step="0.005" value="0.08"><span class="val" id="rdDvV"></span></div>
+      <div class="row"><label>Speed</label><input type="range" id="rdSteps" min="1" max="40" step="1" value="12"><span class="val" id="rdStepsV"></span></div>
+      <div class="row"><label>Seed</label><button class="toggle" id="rdFromImage" style="flex:0 0 auto" title="Seed the reaction from the image">image</button><input type="range" id="rdSeedAmt" min="0" max="1" step="0.01" value="1"><span class="val" id="rdSeedAmtV"></span></div>
+      <div class="row"><label>Image drive</label><input type="range" id="rdImgDrive" min="0" max="1" step="0.01" value="0"><span class="val" id="rdImgDriveV"></span></div>
+      <div class="row"><label>View</label><select id="rdView" style="flex:1;min-width:0"><option value="0">V greyscale</option><option value="1">U / V split</option><option value="2">tinted</option></select></div>
+      <div class="row"><label>Mix</label><input type="range" id="rdMix" min="0" max="1" step="0.01" value="0"><span class="val" id="rdMixV"></span></div>
+      <div class="note">A real Gray&#8211;Scott reaction&#8211;diffusion field running in its own buffers: two chemicals diffuse at different rates and react, and the <b>Feed</b> / <b>Kill</b> pair selects the regime &mdash; spots, stripes, mazes, coral, mitosis. <b>Pattern</b> jumps to known-good settings. <b>Speed</b> is solver steps per frame (higher evolves faster and costs more). <b>Seed &middot; image</b> starts the reaction from the bright parts of your picture, and <b>Image drive</b> lets the picture modulate feed/kill so patterns vary across the frame. <b>Mix</b> blends the chemical field over your render; the <b>RD warp</b> fold instead pushes the fold stack along the chemistry, so the pattern deforms your artwork rather than covering it. Distinct from the RD switch in the Feedback renderer, which is locked to that renderer.</div>
+    </div>
+
+    <div class="group collapsed">
       <h2>Fluid <span style="font-weight:400;opacity:0.45;font-size:10px">— velocity + dye sim</span></h2>
       <div class="btns"><button class="toggle" id="fluidOn" style="flex:1">Enable fluid</button><button class="toggle" id="fluidPause" style="flex:0 0 auto" title="Pause fluid">&#10074;&#10074;</button><button id="fluidReset" style="flex:0 0 auto">clear</button></div>
       <div class="row"><label>Resolution</label><select id="fluidRes" style="flex:1"><option value="128">128 (fast)</option><option value="256" selected>256</option><option value="384">384</option><option value="512">512 (heavy)</option></select></div>
