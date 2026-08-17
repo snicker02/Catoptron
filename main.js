@@ -141,7 +141,8 @@ function stepCA(dt){
   S.step({
     birth: r.birth, survive: r.survive, decay: state.caDecay,
     steps, density: state.caDensity, fromImage: !!state.caFromImage,
-    srcTex: tex, seed: state.seed, viewMode: state.caView | 0,
+    srcTex: (state.caSrc === 'ws' && wsReady && wsTex) ? wsTex : tex,
+    seed: state.seed, viewMode: state.caView | 0,
     imgFeed: state.caImgFeed,
     audio: state.caAudio * Math.max(AUD.beat, AUD.level * 0.7),
   });
@@ -253,8 +254,11 @@ function overlayBlend(w, h, texture, mix){
   gl.activeTexture(gl.TEXTURE0);
 }
 function caPresent(w, h){
-  if(!state.caOn || !CAS || state.caMix <= 0.001) return;
-  captureWorkspace(w, h);                     // clean frame -> base
+  if(!state.caOn || !CAS) return;
+  const need = (state.caSrc === 'ws') || state.caMix > 0.001;
+  if(!need) return;
+  captureWorkspace(w, h);                     // clean frame -> base (and CA's live feed)
+  if(state.caMix <= 0.001) return;
   overlayBlend(w, h, CAS.viewTex(), state.caMix);
 }
 function fluidPresent(w, h){
@@ -1002,7 +1006,7 @@ const state = {
   drawSymMode: 'none', drawSymK: 6, drawSnap: 0, drawSnapGrid: 12,
   drawBgA: 1,
   caOn: 0, caRes: 256, caRule: 'Life', caRate: 8, caDecay: 0.9, caDensity: 0.32,
-  caFromImage: 1, caMix: 0, caView: 2, caPause: 0, caImgFeed: 0.35, caAudio: 0,
+  caFromImage: 1, caMix: 0, caView: 2, caPause: 0, caImgFeed: 0.35, caAudio: 0, caSrc: 'img',
   textStr: '', textFont: 'sans-serif', textBold: 1, textSize: 1, textSpace: 0, textDetail: 0.004,
   cx: 0.5, cy: 0.5, seed: 7.13, aspect: 'free', fbAmt: 0.9, src: 'orbs',
   ccMode: 0, ccTint: '#ff5d7a',
@@ -1290,7 +1294,8 @@ function syncUI(){
     const cfi=$('caFromImage'); if(cfi) cfi.classList.toggle('on', !!state.caFromImage);
     const cr=$('caRes'); if(cr) cr.value = state.caRes;
     const cru=$('caRule'); if(cru) cru.value = state.caRule;
-    const cv=$('caView'); if(cv) cv.value = state.caView; }
+    const cv=$('caView'); if(cv) cv.value = state.caView;
+    const cs=$('caSrc'); if(cs) cs.value = state.caSrc; }
   { const fb=$('fluidOn'); if(fb){ fb.classList.toggle('on', !!state.fluidOn); fb.textContent = state.fluidOn ? 'Fluid on' : 'Enable fluid'; }
     const fr=$('fluidRes'); if(fr) fr.value = state.fluidRes;
     const fs2=$('fluidSrc'); if(fs2) fs2.value = state.fluidSrc;
@@ -1375,6 +1380,7 @@ $('caPause').addEventListener('click', ()=>{ state.caPause = state.caPause?0:1; 
 $('caReseed').addEventListener('click', ()=>{ if(CAS) CAS.reseed(); toast('reseeded'); });
 $('caRes').addEventListener('change', ()=>{ state.caRes = +$('caRes').value; if(state.caOn) ensureCA(); });
 $('caView').addEventListener('change', ()=>{ state.caView = +$('caView').value; });
+$('caSrc').addEventListener('change', ()=>{ state.caSrc = $('caSrc').value; toast(state.caSrc === 'ws' ? 'feeding on the live render' : 'feeding on the source image'); });
 $('caFromImage').addEventListener('click', ()=>{ state.caFromImage = state.caFromImage?0:1; if(CAS) CAS.reseed(); syncUI(); });
 $('caRule').addEventListener('change', ()=>{
   state.caRule = $('caRule').value;
@@ -1763,7 +1769,7 @@ function applyPreset(val){
     if('ifsZ' in d) state.ifsZ = d.ifsZ;
     if('strokes' in d){ state.strokes = JSON.parse(JSON.stringify(d.strokes)); drawRebuild(); }
     ['drawColor','drawW','drawA','drawBg','drawGuide','drawTool','drawTension','drawClosed','drawFill','drawFillColor','drawFillColor2','drawFillAngle','drawColor2','drawGrad','drawBrush','drawTaper','drawSymMode','drawSymK','drawSnap','drawSnapGrid','drawBgA','textStr','textFont','textBold','textSize','textSpace','textDetail'].forEach(k=>{ if(k in d) state[k] = d[k]; });
-    ['caOn','caRes','caRule','caRate','caDecay','caDensity','caFromImage','caMix','caView','caPause','caImgFeed','caAudio'].forEach(k=>{ if(k in d) state[k] = d[k]; });
+    ['caOn','caRes','caRule','caRate','caDecay','caDensity','caFromImage','caMix','caView','caPause','caImgFeed','caAudio','caSrc'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     ['fluidOn','fluidRes','fluidDamp','fluidFade','fluidVort','fluidIters','fluidStir','fluidStirScale','fluidPtr','fluidAud','fluidInject','fluidDye','fluidSrc','fluidPause','fluidWind','fluidWindDir','fluidTiltGain'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     if('rd' in d) state.rd = d.rd;
     if('tint'  in d) state.tint  = d.tint;
