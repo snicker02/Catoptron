@@ -130,7 +130,7 @@ function ensureCA(){
   return CAS;
 }
 function stepCA(dt){
-  if(!state.caOn || state.caPause || paused) return;
+  if(!state.caOn || state.caPause || (paused && !exporting)) return;   // a paused view must not freeze an export
   const S = ensureCA(); if(!S) return;
   // generations per second, so the rule speed is independent of framerate
   caAcc += Math.max(0, dt) * state.caRate;
@@ -212,7 +212,7 @@ function ensureFluid(){
   return FLUID;
 }
 function stepFluid(dt){
-  if(!state.fluidOn || state.fluidPause || paused){ return; }
+  if(!state.fluidOn || state.fluidPause || (paused && !exporting)){ return; }
   const F = ensureFluid(); if(!F) return;
   fluidTime += dt;
   F.step({
@@ -3181,6 +3181,7 @@ hqBtn.addEventListener('click', async ()=>{
       ensureFluid();
       const fwarm = Math.min(240, Math.round(fps * 1.5));
       for(let i = 0; i < fwarm && !hqAbort; i++){
+        stepCA(1 / fps);
         stepFluid(1 / fps);
         if(i % 20 === 0){ hqBtn.textContent = `fluid warmup ${i}/${fwarm}`; await breathe(); }
       }
@@ -3204,7 +3205,7 @@ hqBtn.addEventListener('click', async ()=>{
       if(syncAudio){ const A = offlineSampler(n); AUD.bass=A.bass; AUD.mid=A.mid; AUD.treble=A.treble; AUD.level=A.level; AUD.beat=A.beat; AR = audioRoutes(); } else { AR = {}; }
       arBurst = AR.burst || 0;
       if(syncAudio) applyAR();
-      stepCA(dt);
+      stepCA(1 / fps);
       stepFluid(1 / fps);
       renderScene(ew, eh);
       const mbAmt = state.mblur;
