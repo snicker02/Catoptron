@@ -989,7 +989,7 @@ const state = {
   shiftX: 0, shiftY: 0, zoom: 1,
   frame: 0.45, frameW: 0.035, tint: '#5d8f86', tintA: 0.30,
   hue: 0, chroma: 0, ripple: 0, vign: 0.35, grain: 0.06,
-  drift: 0.15, spin: 0, wobble: 0, rot: 0,
+  drift: 0.15, pingpong: 0, spin: 0, wobble: 0, rot: 0,
   audioOn: 0, audioMode: 'mic', audioGain: 1.6, audioResp: 0.5, beatSens: 0.55,
   aroutes: [ {band:'bass',target:'zoom',amt:0.5}, {band:'treble',target:'twist',amt:0.5} ],
   exposure: 1, contrast: 1, sat: 1, warm: 0, posterize: 0, scan: 0,
@@ -1288,6 +1288,7 @@ function syncUI(){
   { const ao=$('audioOn'); if(ao){ ao.classList.toggle('on', !!state.audioOn); ao.textContent = state.audioOn ? 'on' : 'enable'; }
     const am=$('audioMic'); if(am) am.classList.toggle('on', state.audioMode==='mic');
     const af=$('audioFileBtn'); if(af) af.classList.toggle('on', state.audioMode==='file'); }
+  { const pp=$('pingpong'); if(pp) pp.classList.toggle('on', !!state.pingpong); }
   { const ib=$('ifsOn'); if(ib){ ib.classList.toggle('on', !!state.ifsOn); ib.textContent = state.ifsOn ? 'IFS on' : 'Enable IFS'; } }
   { const cb=$('caOn'); if(cb){ cb.classList.toggle('on', !!state.caOn); cb.textContent = state.caOn ? 'CA on' : 'Enable CA'; }
     const cp=$('caPause'); if(cp){ cp.classList.toggle('on', !!state.caPause); cp.innerHTML = state.caPause ? '&#9654;' : '&#10074;&#10074;'; }
@@ -1372,6 +1373,7 @@ document.querySelectorAll('button.mode').forEach(b=>{
   b.addEventListener('click', ()=>{ state.rend = +b.dataset.rend; syncUI(); });
 });
 $('flip').addEventListener('click', ()=>{ state.flip = state.flip?0:1; syncUI(); });
+$('pingpong').addEventListener('click', ()=>{ state.pingpong = state.pingpong?0:1; syncUI(); toast(state.pingpong ? 'ping-pong: motion reverses instead of resetting' : 'loop: motion resets each cycle'); });
 $('ifsOn').addEventListener('click', ()=>{ state.ifsOn = state.ifsOn?0:1; syncUI(); });
 $('fluidOn').addEventListener('click', ()=>{ state.fluidOn = state.fluidOn?0:1; if(state.fluidOn) ensureFluid(); syncUI(); });
 $('fluidReset').addEventListener('click', ()=>{ if(FLUID) FLUID.reset(); toast('fluid cleared'); });
@@ -1760,6 +1762,7 @@ function applyPreset(val){
     if('burst' in d) state.burst = d.burst;
     if('mosh' in d) state.mosh = d.mosh;
     if('mblur' in d) state.mblur = d.mblur;
+    if('pingpong' in d) state.pingpong = d.pingpong;
     if('ifsOn' in d) state.ifsOn = d.ifsOn;
     if('ifsN' in d) state.ifsN = d.ifsN;
     if('ifsScale' in d) state.ifsScale = d.ifsScale;
@@ -2303,7 +2306,7 @@ function setUniforms(entry, w, h){
   gl.uniform1f(L.uDither, state.dither);
   gl.uniform1f(L.uNoiseG, Math.min(1, state.noiseG + (gBurst+arBurst)*0.5));
   gl.uniform1f(L.uInterlace, state.interlace);
-  gl.uniform1f(L.uPhase, gStQ(phase));
+  gl.uniform1f(L.uPhase, gStQ(phaseOut()));
   gl.uniform1f(L.uSpinA, gStQ(spinA + gJr) + (state.rot || 0) * Math.PI / 180);
   gl.uniform1f(L.uWavePh, gStQ(wavePh));
   gl.uniform1f(L.uWobble, state.wobble);
@@ -2761,9 +2764,9 @@ function frame(now){
   }
   if(kfPlaying && !paused) kfTick(dt);
   const period = state.flip ? 2 : 1;
-  // Keep phase bounded, but wrap on a large EVEN multiple so effects that use phase
-  // linearly (3D kaleidoscope, caustics, waves, flow, some renderers) don't snap every
-  // few seconds. Periodic effects only see phase mod period, so loops still close.
+  // Renderers wrap internally (ph = mod(uPhase, period)), so a large wrap here is safe for
+  // them and keeps folds that read uPhase directly (caustics, waves, flow, 3D kaleido)
+  // from snapping. Even multiple preserves alt-flip parity.
   const wrap = period * 512;
   phase = ((phase % wrap) + wrap) % wrap;
 
@@ -2796,8 +2799,20 @@ syncUI();
 let recorder = null, recChunks = [], recTimer = null;
 const recBtn = $('recBtn');
 
+// Ping-pong: fold the accumulating clock into a triangle wave so the animation runs
+// forward then smoothly reverses, instead of sawtoothing back to zero (which is what
+// makes recursive renderers like Panes snap once per cycle).
+function phaseOut(){
+  if(!state.pingpong) return phase;
+  // Peak just BELOW the period: the shader does mod(uPhase, period), so a triangle that
+  // touched `period` exactly would be folded back to 0 and reintroduce the very snap
+  // ping-pong exists to remove.
+  const L = (state.flip ? 2 : 1) - 1e-3, m2 = 2 * L;
+  const x = ((phase % m2) + m2) % m2;
+  return L - Math.abs(x - L);
+}
 function loopSeconds(){
-  const period = state.flip ? 2 : 1;
+  const period = (state.flip ? 2 : 1) * (state.pingpong ? 2 : 1);
   const rate = Math.abs(state.drift) * 0.6;
   return rate > 1e-3 ? period / rate : 0;
 }
@@ -3174,7 +3189,7 @@ hqBtn.addEventListener('click', async ()=>{
     pulsePh += (1/fps) * 1.8; swayPh += (1/fps) * 1.3;
     hueRotPh += (1/fps) * (state.hueCycle * 0.7 + (isLoop ? 0 : (AR.hueRate||0)));
     glitchClock += (1/fps);
-    { const wrap = period * 512; phase = ((phase % wrap) + wrap) % wrap; }
+    phase = ((phase % period) + period) % period;
   };
   const breathe = ()=> new Promise(r => requestAnimationFrame(r));
 
@@ -3319,7 +3334,7 @@ $('exportBtn').addEventListener('click', async ()=>{
         spinA  += (1/60) * state.spin * 0.5;
         wavePh += (1/60) * state.wobble * 1.5;
         pulsePh += (1/60) * 1.8; swayPh += (1/60) * 1.3; hueRotPh += (1/60) * state.hueCycle * 0.7; glitchClock += (1/60);
-        { const wrap = period * 512; phase = ((phase % wrap) + wrap) % wrap; }
+        phase = ((phase % period) + period) % period;
         if(i % 20 === 0){ btn.textContent = `warmup ${i}/${warm}`; await new Promise(r => requestAnimationFrame(r)); }
       }
     }
