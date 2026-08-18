@@ -242,8 +242,12 @@ const RENDERERS = {
     /* None — true passthrough. No mirroring, no phase flip: whatever the fold
        stack produced is sampled straight, so the source reads exactly as drawn. */
     vec2 p = uv + uShift;
-    float e = min(min(p.x, 1.0 - p.x), min(p.y, 1.0 - p.y));
-    col = shade(p, 0.0, e * 999.0);`
+    /* Frame distance must follow the MIRRORED tile, not the raw 0..1 source box:
+       at zoom < 1 the coordinate leaves the unit square, and measuring against that
+       box darkened every repeat while leaving the source rect conspicuously bright. */
+    vec2 mp = 1.0 - abs(mod(p, 2.0) - 1.0);
+    float e = min(min(mp.x, 1.0 - mp.x), min(mp.y, 1.0 - mp.y));
+    col = shade(p, 0.0, e);`
 };
 
 // transitive closure of helper deps, emitted in dependency order
