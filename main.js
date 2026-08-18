@@ -3189,7 +3189,7 @@ hqBtn.addEventListener('click', async ()=>{
     pulsePh += (1/fps) * 1.8; swayPh += (1/fps) * 1.3;
     hueRotPh += (1/fps) * (state.hueCycle * 0.7 + (isLoop ? 0 : (AR.hueRate||0)));
     glitchClock += (1/fps);
-    phase = ((phase % period) + period) % period;
+    { const wrap = period * 512; phase = ((phase % wrap) + wrap) % wrap; }   // keep the ping-pong triangle intact
   };
   const breathe = ()=> new Promise(r => requestAnimationFrame(r));
 
@@ -3334,7 +3334,7 @@ $('exportBtn').addEventListener('click', async ()=>{
         spinA  += (1/60) * state.spin * 0.5;
         wavePh += (1/60) * state.wobble * 1.5;
         pulsePh += (1/60) * 1.8; swayPh += (1/60) * 1.3; hueRotPh += (1/60) * state.hueCycle * 0.7; glitchClock += (1/60);
-        phase = ((phase % period) + period) % period;
+        { const wrap = period * 512; phase = ((phase % wrap) + wrap) % wrap; }   // keep the ping-pong triangle intact
         if(i % 20 === 0){ btn.textContent = `warmup ${i}/${warm}`; await new Promise(r => requestAnimationFrame(r)); }
       }
     }
