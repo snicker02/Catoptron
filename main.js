@@ -2761,7 +2761,11 @@ function frame(now){
   }
   if(kfPlaying && !paused) kfTick(dt);
   const period = state.flip ? 2 : 1;
-  phase = ((phase % period) + period) % period;
+  // Keep phase bounded, but wrap on a large EVEN multiple so effects that use phase
+  // linearly (3D kaleidoscope, caustics, waves, flow, some renderers) don't snap every
+  // few seconds. Periodic effects only see phase mod period, so loops still close.
+  const wrap = period * 512;
+  phase = ((phase % wrap) + wrap) % wrap;
 
   fitCanvas();
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -3170,7 +3174,7 @@ hqBtn.addEventListener('click', async ()=>{
     pulsePh += (1/fps) * 1.8; swayPh += (1/fps) * 1.3;
     hueRotPh += (1/fps) * (state.hueCycle * 0.7 + (isLoop ? 0 : (AR.hueRate||0)));
     glitchClock += (1/fps);
-    phase = ((phase % period) + period) % period;
+    { const wrap = period * 512; phase = ((phase % wrap) + wrap) % wrap; }
   };
   const breathe = ()=> new Promise(r => requestAnimationFrame(r));
 
@@ -3315,7 +3319,7 @@ $('exportBtn').addEventListener('click', async ()=>{
         spinA  += (1/60) * state.spin * 0.5;
         wavePh += (1/60) * state.wobble * 1.5;
         pulsePh += (1/60) * 1.8; swayPh += (1/60) * 1.3; hueRotPh += (1/60) * state.hueCycle * 0.7; glitchClock += (1/60);
-        phase = ((phase % period) + period) % period;
+        { const wrap = period * 512; phase = ((phase % wrap) + wrap) % wrap; }
         if(i % 20 === 0){ btn.textContent = `warmup ${i}/${warm}`; await new Promise(r => requestAnimationFrame(r)); }
       }
     }
