@@ -1005,6 +1005,7 @@ const state = {
   drawColor2: '', drawGrad: 0, drawBrush: 'solid', drawTaper: 0,
   drawSymMode: 'none', drawSymK: 6, drawSnap: 0, drawSnapGrid: 12,
   drawBgA: 1,
+  vidLoop: 1, vidRate: 1, vidMute: 1,
   caOn: 0, caRes: 256, caRule: 'Life', caRate: 8, caDecay: 0.9, caDensity: 0.32,
   caFromImage: 1, caMix: 0, caView: 2, caPause: 0, caImgFeed: 0.35, caAudio: 0, caSrc: 'img',
   textStr: '', textFont: 'sans-serif', textBold: 1, textSize: 1, textSpace: 0, textDetail: 0.004,
@@ -1203,6 +1204,7 @@ const sliders = [
   ['drawSymK','drawSymKV', v=>v.toFixed(0)],
   ['drawSnapGrid','drawSnapGridV', v=>v.toFixed(0)],
   ['drawBgA','drawBgAV', v=>v.toFixed(2)],
+  ['vidRate','vidRateV', v=>v.toFixed(2)],
   ['textSize','textSizeV', v=>v.toFixed(2)],
   ['textSpace','textSpaceV', v=>v.toFixed(2)],
   ['textDetail','textDetailV', v=>v.toFixed(4)],
@@ -1259,6 +1261,9 @@ function syncUI(){
   $('srcSel').value = state.src || 'user';
   { const sp=$('srcParams'); if(sp) sp.style.display = (state.src && state.src!=='user' && GENS[state.src]) ? '' : 'none'; }
   { const cr=$('camRow'), cv=$('camVideo'); if(cr) cr.style.display = (cv && cv.srcObject) ? '' : 'none'; }
+  { const vl=$('vidLoop'); if(vl) vl.classList.toggle('on', !!state.vidLoop);
+    const vm=$('vidMute'); if(vm) vm.classList.toggle('on', !!state.vidMute);
+    updateVidTransport(); }
   $('ccMode').value = state.ccMode || 0;
   $('ccTint').value = state.ccTint || '#ff5d7a';
   document.querySelectorAll('button.mode').forEach(b=>
@@ -1358,6 +1363,13 @@ $('srcSel').addEventListener('change', e=>{
   if(_prev !== 'draw') _preDrawSrc = _prev;
   state.src = e.target.value;
   if(_prev === 'camera' && state.src !== 'camera') stopCamera();
+  if(_prev === 'video' && state.src !== 'video' && vidEl) vidEl.pause();
+  if(state.src === 'video'){
+    if(!vidEl || !vidEl.src){ $('vidFile').click(); }
+    else { vidEl.play().catch(()=>{}); toast('video source'); }
+    const sp0 = $('srcParams'); if(sp0) sp0.style.display = 'none';
+    syncUI(); return;
+  }
   if(state.src === 'camera'){
     if(_prev !== 'camera') _preCameraSrc = _prev;
     startCamera();
@@ -1463,6 +1475,14 @@ $('audioMic').addEventListener('click', ()=>{ state.audioMode='mic'; if(state.au
 $('audioFileBtn').addEventListener('click', ()=>{ $('audioFile').click(); });
 $('audioFile').addEventListener('change', e=>{ const f = e.target.files && e.target.files[0]; if(f) audioLoadFile(f); });
 $('addRoute').addEventListener('click', ()=>{ state.aroutes.push({band:'level', target:'zoom', amt:0.4}); renderRoutes(); });
+$('vidBtn').addEventListener('click', ()=> $('vidFile').click());
+$('vidFile').addEventListener('change', e=>{ const f = e.target.files && e.target.files[0]; if(f) videoLoadFile(f); e.target.value=''; });
+$('vidPlay').addEventListener('click', ()=>{ if(!vidEl) return; if(vidEl.paused) vidEl.play().catch(()=>{}); else vidEl.pause(); updateVidTransport(); });
+$('vidSeek').addEventListener('input', ()=>{ if(vidEl && vidEl.duration){ _vidScrub = true; vidEl.currentTime = (+$('vidSeek').value/1000)*vidEl.duration; updateVidTransport(); } });
+$('vidSeek').addEventListener('change', ()=>{ _vidScrub = false; });
+$('vidLoop').addEventListener('click', ()=>{ state.vidLoop = state.vidLoop?0:1; if(vidEl) vidEl.loop = !!state.vidLoop; syncUI(); });
+$('vidMute').addEventListener('click', ()=>{ state.vidMute = state.vidMute?0:1; if(vidEl) vidEl.muted = !!state.vidMute; syncUI(); });
+$('vidRate').addEventListener('input', ()=>{ if(vidEl) vidEl.playbackRate = Math.max(0.1, state.vidRate); });
 $('audPlay').addEventListener('click', ()=>{
   if(!AUD.mediaEl){ toast('Load an audio file first'); return; }
   if(AUD.mediaEl.paused){ if(!state.audioOn) audioEnable(true); else AUD.mediaEl.play().catch(()=>{}); }
@@ -1763,6 +1783,7 @@ function applyPreset(val){
     if('mosh' in d) state.mosh = d.mosh;
     if('mblur' in d) state.mblur = d.mblur;
     if('pingpong' in d) state.pingpong = d.pingpong;
+    ['vidLoop','vidRate','vidMute'].forEach(k=>{ if(k in d) state[k] = d[k]; });
     if('ifsOn' in d) state.ifsOn = d.ifsOn;
     if('ifsN' in d) state.ifsN = d.ifsN;
     if('ifsScale' in d) state.ifsScale = d.ifsScale;
@@ -2776,6 +2797,10 @@ function frame(now){
   const h = Math.round(canvas.clientHeight * dpr);
   if(canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; }
 
+  if(state.src === 'video' && vidEl && vidEl.readyState >= 2 && vidEl.videoWidth){
+    setImage(vidEl, vidEl.videoWidth, vidEl.videoHeight);
+    updateVidTransport();
+  }
   if(camActive && camVideo && camVideo.readyState >= 2 && camVideo.videoWidth){
     setImage(camVideo, camVideo.videoWidth, camVideo.videoHeight);
   }
@@ -3193,6 +3218,8 @@ hqBtn.addEventListener('click', async ()=>{
   };
   const breathe = ()=> new Promise(r => requestAnimationFrame(r));
 
+  const vidStart = (state.src === 'video' && vidEl) ? (vidEl.currentTime || 0) : 0;
+  const vidWasPlaying = (state.src === 'video' && vidEl) ? !vidEl.paused : false;
   try{
     mbInit = false;
     /* fluid: build motion + dye at export resolution before frame 1 */
@@ -3224,6 +3251,15 @@ hqBtn.addEventListener('click', async ()=>{
       if(syncAudio){ const A = offlineSampler(n); AUD.bass=A.bass; AUD.mid=A.mid; AUD.treble=A.treble; AUD.level=A.level; AUD.beat=A.beat; AR = audioRoutes(); } else { AR = {}; }
       arBurst = AR.burst || 0;
       if(syncAudio) applyAR();
+      if(state.src === 'video' && vidEl && vidReady){
+        // seek the exact frame instead of trusting playback speed, so the export is deterministic
+        if(!vidEl.paused) vidEl.pause();
+        const vd = vidEl.duration || 0;
+        let vt = vidStart + n / fps;
+        if(state.vidLoop && vd > 0.05) vt = vidStart + ((n / fps) % Math.max(0.05, vd - vidStart));
+        await videoSeekExact(vt);
+        setImage(vidEl, vidEl.videoWidth || 2, vidEl.videoHeight || 2);
+      }
       stepCA(1 / fps);
       stepFluid(1 / fps);
       renderScene(ew, eh);
@@ -3286,6 +3322,7 @@ hqBtn.addEventListener('click', async ()=>{
     try{ encoder.close(); }catch(_){}
     toast('HQ export failed');
   } finally {
+    if(state.src === 'video' && vidEl){ try { vidEl.currentTime = vidStart; if(vidWasPlaying) vidEl.play().catch(()=>{}); } catch(_){} }
     restoreAR();
     canvas.width = save.cw; canvas.height = save.ch;
     phase = save.phase; spinA = save.spinA; wavePh = save.wavePh;
@@ -3612,6 +3649,53 @@ function redo(){
 
 
 // ===================== LIVE CAMERA INPUT =====================
+// ---- video file source: a <video> uploaded per frame, like the camera ----
+let vidEl = null, vidReady = false, _vidSeeking = false;
+function ensureVideoEl(){
+  if(vidEl) return vidEl;
+  vidEl = document.createElement('video');
+  vidEl.setAttribute('playsinline',''); vidEl.crossOrigin = 'anonymous';
+  vidEl.muted = !!state.vidMute; vidEl.loop = !!state.vidLoop; vidEl.preload = 'auto';
+  vidEl.addEventListener('loadeddata', ()=>{ vidReady = true; updateVidTransport(); });
+  vidEl.addEventListener('seeked', ()=>{ _vidSeeking = false; });
+  return vidEl;
+}
+function videoLoadFile(file){
+  if(!file) return;
+  const v = ensureVideoEl();
+  if(v.src && v.src.startsWith('blob:')) URL.revokeObjectURL(v.src);
+  vidReady = false;
+  v.src = URL.createObjectURL(file);
+  v.loop = !!state.vidLoop; v.muted = !!state.vidMute; v.playbackRate = state.vidRate;
+  v.play().catch(()=>{});
+  state.src = 'video';
+  const ss = $('srcSel'); if(ss) ss.value = 'video';
+  const sp = $('srcParams'); if(sp) sp.style.display = 'none';
+  syncUI(); toast('video loaded \u2014 it feeds the fold stack live');
+}
+function fmtT(t){ t = Math.max(0, t|0); const mm=(t/60)|0, ss=t%60; return mm+':'+(ss<10?'0':'')+ss; }
+function updateVidTransport(){
+  const row = $('vidRow'); if(!row) return;
+  const show = (state.src === 'video' && vidEl && vidReady);
+  row.style.display = show ? '' : 'none';
+  if(!show) return;
+  const pb = $('vidPlay'); if(pb) pb.innerHTML = vidEl.paused ? '&#9654;' : '&#10074;&#10074;';
+  const d = vidEl.duration || 0, c = vidEl.currentTime || 0;
+  if(!_vidScrub){ const sk = $('vidSeek'); if(sk) sk.value = d ? Math.round(c/d*1000) : 0; }
+  const tt = $('vidTime'); if(tt) tt.textContent = fmtT(c) + ' / ' + fmtT(d);
+}
+let _vidScrub = false;
+/* Export needs exact frames, so seek and wait rather than trusting playback timing. */
+function videoSeekExact(t){
+  return new Promise(res=>{
+    if(!vidEl || !vidReady) return res();
+    const done = ()=>{ vidEl.removeEventListener('seeked', done); res(); };
+    vidEl.addEventListener('seeked', done);
+    try { vidEl.currentTime = Math.max(0, Math.min((vidEl.duration || 0) - 0.001, t)); }
+    catch(_){ vidEl.removeEventListener('seeked', done); res(); }
+    setTimeout(done, 250);          // never hang the export on a stubborn seek
+  });
+}
 let camStream = null, camActive = false, camFacing = 'environment', _preCameraSrc = 'orbs';
 const camVideo = document.getElementById('camVideo');
 async function startCamera(){
