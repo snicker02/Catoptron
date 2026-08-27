@@ -538,6 +538,7 @@ body.theme-light{
         <select id="srcSel" style="flex:1" title="Load a photo or pick a built-in probe pattern">
           <option value="user">user image</option>
           <option value="camera">camera (live)</option>
+          <option value="video">video file</option>
           <option value="orbs" selected>orbs</option>
           <option value="plasma">plasma</option>
           <option value="grid">grid probe</option>
@@ -552,6 +553,12 @@ body.theme-light{
         </select>
       </div>
       <div id="camRow" class="btns" style="display:none;margin-top:8px"><button id="camFlip" style="flex:1">Flip camera</button><button id="freezeBtn" style="flex:1">Freeze frame</button></div>
+      <div class="btns" style="margin-top:8px"><button id="vidBtn" style="flex:1">load video&#8230;</button><input type="file" id="vidFile" accept="video/*" style="display:none"></div>
+      <div id="vidRow" style="display:none">
+        <div class="row" style="gap:6px"><button class="toggle" id="vidPlay" style="flex:0 0 auto;padding:4px 11px">&#10074;&#10074;</button><input type="range" id="vidSeek" min="0" max="1000" step="1" value="0" style="flex:1;min-width:0"><span class="val" id="vidTime" style="flex:0 0 auto;min-width:82px;text-align:right;border:none;cursor:default">0:00 / 0:00</span></div>
+        <div class="row"><label>Speed</label><input type="range" id="vidRate" min="0.1" max="3" step="0.01" value="1"><span class="val" id="vidRateV"></span></div>
+        <div class="row"><label>Playback</label><button class="toggle" id="vidLoop" style="flex:1;min-width:0">loop</button><button class="toggle" id="vidMute" style="flex:1;min-width:0">mute</button></div>
+      </div>
       <div id="srcParams">
         <div class="row"><label>Scale</label><input type="range" id="srcScale" min="0.25" max="4" step="0.05" value="1"><span class="val" id="srcScaleV"></span></div>
         <div class="row"><label>Hue</label><input type="range" id="srcHue" min="0" max="360" step="1" value="0"><span class="val" id="srcHueV"></span></div>
