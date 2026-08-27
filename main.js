@@ -3122,15 +3122,20 @@ hqBtn.addEventListener('click', async ()=>{
   const lenSel = $('recLen').value;
   const fmt = $('recFmt') ? $('recFmt').value : 'webm';
   // can we sync + mux the loaded audio file? if so, export starts at the scrubber position
-  const canSyncAudio = fmt === 'mp4' && state.audioOn && state.audioMode === 'file' && AUD.file
-    && $('hqSyncAudio') && $('hqSyncAudio').checked
-    && typeof AudioEncoder !== 'undefined' && typeof AudioData !== 'undefined'
-    && AUD.mediaEl && isFinite(AUD.mediaEl.duration);
-  const startTime = canSyncAudio ? Math.max(0, AUD.mediaEl.currentTime || 0) : 0;
+  const codecsOK = typeof AudioEncoder !== 'undefined' && typeof AudioData !== 'undefined';
+  const syncBoxOn = $('hqSyncAudio') && $('hqSyncAudio').checked;
+  // audio can come from the Audio panel's file, or from the video source's own track
+  const panelAudio = state.audioOn && state.audioMode === 'file' && AUD.file && AUD.mediaEl && isFinite(AUD.mediaEl.duration);
+  const videoAudio = state.src === 'video' && vidFileObj && vidEl && isFinite(vidEl.duration);
+  const audioFrom = panelAudio ? 'panel' : (videoAudio ? 'video' : null);
+  const canSyncAudio = fmt === 'mp4' && syncBoxOn && codecsOK && !!audioFrom;
+  const audioFile = !canSyncAudio ? null : (audioFrom === 'panel' ? AUD.file : vidFileObj);
+  const audioMediaEl = !canSyncAudio ? null : (audioFrom === 'panel' ? AUD.mediaEl : vidEl);
+  const startTime = canSyncAudio ? Math.max(0, audioMediaEl.currentTime || 0) : 0;
   const period = state.flip ? 2 : 1;
   let dur;
   if(lenSel === 'manual'){
-    if(canSyncAudio){ dur = Math.max(0.2, AUD.mediaEl.duration - startTime); }   // scrub position -> end of track
+    if(canSyncAudio){ dur = Math.max(0.2, audioMediaEl.duration - startTime); }   // scrub position -> end of media
     else { toast('manual length is live-record only \u2014 pick a duration (or load an audio file + MP4 to export from the scrubber to the end of the track)'); return; }
   } else if(lenSel === 'loop1' || lenSel === 'loop2'){
     const L = loopSeconds();
@@ -3175,7 +3180,7 @@ hqBtn.addEventListener('click', async ()=>{
   let encErr = null;
   if(wantAudio){
     try {
-      const abuf = await AUD.file.arrayBuffer();
+      const abuf = await audioFile.arrayBuffer();   // works for video containers too (the audio track is decoded)
       const dctx = new (window.AudioContext || window.webkitAudioContext)();
       audioBuffer = await dctx.decodeAudioData(abuf.slice(0));
       try { dctx.close(); } catch(_){}
@@ -3188,7 +3193,8 @@ hqBtn.addEventListener('click', async ()=>{
         audioEncoder.configure({ codec:'mp4a.40.2', sampleRate:asr, numberOfChannels:audioCh, bitrate:128000 });
         const L = audioBuffer.getChannelData(0);
         const R = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : L;
-        offlineSampler = makeOfflineAudio(L, R, asr, fps, startTime);
+        // AR is driven by the Audio panel only; a video's own track is muxed, not routed
+        offlineSampler = (audioFrom === 'panel') ? makeOfflineAudio(L, R, asr, fps, startTime) : null;
         syncAudio = true;
       }
     } catch(e){ syncAudio = false; audioEncoder = null; }
@@ -3248,9 +3254,9 @@ hqBtn.addEventListener('click', async ()=>{
     let rendered = 0;
     for(let n = 0; n < frames && !hqAbort && !encErr; n++){
       if(kfBase) kfApply(kfExportU(n, frames));
-      if(syncAudio){ const A = offlineSampler(n); AUD.bass=A.bass; AUD.mid=A.mid; AUD.treble=A.treble; AUD.level=A.level; AUD.beat=A.beat; AR = audioRoutes(); } else { AR = {}; }
+      if(syncAudio && offlineSampler){ const A = offlineSampler(n); AUD.bass=A.bass; AUD.mid=A.mid; AUD.treble=A.treble; AUD.level=A.level; AUD.beat=A.beat; AR = audioRoutes(); } else { AR = {}; }
       arBurst = AR.burst || 0;
-      if(syncAudio) applyAR();
+      if(syncAudio && offlineSampler) applyAR();
       if(state.src === 'video' && vidEl && vidReady){
         // seek the exact frame instead of trusting playback speed, so the export is deterministic
         if(!vidEl.paused) vidEl.pause();
@@ -3264,7 +3270,7 @@ hqBtn.addEventListener('click', async ()=>{
       stepFluid(1 / fps);
       renderScene(ew, eh);
       const mbAmt = state.mblur;
-      if(syncAudio) restoreAR();
+      if(syncAudio && offlineSampler) restoreAR();
       caPresent(ew, eh);
       fluidPresent(ew, eh);
       if(mbAmt > 0.001) motionBlurPass(ew, eh, mbAmt);
@@ -3313,7 +3319,7 @@ hqBtn.addEventListener('click', async ()=>{
       a.download = `catoptron-hq-${Date.now()}.${ext}`;
       a.click();
       setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
-      toast(`HQ export: ${ew}\u00d7${eh}, ${rendered} frames${hqAbort ? ' (stopped early)' : ''}, ${ext.toUpperCase()}${syncAudio ? ' + audio' : ''}`);
+      toast(`HQ export: ${ew}\u00d7${eh}, ${rendered} frames${hqAbort ? ' (stopped early)' : ''}, ${ext.toUpperCase()}${syncAudio ? (audioFrom === 'video' ? ' + video audio' : ' + audio') : ''}`);
     } else {
       try{ encoder.close(); }catch(_){}
       toast(encErr ? 'encoder error \u2014 try a lower resolution' : 'HQ export cancelled (no frames)');
@@ -3660,8 +3666,10 @@ function ensureVideoEl(){
   vidEl.addEventListener('seeked', ()=>{ _vidSeeking = false; });
   return vidEl;
 }
+let vidFileObj = null;
 function videoLoadFile(file){
   if(!file) return;
+  vidFileObj = file;
   const v = ensureVideoEl();
   if(v.src && v.src.startsWith('blob:')) URL.revokeObjectURL(v.src);
   vidReady = false;
