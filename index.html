@@ -293,6 +293,44 @@ input[type=file]{display:none}
   #timeline .tl-scrub{flex:1 1 100%;min-width:0}
   #timeline #kfList{max-width:100%}
 }
+/* ── phone tab layout (body.tabbed, set by __mobileLayout in main.js) ──────────
+   Canvas docked on top (left in landscape); one tab bar for every section of
+   both panels plus Animation; only the open tab's panel scrolls. */
+#tabbar{display:none}
+body.tabbed{height:100vh;height:100dvh;overflow:hidden}
+body.tabbed header .sub, body.tabbed header .hint, body.tabbed #panelsBtn{display:none}
+body.tabbed header{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;align-items:center}
+body.tabbed header::-webkit-scrollbar{display:none}
+body.tabbed header button, body.tabbed header select{flex:none}
+body.tabbed main{display:grid;overflow:hidden;min-height:0;
+  grid-template-columns:minmax(0,1fr);grid-template-rows:46% auto minmax(0,1fr)}
+body.tabbed #stage{grid-column:1;grid-row:1;position:relative;top:auto;box-shadow:none;min-height:0}
+body.tabbed #tabbar{grid-column:1;grid-row:2;display:flex;gap:6px;overflow-x:auto;padding:8px 10px;
+  background:var(--panel);border-top:1px solid var(--edge);border-bottom:1px solid var(--edge);scrollbar-width:none}
+body.tabbed #tabbar::-webkit-scrollbar{display:none}
+#tabbar .tab{flex:none;white-space:nowrap;min-height:34px;padding:0 13px;border-radius:999px;cursor:pointer;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--dim);background:var(--sunken);border:1px solid var(--edge)}
+#tabbar .tab.sel{color:var(--ice2);border-color:var(--ice1);background:var(--tog2)}
+body.tabbed #panelL, body.tabbed #panelR, body.tabbed #timeline{grid-column:1;grid-row:3;display:none;min-height:0;
+  overflow-y:auto;border:0;padding:10px 12px calc(22px + env(safe-area-inset-bottom))}
+body.tabbed main[data-pane="L"] #panelL, body.tabbed main[data-pane="R"] #panelR{display:block}
+body.tabbed main[data-pane="T"] #timeline{display:flex;align-content:flex-start}
+body.tabbed #panelL > .group, body.tabbed #panelR > .group{display:none}
+body.tabbed #panelL > .group.tabon, body.tabbed #panelR > .group.tabon{display:block;border:0;margin:0}
+body.tabbed .group.tabon > h2{display:none}
+body.tabbed #timeline > h2{display:none!important}
+body.tabbed #timeline > *:not(h2){display:revert}
+/* landscape phones: canvas on the left, tabs and controls on the right */
+@media (max-height:500px) and (orientation:landscape){
+  body.tabbed header{padding:4px 10px}
+  body.tabbed main{grid-template-columns:minmax(0,1fr) 300px;grid-template-rows:auto minmax(0,1fr)}
+  body.tabbed #stage{grid-row:1 / 3}
+  body.tabbed #tabbar{grid-column:2;grid-row:1;border-top:0;border-left:1px solid var(--edge)}
+  body.tabbed #panelL, body.tabbed #panelR, body.tabbed #timeline{grid-column:2;grid-row:2;border-left:1px solid var(--edge)}
+  body.tabbed .row{min-height:34px}
+  body.tabbed input[type=range]{height:28px}
+}
 @media (prefers-reduced-motion:reduce){ #toast{transition:none} }
 
 /* ── user guide overlay ─────────────────────────────────────────── */

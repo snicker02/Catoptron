@@ -3627,7 +3627,8 @@ function redo(){
 
 // ---- mobile layout: pin canvas above controls, collapse sections ----
 (function __mobileLayout(){
-  const mq = window.matchMedia('(max-width:760px)');
+  // Phones in portrait (≤760 px) and phones in landscape (short screens) share the tab layout.
+  const mq = window.matchMedia('(max-width:760px), (max-height:500px) and (orientation:landscape)');
   const main = document.querySelector('main');
   const stage = document.getElementById('stage');
   const pL = document.getElementById('panelL');
@@ -3651,6 +3652,46 @@ function redo(){
   let __rt; const __refit = ()=>{ clearTimeout(__rt); __rt = setTimeout(()=>{ if(typeof fitCanvas === 'function') fitCanvas(); }, 200); };
   window.addEventListener('resize', __refit);
   window.addEventListener('orientationchange', __refit);
+
+  // ---- phone tabs: every section (both panels + Animation) is a tab under the canvas ----
+  // The canvas stays docked; only the open tab's panel scrolls. main[data-pane] says
+  // which panel holds the open tab (L, R or T for the timeline).
+  const bar = document.createElement('nav');
+  bar.id = 'tabbar'; bar.setAttribute('role', 'tablist'); bar.setAttribute('aria-label', 'Panels');
+  main.insertBefore(bar, pL);
+  const nameOf = h2 => { const c = h2.cloneNode(true); c.querySelectorAll('span,button').forEach(n => n.remove()); return c.textContent.trim(); };
+  const tabs = [];
+  const addTab = (el, pane, name) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'tab'; b.textContent = name; b.setAttribute('role', 'tab');
+    b.addEventListener('click', () => select(tabs.findIndex(t => t.btn === b)));
+    bar.appendChild(b); tabs.push({ el, pane, btn: b });
+  };
+  pL.querySelectorAll(':scope > .group').forEach(g => addTab(g, 'L', nameOf(g.querySelector('h2'))));
+  pR.querySelectorAll(':scope > .group').forEach(g => addTab(g, 'R', nameOf(g.querySelector('h2'))));
+  if(timeline) addTab(timeline, 'T', 'Animation');
+  let cur = 0;
+  try { const v = +localStorage.getItem('catoptron.tab'); if(v >= 0 && v < tabs.length) cur = v; } catch(_){}
+  function select(i, scroll = true){
+    cur = i;
+    const t = tabs[i];
+    tabs.forEach((x, j) => { const on = j === i; x.btn.classList.toggle('sel', on); x.btn.setAttribute('aria-selected', on ? 'true' : 'false'); x.el.classList.toggle('tabon', on); });
+    main.dataset.pane = t.pane;
+    if(document.body.classList.contains('tabbed')){
+      t.el.classList.remove('collapsed', 'tl-collapsed');       // a folded section would be an empty tab
+      const host = t.pane === 'L' ? pL : t.pane === 'R' ? pR : timeline;
+      if(host) host.scrollTop = 0;
+      if(scroll) t.btn.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+    }
+    try { localStorage.setItem('catoptron.tab', String(i)); } catch(_){}
+  }
+  const applyTabs = () => {
+    document.body.classList.toggle('tabbed', mq.matches);
+    if(mq.matches) select(cur, false);
+    if(typeof fitCanvas === 'function') requestAnimationFrame(fitCanvas);
+  };
+  if(mq.addEventListener) mq.addEventListener('change', applyTabs); else if(mq.addListener) mq.addListener(applyTabs);
+  applyTabs();
 })();
 
 
