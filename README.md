@@ -76,6 +76,10 @@ The left panel is grouped top to bottom:
 - **Motion** — animation (section 7): Drift, Spin, Rotate, Wobble, Pulse, Sway, Hue cycle, plus **motion glitch** (Stutter, Jitter, Glitch burst).
 - **Record** — WebM capture and offline HQ video.
 
+**On a phone** (portrait, or landscape on a short screen) the canvas stays docked at the top
+(left in landscape) and every section of both panels, plus **Animation**, becomes a tab in one
+bar directly under it; only the open tab scrolls. The tab you were on is remembered.
+
 ---
 
 ## 5. Renderers
