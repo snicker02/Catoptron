@@ -2171,6 +2171,20 @@ window.addEventListener('paste', e=>{
   if(item) loadFile(item.getAsFile());
 });
 
+/* shared image shelf (snicker02.github.io/shared/bridge.js) */
+if(window.SnickerShelf){
+  window.SnickerShelf.mount({
+    app: 'Catoptron',
+    button: $('shelfBtn'),
+    onImage: file => loadFile(file),
+    /* GL context uses preserveDrawingBuffer, so the live view can be read directly */
+    getImage: () => new Promise((res, rej)=> canvas.toBlob(b => b ? res(b) : rej(new Error('encode failed')), 'image/png')),
+    getMeta: () => ({ name: `catoptron-${Date.now()}.png` }),
+  });
+} else {
+  $('shelfBtn').hidden = true;
+}
+
 /* toast */
 let toastT;
 function toast(msg){
