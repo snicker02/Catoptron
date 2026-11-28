@@ -541,3 +541,7 @@ recompile when you add or reorder a fold — so it's worth a quick check that re
 function name, `deps` from `helpers.js`, `params`, and the `glsl`). Choice params render as
 dropdowns via a `names` array; a 7th param entry `[selectorIndex, …values]` hides that row unless
 the selector matches, which is how multi-mode panels show only the active mode's controls.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
